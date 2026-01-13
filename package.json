@@ -1,0 +1,43 @@
+{
+  "name": "updatelens",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "build:release": "npm run build && tsx tools/inlineReleaseAssets.ts",
+    "preview": "vite preview",
+    "typecheck": "tsc -b --pretty false",
+    "refresh:microsoft": "tsx tools/refreshMicrosoft.ts",
+    "refresh:eos": "tsx tools/refreshEos.ts",
+    "test:releaseplans": "tsx tools/releaseplansUrlCheck.ts",
+    "ingest:releaseplans": "tsx server/ingest.ts",
+    "server:dev": "tsx server/index.ts"
+  },
+  "dependencies": {
+    "better-sqlite3": "^9.6.0",
+    "express": "^4.19.2",
+    "jszip": "^3.10.1",
+    "node-cron": "^3.0.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.2",
+    "zod": "^3.23.8",
+    "zustand": "^4.5.5"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.10",
+    "@types/express": "^4.17.21",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.19",
+    "cheerio": "^1.0.0-rc.12",
+    "postcss": "^8.4.39",
+    "tailwindcss": "^3.4.7",
+    "tsx": "^4.16.0",
+    "typescript": "^5.5.3",
+    "vite": "^5.4.1"
+  }
+}

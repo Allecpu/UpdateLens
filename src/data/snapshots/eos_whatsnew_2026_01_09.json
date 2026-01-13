@@ -1,0 +1,805 @@
+{
+  "version": 1,
+  "items": [
+    {
+      "id": "eos-electronic-invoice-for-italy-fte-22-12-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Electronic Invoice for Italy (FTE)",
+      "summary": "Gestita l’importazione dei nodi DatiOrdineAcquisto e DatiDDT in Scheda anteprima documento elettronico.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/en/docs/apps-func/electronic-vat-settlement-for-italy.html"
+    },
+    {
+      "id": "eos-packing-list-pkl-18-12-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Packing List (PKL)",
+      "summary": "Implementata la gestione della Packing list per ordini di assistenza.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/packing-list-pck.html"
+    },
+    {
+      "id": "eos-packing-list-pkl-09-12-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Packing List (PKL)",
+      "summary": "Spostata l’action di “Stampa Packing List” nell’apposito gruppo di stampa.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/packing-list-pck.html"
+    },
+    {
+      "id": "eos-electronic-invoice-for-italy-fte-03-12-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Electronic Invoice for Italy (FTE)",
+      "summary": "Aggiunta nuova voce “Rappresentante fiscale” nel “Progetta Layout” del “Setup report (ADR)”. Selezionando questa voce, il rappresentante fiscale viene stampato come prima sezione, prima delle righe di dettaglio della fattura/nota credito provvisoria e registrata.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/en/docs/apps-func/electronic-vat-settlement-for-italy.html"
+    },
+    {
+      "id": "eos-delivery-rout-planner-drp-26-11-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Delivery Rout Planner (DRP)",
+      "summary": "Aggiunta procedura per visualizzare a quali giri di consegna un documento (ordine, spedizione registrata, carico registrato) è assegnato.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/delivery-route-planner.html"
+    },
+    {
+      "id": "eos-dual-unit-of-measure-dum-18-11-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Dual Unit of Measure (DUM)",
+      "summary": "Sulla scheda articolo è stato aggiunto un nuovo valore per il metodo di calcolo della quantità secondaria: «Fisso da quantità primaria a quantità secondaria», che consente di ricalcolare sempre la quantità secondaria quando la quantità primaria cambia.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/en/docs/apps-func/dual-unit-of-measure.html"
+    },
+    {
+      "id": "eos-advanced-customer-vendor-statements-for-italy-cvs-17-11-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Advanced Customer Vendor Statements for Italy (CVS)",
+      "summary": "Gestione stampa CVS di esposizione scadenze passive che sia : Filtrabile per i soli movimenti contabili fornitori con IN SOSPESO = ‘'; evidenziabile in stampa la colonna IN SOSPESO a fronte di ogni singola scadenza.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://helpbc.eos-solutions.it/main.aspx?lang=it-it&content=AdvancedCustomerVendorStatement.html"
+    },
+    {
+      "id": "eos-product-configurator-cfg-11-11-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Product Configurator (CFG)",
+      "summary": "Aggiunta possibilità di salvare il prezzo di un articolo configurato sui listini di acquisto da una configurazione di vendita previa abilitazione del setup “Abilita creazione listini d’acquisto dalle vendite”. Viene usato il fornitore dell’articolo neutro per filtrare la matrice prezzi.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/product-configurator-cfg.html"
+    },
+    {
+      "id": "eos-vat-management-for-italy-vmi-04-11-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Vat Management for Italy (VMI)",
+      "summary": "Gestione del cliente/fornitore di tipologia persona fisica (Primo nome, Cognome e Sesso) nelle dichiarazioni di intento attive e passive. Modifica stampa e file esportato.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/en/docs/apps-func/ex020-vat-management-for-italy.html"
+    },
+    {
+      "id": "eos-manufacturing-masterdata-management-mmm-03-11-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Manufacturing Masterdata Management (MMM)",
+      "summary": "Aggiunta la possibilità di inserire ed eliminare componenti anche se la distinta base è certificata.Tramite abilitazione del flag “Abilita gestione date righe DB” si attiva la gestione delle date di validità sulle righe di distinta base.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/manufacturing-masterdata-management.html"
+    },
+    {
+      "id": "eos-advanced-cash-flow-csf-31-10-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Advanced Cash Flow (CSF)",
+      "summary": "Possibilità di escludere i progetti in stato pianificazione e possibilità di gestire le condizioni di pagamento dei progetti.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/advanced-cash-flow.html"
+    },
+    {
+      "id": "eos-product-configurator-cfg-29-10-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Product Configurator (CFG)",
+      "summary": "Aggiunta la gestione del configuratore sugli ordini di assemblaggio con apertura manuale ed automatica alla validazione dell’articolo.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/product-configurator-cfg.html"
+    },
+    {
+      "id": "eos-bank-files-for-italy-bnk-22-10-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Bank Files for Italy (BNK)",
+      "summary": "Nell’esportazione dei bonifici esteri (XMLPort 18123334) è stata aggiunta la gestione del codice ISO per la valuta. Per questa gestione è stato aggiunto il nuovo campo “Nr. campo cod. valuta” nel Setup BNK. In questo nuovo campo è possibile indicare da quale campo della tabella Valute (4 Currency) prendere il codice da inserire nell’XML. In fase di creazione dell’XML il codice valuta verrà preso dal campo indicato a setup, se invece non viene indicato nulla verrà preso di default dal campo “Codice” come avviene adesso.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/bank-files-for-italy-cbi.html"
+    },
+    {
+      "id": "eos-manufacturing-planning-mpl-20-10-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Manufacturing Planning (MPL)",
+      "summary": "Aggiunta opzione per poter selezionare la tipologia di piano nel report Calcola Pianificazione (MPL).",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/manufacturing-planning-mpl.html"
+    },
+    {
+      "id": "eos-transport-costs-etc-16-10-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Transport Costs (ETC)",
+      "summary": "Aggiunta la funzionalità di setup wizard dalla pagina di setup ETC per creare dati di test.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/en/docs/apps-tech/5c4e78c2-7a6a-4822-b58c-812a92792b9b.html"
+    },
+    {
+      "id": "eos-product-configurator-cfg-09-10-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Product Configurator (CFG)",
+      "summary": "Aggiunto nella pagina Setup Configuratore (CFG) nuovo campo Primo stato articoli EDS, per poter definire lo stato iniziale di un articolo quando viene generato tramite il configuratore.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/product-configurator-cfg.html"
+    },
+    {
+      "id": "eos-transport-costs-etc-08-10-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Transport Costs (ETC)",
+      "summary": "Aggiunta la possibilità di inserire oneri aggiuntivi dalla lista di indirizzi di spedizione presente sulla scheda cliente.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/en/docs/apps-tech/5c4e78c2-7a6a-4822-b58c-812a92792b9b.html"
+    },
+    {
+      "id": "eos-handling-units-management-hum-08-10-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Handling Units Management (HUM)",
+      "summary": "Aggiunta possibilità di selezione multipla delle unità di carico sulla funzione “Prendi unità di carico” presente nei giornali di registrazione (riclassifiche, magazzino, consumi, ecc.).",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/handling-units-management.html"
+    },
+    {
+      "id": "eos-bank-files-for-italy-bnk-01-10-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Bank Files for Italy (BNK)",
+      "summary": "Aggiunto nuovo campo sul setup BNK “Escludi CIG e CUP da distinta fornitore”. Se impostato, i campi CIG e CUP non verranno popolati sulle distinte fornitore quando si creato le righe col suggerisci pagamenti.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/bank-files-for-italy-cbi.html"
+    },
+    {
+      "id": "eos-bank-files-for-italy-bnk-26-09-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Bank Files for Italy (BNK)",
+      "summary": "Aggiunta la possibilità di effettuare pagamenti tramite Bonifico SEPA su Conto C\\G o C\\C Bancario con l’introduzione di un “tipo beneficiario” in distinta. Aggiunta la possibilità di effettuare pagamenti tramite Bonifico SEPA al Factor dando la possibilità, sulla scheda C\\C bancario fornitore, di inserire un diverso beneficiario.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/bank-files-for-italy-cbi.html"
+    },
+    {
+      "id": "eos-customer-test-suite-cts-22-09-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Customer Test Suite (CTS)",
+      "summary": "Aggiunta nuova app per il censimento dei casi di test e gestione dei piani e delle esecuzioni.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/customer-test-suite.html"
+    },
+    {
+      "id": "eos-over-and-under-delivery-quantities-ovr-15-09-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Over- and Under-Delivery Quantities (OVR)",
+      "summary": "Sul Setup (OVR) è stato aggiunto il campo “Abilita quantità in eccesso sul prelievo”, valido per prelievi warehouse e prelievi di magazzino. Se attivo, è possibile impostare, sulle righe del prelievo, una quantità da gestire maggiore della quantità, in base alla riga del setup in eccesso trovata per quel documento di origine.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/en/docs/apps-func/over-and-under-delivery-quantities.html"
+    },
+    {
+      "id": "eos-commissions-cms-15-09-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Commissions (CMS)",
+      "summary": "Gestita l’assegnazione agente dal campo presente nello User setup nel momento in cui non ci sia l’agente sul cliente.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/en/docs/apps-func/commissions-cms.html"
+    },
+    {
+      "id": "eos-advanced-intrastat-for-italy-itr-12-09-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Advanced Intrastat For Italy (ITR)",
+      "summary": "Gestita la possibilità, tramite flag dedicato, di effettuare delle estrazioni incrementali nella funzionalità “Suggerisci Righe Intrastat”.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/en/docs/apps-func/advanced-intrastat-for-italy-itr.html"
+    },
+    {
+      "id": "eos-combine-warehouse-shipment-cws-11-09-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Combine Warehouse Shipment (CWS)",
+      "summary": "Aggiunta funzionalità sulla scheda del gruppo CWS per copiare le informazioni dei pesi, volume, nr. colli e pallet dalla packing list al gruppo.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/en/docs/apps-func/combine-warehouse-shipment.html"
+    },
+    {
+      "id": "eos-combine-warehouse-shipment-cws-03-09-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Combine Warehouse Shipment (CWS)",
+      "summary": "Sul setup CWS e sulla scheda ubicazioni è stato aggiunto il flag “Abilita trasferimento diretto”. Se attivo, alla registrazione della spedizione warehouse di trasferimento, viene registrato anche il carico di trasferimento; l’ubicazione di carico non deve avere il warehouse.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/en/docs/apps-func/combine-warehouse-shipment.html"
+    },
+    {
+      "id": "eos-mes-manufacturing-execution-system-mes-03-09-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "MES Manufacturing Execution System (MES)",
+      "summary": "Aggiunta nuova visualizzazione di dettaglio della fase nel PowerMES, che permette la visualizzazione di informazioni relative alla fase in lavorazione oltre a note, notifiche e parametri IoT.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/mes-manufacturing-execution-system.html"
+    },
+    {
+      "id": "eos-plant-maintenance-pmm-03-09-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Plant Maintenance (PMM)",
+      "summary": "Aggiunta pila “Da approvare” nella dashboard dell’app PowerPMM.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/plant-maintenance-plm.html"
+    },
+    {
+      "id": "eos-customer-vendor-compensation-cvc-25-08-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Customer Vendor Compensation (CVC)",
+      "summary": "Implementata gestione compensazioni in valuta.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/customer-vendor-compensation.html"
+    },
+    {
+      "id": "eos-conai-con-06-08-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "CONAI (CON)",
+      "summary": "Aggiunta possibilità d’inserire le traduzioni in lingua per il campo “Descrizione documento”, sui materiali CONAI. All’esecuzione del calcolo CONAI, le righe CONAI aggiunte in fattura avranno la descrizione tradotta nella lingua del documento.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/en/docs/apps-func/empties-management-epm.html"
+    },
+    {
+      "id": "eos-dual-unit-of-measure-dum-18-07-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Dual Unit of Measure (DUM)",
+      "summary": "Sui movimenti di magazzino è stata implementata la gestione della doppia unità di misura.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/en/docs/apps-func/dual-unit-of-measure.html"
+    },
+    {
+      "id": "eos-inventory-with-serial-and-lot-number-isl-09-07-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Inventory with Serial and Lot Number (ISL)",
+      "summary": "Aggiunto un nuovo report, attivabile tramite feature flag, che consente il calcolo dell’inventario fisico con la suddivisione anche per Nr. Collo.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/inventory-with-serial-and-lot-number.html"
+    },
+    {
+      "id": "eos-bank-files-for-italy-bnk-09-07-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Bank Files for Italy (BNK)",
+      "summary": "Aggiunta Distinta bonifico clienti, che permette di creare bonifici SEPA anche per i clienti come avviene per i fornitori.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/bank-files-for-italy-cbi.html"
+    },
+    {
+      "id": "eos-product-quality-assurance-pqa-09-07-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Product Quality Assurance (PQA)",
+      "summary": "Aggiunta la possibilità di cumulare, su ordini di controllo di tipo output, le quantità prodotte all’ultima fase di ordini di produzione con abilitazione, dal setup matrice di controllo, tramite il campo “Cumula output”.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/product-quality-assurance.html"
+    },
+    {
+      "id": "eos-combine-warehouse-shipment-cws-09-07-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Combine Warehouse Shipment (CWS)",
+      "summary": "Sulla spedizione CWS sono state aggiunte due nuove azioni: “Copia info dalle righe”, che consente di valorizzare sulla testata CWS i pesi, volume e nr. colli, leggendoli dalle righe della CWS; “Copiare le informazioni della packing list sulla spedizione CWS”, che consente di copiare le informazioni (pesi, volume, nr. pallet, nr. colli) dalla packing list alla spedizione CWS.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/en/docs/apps-func/combine-warehouse-shipment.html"
+    },
+    {
+      "id": "eos-over-and-under-delivery-quantities-ovr-30-06-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Over- and Under-Delivery Quantities (OVR)",
+      "summary": "Sulle righe di assistenza è stata implementata la consegna per eccesso/difetto e aggiunto il flag “Riga chiusa”. Sul setup consegne per eccesso/difetto è stato aggiunto il tipo origine “Assistenza” per abilitare la funzionalità.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/en/docs/apps-func/over-and-under-delivery-quantities.html"
+    },
+    {
+      "id": "eos-inventory-with-serial-and-lot-number-isl-13-06-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Inventory with Serial and Lot Number (ISL)",
+      "summary": "Il campo “Data Scadenza” sulla riga delle “Registrazioni inventario fisico” è stato reso non editabile se già valorizzato o non richiesto dalla tracciabilità.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/inventory-with-serial-and-lot-number.html"
+    },
+    {
+      "id": "eos-manufacturing-planning-mpl-11-06-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Manufacturing Planning (MPL)",
+      "summary": "Aggiunta una finestra di caricamento quando vengono applicati i filtri nella pagina della pianificazione sequenziale.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/manufacturing-planning-mpl.html"
+    },
+    {
+      "id": "eos-product-quality-assurance-pqa-10-06-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Product Quality Assurance (PQA)",
+      "summary": "Sulle non conformità è stato aggiunto il valore “Spedizione CWS” sul campo “Tipo di Controllo”, che consente di specificare come documento di riferimento la spedizione e riga CWS.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/product-quality-assurance.html"
+    },
+    {
+      "id": "eos-empties-management-epm-10-06-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Empties Management (EPM)",
+      "summary": "Aggiunto sulle istruzioni di imballaggio e sulle righe vendita il flag “Vuoto non fatturabile”, che consente di indicare che un determinato contenitore non è fatturabile consentendo la chiusura di quella riga senza fatturarla.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/empties-management-epm.html"
+    },
+    {
+      "id": "eos-advanced-intrastat-for-italy-itr-09-06-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Advanced Intrastat For Italy (ITR)",
+      "summary": "Aggiunta gestione del codice paese GR al posto del codice paese EL, per i campi “Cod. paese di origine” e “Paese di pagamento”, come richiesto dal SW Intraweb.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/en/docs/apps-func/advanced-intrastat-for-italy-itr.html"
+    },
+    {
+      "id": "eos-bank-files-for-italy-bnk-03-06-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Bank Files for Italy (BNK)",
+      "summary": "Reso obsoleto report 18123331 “EOS Import Cust. Paym. CBI EXT” (Importazione pagamenti clienti (CBI)).",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/bank-files-for-italy-cbi.html"
+    },
+    {
+      "id": "eos-close-documents-without-invoicing-cdw-26-05-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Close documents without invoicing (CDW)",
+      "summary": "Aggiunta gestione dei documenti di assistenza, e relativi DDT.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/close-documents-without-invoicing.html"
+    },
+    {
+      "id": "eos-dual-unit-of-measure-dum-22-05-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Dual Unit of Measure (DUM)",
+      "summary": "Sul setup dell’app è stato aggiunto il campo “Gestione Quantità Residua Sec.\", che può assumere i seguenti valori : “Standard” e “Azzera quantità residua sec. alla chiusura della riga”. Il valore “Azzera quantità residua sec. alla chiusura della riga” indica che la quantità residua sec. viene azzerata quando la riga viene chiusa nell’unità di misura principale.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/en/docs/apps-func/dual-unit-of-measure.html"
+    },
+    {
+      "id": "eos-engineering-to-order-m365-20-05-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Engineering to Order (M365)",
+      "summary": "Su Engineering to order, in BC26, è stato aggiunto un controllo, e relativo messaggio, per cui sui carichi warehouse non verranno riportate righe ordine con indicato il codice progetto. Questo controllo si è reso necessario per un’incompatibilità dell’app con il warehouse a seguito di modifiche introdotte da Microsoft in BC26 che hanno aperto a standard la possibilità di creare carichi warehouse con righe ordine con codice progetto. NOTA fino alla BC25 i carichi warehouse con codice progetto era possibile crearli solo con ETO oppure con la CWS. Il controllo verrà tolto una volta che Microsoft metterà a disposizione un evento (che è già stato richiesto) per gestire la nuova gestione del Warehouse introdotta in BC26. Con l’uscita di BC26 cu1, il controllo sopra descritto è stato rimosso. Installando la versione 26.1.11.0 in avanti di Engineering to Order su BC26.1 sarà possibile creare carichi warehouse su progetto.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/engineering-to-order.html"
+    },
+    {
+      "id": "eos-plant-maintenance-pmm-20-05-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Plant Maintenance (PMM)",
+      "summary": "Aggiunto l’OnBoarding avviabile dal setup assistito per una introduzione all’uso dell’app. Presenta il setup dell’app e poi gli oggetti fondamentali: macchine, punti di manutenzione, cicli di manutenzione e richieste di lavoro.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/plant-maintenance-plm.html"
+    },
+    {
+      "id": "eos-bank-files-for-italy-bnk-19-05-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Bank Files for Italy (BNK)",
+      "summary": "Per il report 18123330 Importazione Insoluti clienti (CBI) sono stati gestite le fatture del modulo assistenza e l’importazione di righe di distinta che presentano il flag Effetti cumulativi.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/bank-files-for-italy-cbi.html"
+    },
+    {
+      "id": "eos-product-configurator-cfg-12-05-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Product Configurator (CFG)",
+      "summary": "Sul setup (CFG) sono stati aggiunti i campi “Metodo di calcolo dei prezzi di vendita” e “Metodo di calcolo dei prezzi di acquisto”, con i seguenti valori: “Prezzo più basso” e “Calcolo per priorità”. Servono per specificare il metodo di calcolo dei prezzi e delle maggiorazioni nella matrice prezzi. Il “Calcolo per priorità” segue quest’ordine di importanza per le vendite: “Campagna”, “Cliente”, “Gruppo prezzi cliente”, “Tutti i clienti”. Per gli acquisti l’ordine è “Fornitore”, “Tutti i fornitori”.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/product-configurator-cfg.html"
+    },
+    {
+      "id": "eos-product-configurator-cfg-06-05-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Product Configurator (CFG)",
+      "summary": "Sul setup del configuratore è stato aggiunto il flag “Abilita il calcolo dei sottolivelli per livello di distinta”. Se attivo, consente di migliorare le performance in chiusura del configuratore (richiede che il campo “Tipo calcolo sottolivelli DB” abbia valore “Chiusura configuratore”).",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/product-configurator-cfg.html"
+    },
+    {
+      "id": "eos-handling-units-management-hum-23-04-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Handling Units Management (HUM)",
+      "summary": "Sulle righe degli ordini di produzione confermati/rilasciati sono stati aggiunti i campi delle istruzioni di imballaggio ed il campo “Nr. unità di carico”. I campi delle istruzioni di imballaggio sono valorizzati in automatico sulla riga, cercando l’istruzione di tipo “Output” o vuoto. Tramite l’azione “Suggerisci Riga per imballaggio” è possibile creare le unità di carico necessarie a partire dall’istruzione in riga. Le unità di carico create sono assegnate alla riga dell’ordine in una nuova tabella “Assegnazioni Unità di Carico a Righe Ordine di Produzione (HUM)\". Le assegnazioni sono visibili dalla nuova factbox “Assegnazioni unità di carico”, disponibile sull’ordine di produzione e sulla lista/scheda delle unità di carico. Il campo “Nr.unità di carico” aggiunto sulla riga dell’ordine viene riportato in automatico sulla riga dei giornali per le registrazioni dell’output.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/handling-units-management.html"
+    },
+    {
+      "id": "eos-product-configurator-cfg-22-04-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Product Configurator (CFG)",
+      "summary": "Aggiunta la possibilità, se è attiva la gestione degli attributi con il flag “Abilita gestione attributi”, abilitando il flag a setup “Copia attributi dall’articolo neutro”, di copiare gli attributi dall’articolo neutro non collegati alle caratteristiche della regola all’articolo configurato.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/product-configurator-cfg.html"
+    },
+    {
+      "id": "eos-inventory-valuation-and-costing-ivc-15-04-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Inventory valuation and costing (IVC)",
+      "summary": "Escluse, dalla stampa Valutazione fiscale IVC (report 18123473), le seguenti tipologie di articoli: - con flag Valore zero magazzino a Sì, - con Tipo = Non inventario.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/inventory-valuation-and-costing.html"
+    },
+    {
+      "id": "eos-product-configurator-cfg-09-04-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Product Configurator (CFG)",
+      "summary": "Il configuratore di prodotto è stato aggiunto sulle righe di distinta base di produzione/assemblaggio. Sul setup del configuratore è stato aggiunto il flag “Esegui Configuratore alla validazione articolo nelle righe DB”, che consente l’apertura automatica del configuratore, all’inserimento dell’articolo sulla riga DB produzione/assemblaggio.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/product-configurator-cfg.html"
+    },
+    {
+      "id": "eos-plant-maintenance-pmm-07-04-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Plant Maintenance (PMM)",
+      "summary": "Le assenze capacità verranno aggiornate immediatamente dopo l’inserimento delle assenze in seguito all’impostazione del flag “Interrompe la produzione” nelle richieste di lavoro.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/plant-maintenance-plm.html"
+    },
+    {
+      "id": "eos-product-configurator-cfg-03-04-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Product Configurator (CFG)",
+      "summary": "Sulle righe delle “Formule” del configuratore, è stato aggiunto il flag “Abilita arrotondamento formula”, attivabile per le righe di tipo Formula. Da standard, una formula inserita in un’altra formula, non viene arrotondata. Attivando il flag è possibile modificare questo comportamento.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/product-configurator-cfg.html"
+    },
+    {
+      "id": "eos-engineering-to-order-m365-01-04-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Engineering to Order (M365)",
+      "summary": "Modificati e ristrutturati i set di autorizzazioni delle 4 app che compongono engineering to order. I nuovi set di autorizzazioni sono i seguenti: M365 EOS090 ADM, M365 EOS09001 ADM, M365 EOS09002 ADM. In particolare il set “M365 EOS090 ADM” contiene i permessi per tutti gli oggetti delle 4 app, quindi basta indicare solo questo set per configurare i permessi sugli utente.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/engineering-to-order.html"
+    },
+    {
+      "id": "eos-product-configurator-cfg-31-01-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Product Configurator (CFG)",
+      "summary": "Aggiunta la possibilità di rinominare caratteristiche, regole, condizioni e formule.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/product-configurator-cfg.html"
+    },
+    {
+      "id": "eos-engineering-to-order-m365-31-03-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Engineering to Order (M365)",
+      "summary": "Su Engineering to order, in BC26, è stato aggiunto un controllo, e relativo messaggio, per cui sui carichi warehouse non verranno riportate righe ordine con indicato il codice progetto. Questo controllo si è reso necessario per un’incompatibilità dell’app con il warehouse a seguito di modifiche introdotte da Microsoft in BC26 che hanno aperto a standard la possibilità di creare carichi warehouse con righe ordine con codice progetto. NOTA fino alla BC25 i carichi warehouse con codice progetto era possibile crearli solo con ETO oppure con la CWS. Il controllo verrà tolto una volta che Microsoft metterà a disposizione un evento (che è già stato richiesto) per gestire la nuova gestione del Warehouse introdotta in BC26.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/engineering-to-order.html"
+    },
+    {
+      "id": "eos-packing-list-pkl-26-03-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Packing List (PKL)",
+      "summary": "Aggiunto campo “Bin Code” nella tabella dei movimenti contenitori (EPM), valorizzato in fase di registrazione dei vuoti.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/packing-list-pck.html"
+    },
+    {
+      "id": "eos-power-wms-wms-25-03-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Power WMS (WMS)",
+      "summary": "Aggiunta la possibilità di personalizzare i campi visualizzati in lista in fase di riclassificazione delle unità di carico.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/en/docs/apps-func/power-wms.html"
+    },
+    {
+      "id": "eos-electronic-invoice-for-italy-fte-17-03-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Electronic Invoice for Italy (FTE)",
+      "summary": "Aggiunta gestione della nuova Causale “F”, introdotta con l’aggiornamento delle CU2025 in Anteprima documenti in entrata (FTE).",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/en/docs/apps-func/electronic-vat-settlement-for-italy.html"
+    },
+    {
+      "id": "eos-product-configurator-cfg-17-03-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Product Configurator (CFG)",
+      "summary": "L’azione “Configuratore” è stata aggiunta sulle liste “Varianti Articolo” e “Articoli Configurati”.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/product-configurator-cfg.html"
+    },
+    {
+      "id": "eos-handling-units-management-hum-17-03-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Handling Units Management (HUM)",
+      "summary": "Sulle testate Spedizioni di vendita registrate, Spedizioni reso acquisti registrate e Spedizioni CWS è stata aggiunta l’azione “Annulla righe spedizione e unità di carico”, che consente di annullare l’intera spedizione e di spostare in stato “Caricato” le unità di carico.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/handling-units-management.html"
+    },
+    {
+      "id": "eos-power-wms-wms-12-03-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Power WMS (WMS)",
+      "summary": "Aggiunta possibilità di aprire i dettagli di una HU direttamente dal documento in elaborazione.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/en/docs/apps-func/power-wms.html"
+    },
+    {
+      "id": "eos-electronic-invoice-for-italy-fte-11-03-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Electronic Invoice for Italy (FTE)",
+      "summary": "Popolato il tag 1.5 “TerzoIntermediarioOSoggettoEmittente” nel caso di fatture conto terzi autofatture.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/en/docs/apps-func/electronic-vat-settlement-for-italy.html"
+    },
+    {
+      "id": "eos-engineering-to-order-m365-10-03-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Engineering to Order (M365)",
+      "summary": "Aggiunto in Setup engineering un nuovo campo “Blocca aggiornamento ord. produzione”. Impostando questo campo viene impedito all’utente di lanciare la funzione standard “Aggiorna ordine produzione” per gli ordini collegati a struttura progetto.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/engineering-to-order.html"
+    },
+    {
+      "id": "eos-docfinance-connector-dcf-06-03-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "DocFinance Connector (DCF)",
+      "summary": "Migliorata l’integrazione con DocCredit, attraverso: la gestione dell’esportazione di ordini e spedizioni a partire dalla data di spedizione presente in riga, e la gestione dei documenti di reso.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/docfinance-connector-dcf.html"
+    },
+    {
+      "id": "eos-plant-maintenance-pmm-03-03-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Plant Maintenance (PMM)",
+      "summary": "Aggiunta la possibilità di visualizzare i dettagli dell’articolo collegato al ricambio nel Power PMM.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/plant-maintenance-plm.html"
+    },
+    {
+      "id": "eos-manufacturing-masterdata-management-mmm-28-02-24",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Manufacturing Masterdata Management (MMM)",
+      "summary": "Aggiunto sui giornali di produzione (consumi, output e ordine di produzione) il gruppo “Registra (MMM)\", per processare tutte le righe ignorando gli errori e lasciando nel batch le righe non registrate. Aggiunto flag a setup “Abilita log delle registrazioni di produzione”, per il salvataggio fisico dei messaggi di errore di queste registrazioni: abilitandolo appare una factbox sui giornali di consumo e output che visualizza l’eventuale errore di riga.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/manufacturing-masterdata-management.html"
+    },
+    {
+      "id": "eos-electronic-invoice-for-italy-fte-24-02-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Electronic Invoice for Italy (FTE)",
+      "summary": "Adeguamento app FTE alle specifiche tecniche versione 1.9 della fatturazione elettronica in vigore dal 01/04/2025.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/en/docs/apps-func/electronic-vat-settlement-for-italy.html"
+    },
+    {
+      "id": "eos-withholding-tax-certificazioni-uniche-for-italy-ecu-19-02-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Withholding Tax Certificazioni Uniche For Italy (ECU)",
+      "summary": "Adeguamento al modello CU 2025.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/withholding-tax-certificazioni-uniche-for-italy-ecu.html"
+    },
+    {
+      "id": "eos-product-configurator-cfg-17-02-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Product Configurator (CFG)",
+      "summary": "Sul setup del configuratore è stato aggiunto il campo “Sospendi controllo dello stato della regola”, che disabilita il controllo dello stato, quando si configura un articolo o si modificano le tabelle legate alla regola.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/product-configurator-cfg.html"
+    },
+    {
+      "id": "eos-electronic-invoice-for-italy-fte-12-02-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Electronic Invoice for Italy (FTE)",
+      "summary": "Aggiunta valorizzazione, nel file XML della fattura elettronica, dei TAG relativi CIG e CUP per le autofatture di acquisto in uscita (TD20).",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/en/docs/apps-func/electronic-vat-settlement-for-italy.html"
+    },
+    {
+      "id": "eos-packing-list-pkl-11-02-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Packing List (PKL)",
+      "summary": "È stato aggiunto il Setup assistito della packing list, che consente all’utente d’impostare i setup e dati di base per utilizzare l’app.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/packing-list-pck.html"
+    },
+    {
+      "id": "eos-electronic-invoice-for-italy-fte-03-02-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Electronic Invoice for Italy (FTE)",
+      "summary": "Gestita possibilità, nei “Dati documenti correlati”, di collegare l’informazione inserita relativamente al TAG ad una specifica riga del documento, tramite un nuovo campo di lookup sulle righe del documento stesso.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/en/docs/apps-func/electronic-vat-settlement-for-italy.html"
+    },
+    {
+      "id": "eos-data-security-eds-28-01-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Data Security (EDS)",
+      "summary": "Aggiunta possibilità d’inserire nel setup “Requisiti Tabelle” dei prerequisiti per la tabella d’origine attraverso il Filtro Tabella d’Origine.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/en/docs/apps-func/data-security.html"
+    },
+    {
+      "id": "eos-vat-management-for-italy-vmi-27-01-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "VAT Management for Italy (VMI)",
+      "summary": "Aggiunta, tramite flag in request page, la possibilità di effettuare la verifica sequenza protocolli nel report Registro Fiscale IVA - Stampa (VMI).",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/ex020-vat-management-for-italy.html"
+    },
+    {
+      "id": "eos-engineering-to-order-m365-23-01-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Engineering to Order (M365)",
+      "summary": "Aggiunta funzione SetSchedulingDirection nella codeunit 5130128 “M365 Calc. Job Structure Dates”. Questa funzione permette di indicare la direzione di calcolo delle date senza far aprire la finestra di dialogo. (Per dettagli vedere documentazione tecnica).",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/engineering-to-order.html"
+    },
+    {
+      "id": "eos-product-configurator-cfg-23-01-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Product Configurator (CFG)",
+      "summary": "È stato aggiunto il Setup assistito del Configuratore di Prodotto, che consente all’utente di impostare i setup e dati di base per utilizzare il configuratore.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/product-configurator-cfg.html"
+    },
+    {
+      "id": "eos-handling-units-management-hum-23-01-25",
+      "source": "EOS",
+      "product": "EOS Apps",
+      "title": "Handling Units Management (HUM)",
+      "summary": "Sui “Percorsi trasferimento” è stato aggiunto il campo “Gestione unità di carico in ordine di trasferimento”, che consente di specificare come gestire le unità di carico in uscita in un ordine di trasferimento. Il valore “Trasferisci HU in uscita” consente di spostare le unità di carico da in uscita a in entrata alla registrazione della spedizione. Il valore “Spedisci HU in uscita” consente di spedire e svuotare le unità di carico alla registrazione della spedizione. Il campo è presente anche sull’ordine di trasferimento e viene valorizzato in base al percorso di trasferimento, se esiste, altrimenti in base al valore sul setup.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "url": "https://docs.eos-solutions.it/it/docs/apps-func/handling-units-management.html"
+    }
+  ]
+}

@@ -1,0 +1,170 @@
+{
+    "version": "1.0",
+    "items": [
+        {
+            "id": "aeb-spa",
+            "displayName": "AEB SPA",
+            "ownerCss": "Alessandro Levantini"
+        },
+        {
+            "id": "askoll-holding",
+            "displayName": "ASKOLL HOLDING",
+            "ownerCss": "Alessandro Levantini"
+        },
+        {
+            "id": "autoclima-spa-indel-b-spa",
+            "displayName": "AUTOCLIMA SPA / INDEL B SPA",
+            "ownerCss": "Ernestino Paraboschi"
+        },
+        {
+            "id": "balocco-spa",
+            "displayName": "BALOCCO S.p.A",
+            "ownerCss": "Ernestino Paraboschi"
+        },
+        {
+            "id": "bestrade-spa",
+            "displayName": "BESTRADE SPA",
+            "ownerCss": "Alessandro Levantini"
+        },
+        {
+            "id": "daikin-applied-europe-spa",
+            "displayName": "DAIKIN APPLIED EUROPE SPA",
+            "ownerCss": "Alessandro Levantini"
+        },
+        {
+            "id": "dr-schar-ag",
+            "displayName": "DR. SCHÄR AG",
+            "ownerCss": "Ernestino Paraboschi"
+        },
+        {
+            "id": "ecospray-technologies-srl",
+            "displayName": "ECOSPRAY TECHNOLOGIES S.R.L.",
+            "ownerCss": "Alessandro Levantini"
+        },
+        {
+            "id": "fiocchi-munizioni-spa",
+            "displayName": "FIOCCHI MUNIZIONI SPA",
+            "ownerCss": "Alessandro Levantini"
+        },
+        {
+            "id": "formula-ambiente",
+            "displayName": "FORMULA AMBIENTE",
+            "ownerCss": "Gianluigi Calisesi"
+        },
+        {
+            "id": "formula-servizi",
+            "displayName": "FORMULA SERVIZI",
+            "ownerCss": "Gianluigi Calisesi"
+        },
+        {
+            "id": "gruppo-gimoka-spa",
+            "displayName": "GRUPPO GIMOKA SPA",
+            "ownerCss": "Ernestino Paraboschi"
+        },
+        {
+            "id": "icam-spa",
+            "displayName": "ICAM SPA",
+            "ownerCss": "Ernestino Paraboschi"
+        },
+        {
+            "id": "igd-siiq-spa",
+            "displayName": "IGD SIIQ SPA",
+            "ownerCss": "Gianluigi Calisesi"
+        },
+        {
+            "id": "ilcam-spa",
+            "displayName": "ILCAM SPA",
+            "ownerCss": "Ernestino Paraboschi"
+        },
+        {
+            "id": "laterlite-spa",
+            "displayName": "LATERLITE SPA",
+            "ownerCss": "Gianluigi Calisesi"
+        },
+        {
+            "id": "marco-bicego-spa",
+            "displayName": "MARCO BICEGO SPA",
+            "ownerCss": "Gianluigi Calisesi"
+        },
+        {
+            "id": "niederwieser-spa",
+            "displayName": "NIEDERWIESER SpA",
+            "ownerCss": "Ernestino Paraboschi"
+        },
+        {
+            "id": "orva",
+            "displayName": "ORVA",
+            "ownerCss": "Ernestino Paraboschi"
+        },
+        {
+            "id": "pfch-luxe-sa",
+            "displayName": "PFCH LUXE SA",
+            "ownerCss": "Ernestino Paraboschi"
+        },
+        {
+            "id": "pm-oil-steel-spa",
+            "displayName": "PM OIL & STEEL SPA",
+            "ownerCss": "Gianluigi Calisesi"
+        },
+        {
+            "id": "polifilm-protection-gmbh",
+            "displayName": "POLIFILM PROTECTION GMBH",
+            "ownerCss": "Gianluigi Calisesi"
+        },
+        {
+            "id": "progeo",
+            "displayName": "PROGEO",
+            "ownerCss": "Ernestino Paraboschi"
+        },
+        {
+            "id": "protect-medical-holding-gmbh",
+            "displayName": "PROTECT MEDICAL HOLDING GMBH",
+            "ownerCss": "Gianluigi Calisesi"
+        },
+        {
+            "id": "rotho-blaas-srl",
+            "displayName": "ROTHO BLAAS SRL",
+            "ownerCss": ""
+        },
+        {
+            "id": "scilm-spa",
+            "displayName": "SCILM SPA",
+            "ownerCss": "Ernestino Paraboschi"
+        },
+        {
+            "id": "service-key-spa",
+            "displayName": "SERVICE KEY SPA",
+            "ownerCss": "Alessandro Levantini"
+        },
+        {
+            "id": "snam-spa",
+            "displayName": "SNAM SPA",
+            "ownerCss": "Ernestino Paraboschi"
+        },
+        {
+            "id": "so-gest-i-srl-colussi",
+            "displayName": "SO.GEST.I SRL / COLUSSI",
+            "ownerCss": "Ernestino Paraboschi"
+        },
+        {
+            "id": "tamini-trasformatori-srl",
+            "displayName": "TAMINI TRASFORMATORI SRL",
+            "ownerCss": "Alessandro Levantini"
+        },
+        {
+            "id": "transfer-oil-spa",
+            "displayName": "TRANSFER OIL SPA",
+            "ownerCss": "Gianluigi Calisesi"
+        },
+        {
+            "id": "valoritalia-srl",
+            "displayName": "VALORITALIA SRL",
+            "ownerCss": "Ernestino Paraboschi"
+        },
+        {
+            "id": "veronafiere-spa",
+            "displayName": "VERONAFIERE SPA",
+            "ownerCss": "Ernestino Paraboschi"
+        }
+    ]
+}
