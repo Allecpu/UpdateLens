@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+
 import { loadAllSnapshots, loadRulesConfig } from '../../services/DataLoader';
 import { buildFilterMetadata } from '../../services/FilterMetadata';
 import { filterReleaseItems } from '../../services/FilterService';
@@ -53,19 +53,32 @@ const GlobalFiltersPage = () => {
   const [snapshotErrors, setSnapshotErrors] = useState<string[]>([]);
   const [snapshotsLoaded, setSnapshotsLoaded] = useState(false);
   const rulesConfig = loadRulesConfig();
-  const navigate = useNavigate();
+
   const {
     cssFilters,
     customerFilters,
     customerFilterMode,
     setCssFilters,
-    ensureCssFilters
+    setCustomerFilters,
+    setCustomerMode,
+    resetCustomerFilters,
+    ensureCssFilters,
+    applyGlobalToCustomers
   } = useFilterStore();
-  const { index } = useCustomerStore();
+  const { index, activeCustomerId, customers, updateCustomer } = useCustomerStore();
   const activeIndex = useMemo(() => index.filter((entry) => isEntryActive(entry)), [index]);
   const { groups } = useCustomerGroupStore();
   const [saveStatus, setSaveStatus] = useState<'saved' | 'pending'>('saved');
+  const [filterScope, setFilterScope] = useState<'global' | 'customer'>('global');
   const [pageIndex, setPageIndex] = useState(0);
+
+  useEffect(() => {
+    if (activeCustomerId) {
+      setFilterScope('customer');
+    } else {
+      setFilterScope('global');
+    }
+  }, [activeCustomerId]);
 
   useEffect(() => {
     let active = true;
@@ -224,182 +237,11 @@ const GlobalFiltersPage = () => {
     }
   }, [cssFilters, setCssFilters]);
 
-  const normalizedGlobal = useMemo(() => {
-    if (!cssFilters) {
-      return defaultFilters;
-    }
-    const merged = { ...defaultFilters, ...cssFilters };
-    const sources = normalizeSelection(merged.sources, sourceOptions) as ReleaseSource[];
-    const matchAllSources = false;
-    const productSelection = normalizeSelectionForSources(
-      merged.products,
-      metadata.products,
-      sources,
-      matchAllSources
-    );
-    const statuses = normalizeSelectionForSources(
-      merged.statuses,
-      metadata.statuses,
-      sources,
-      matchAllSources
-    );
-    const categories = normalizeSelectionForSources(
-      merged.categories,
-      metadata.categories,
-      sources,
-      matchAllSources
-    );
-    const tags = normalizeSelectionForSources(
-      merged.tags,
-      metadata.tags,
-      sources,
-      matchAllSources
-    );
-    const waves = normalizeSelectionForSources(
-      merged.waves,
-      metadata.waves,
-      sources,
-      matchAllSources
-    );
-    const months = normalizeSelectionForSources(
-      merged.months,
-      metadata.months,
-      sources,
-      matchAllSources
-    );
-    const availabilityTypes = normalizeSelectionForSources(
-      merged.availabilityTypes,
-      metadata.availabilityTypes,
-      sources,
-      matchAllSources
-    );
-    const enabledFor = normalizeSelectionForSources(
-      merged.enabledFor,
-      metadata.enabledFor,
-      sources,
-      matchAllSources
-    );
-    const geography = normalizeSelectionForSources(
-      merged.geography,
-      metadata.geography,
-      sources,
-      matchAllSources
-    );
-    const language = normalizeSelectionForSources(
-      merged.language,
-      metadata.language,
-      sources,
-      matchAllSources
-    );
-    const expandedProducts = new Set(productSelection);
-    sources.forEach((source) => {
-      const hasProduct = productSelection.some(
-        (product) => productSourceMap.get(product) === source
-      );
-      if (!hasProduct) {
-        (productsBySource.get(source) ?? []).forEach((product) =>
-          expandedProducts.add(product)
-        );
-      }
-    });
-    return {
-      ...merged,
-      products: Array.from(expandedProducts),
-      sources,
-      statuses,
-      categories,
-      tags,
-      waves,
-      months,
-      availabilityTypes,
-      enabledFor,
-      geography,
-      language
-    };
-  }, [
-    defaultFilters,
-    cssFilters,
-    productOptions,
-    sourceOptions,
-    statusOptions,
-    metadata.products,
-    metadata.statuses,
-    metadata.categories,
-    metadata.tags,
-    metadata.waves,
-    metadata.months,
-    metadata.availabilityTypes,
-    metadata.enabledFor,
-    metadata.geography,
-    metadata.language,
-    productSourceMap,
-    productsBySource
-  ]);
-
-  const updateFilters = (next: Partial<FilterState>) => {
-    setSaveStatus('pending');
-    setCssFilters({ ...normalizedGlobal, ...next });
-    setTimeout(() => setSaveStatus('saved'), 200);
-  };
-
-  const onReset = () => {
-    setSaveStatus('pending');
-    setCssFilters(defaultFilters);
-    setTimeout(() => setSaveStatus('saved'), 200);
-  };
-
-  const activeSources = resolveActiveSources(
-    (normalizedGlobal.sources ?? []) as ReleaseSource[]
-  );
-  const matchAllSources = false;
-  const hasOptionsForSources = (
-    options: { value: string; sources: ReleaseSource[] }[]
-  ): boolean => optionValuesForSources(options, activeSources, matchAllSources).length > 0;
-  const sourcesFromOptions = (options: { sources: ReleaseSource[] }[]): ReleaseSource[] => {
-    const set = new Set<ReleaseSource>();
-    options.forEach((option) => option.sources.forEach((source) => set.add(source)));
-    return Array.from(set);
-  };
-  const formatSourceBadge = (sources: ReleaseSource[]): string | undefined => {
-    const ordered = (['Microsoft', 'EOS'] as ReleaseSource[]).filter((source) =>
-      sources.includes(source)
-    );
-    if (ordered.length === 2) {
-      return `${RELEASE_SOURCE_LABELS[ordered[0]]} + ${RELEASE_SOURCE_LABELS[ordered[1]]}`;
-    }
-    if (ordered.length === 1) {
-      return RELEASE_SOURCE_LABELS[ordered[0]];
-    }
-    return undefined;
-  };
-  const sourceTagFor = (
-    key: FilterKey,
-    availableSources?: ReleaseSource[]
-  ): string | undefined => {
-    const supported = availableSources ?? getActiveSupportedSources(activeSources, key);
-    const activeSupported = supported.filter((source) => activeSources.includes(source));
-    if (activeSources.length > 1 && activeSupported.length > 0) {
-      return formatSourceBadge(activeSupported);
-    }
-    return undefined;
-  };
-  const isFilterVisible = (key: FilterKey): boolean =>
-    getActiveSupportedSources(activeSources, key).length > 0;
-  const showProductSplit = activeSources.length > 1;
-  const microsoftProducts = metadata.products.filter((option) =>
-    option.sources.includes('Microsoft')
-  );
-  const eosProducts = metadata.products.filter((option) => option.sources.includes('EOS'));
-  const updateProductsForSource = (source: ReleaseSource, next: string[]) => {
-    const toKeep = normalizedGlobal.products.filter(
-      (product) => productSourceMap.get(product) !== source
-    );
-    const merged = Array.from(new Set([...toKeep, ...next]));
-    updateFilters({ products: merged });
-  };
-  const normalizeFiltersForOverrides = (raw: FilterState): FilterState => {
+  // Normalization logic helper
+  const normalizeFiltersInternal = (raw: FilterState): FilterState => {
     const merged = { ...defaultFilters, ...raw };
     const sources = normalizeSelection(merged.sources, sourceOptions) as ReleaseSource[];
+    const matchAllSources = false;
     const productSelection = normalizeSelectionForSources(
       merged.products,
       metadata.products,
@@ -472,6 +314,161 @@ const GlobalFiltersPage = () => {
       )
     };
   };
+
+  const normalizedGlobal = useMemo(() => {
+    if (!cssFilters) {
+      return defaultFilters;
+    }
+    return normalizeFiltersInternal(cssFilters);
+  }, [
+    defaultFilters,
+    cssFilters,
+    productOptions,
+    sourceOptions,
+    statusOptions,
+    metadata,
+    productSourceMap,
+    productsBySource
+  ]);
+
+  const currentFilters = useMemo(() => {
+    if (filterScope === 'customer' && activeCustomerId) {
+      const activeMode = customerFilterMode[activeCustomerId] ?? 'inherit';
+      const activeFilters = customerFilters[activeCustomerId];
+      if (activeMode === 'custom' && activeFilters) {
+        return normalizeFiltersInternal(activeFilters);
+      }
+      return normalizedGlobal;
+    }
+    return normalizedGlobal;
+  }, [
+    filterScope,
+    activeCustomerId,
+    customerFilterMode,
+    customerFilters,
+    normalizedGlobal,
+    defaultFilters,
+    sourceOptions,
+    metadata,
+    productSourceMap,
+    productsBySource
+  ]);
+
+  const updateFilters = (next: Partial<FilterState>) => {
+    setSaveStatus('pending');
+    if (filterScope === 'customer' && activeCustomerId) {
+      // Customer Scope: ALWAYS write to override, setting mode to custom
+      // STRIP TARGETING FIELDS: they are not part of customer override
+      const safeNext = { ...next };
+      delete safeNext.targetCustomerIds;
+      delete safeNext.targetGroupIds;
+      delete safeNext.targetCssOwners;
+
+      // We merge with currentFilters (which might be inherited or already overridden)
+      const nextFilters = { ...currentFilters, ...safeNext };
+      setCustomerMode(activeCustomerId, 'custom');
+      setCustomerFilters(activeCustomerId, nextFilters);
+    } else {
+      // Global Scope
+      setCssFilters({ ...normalizedGlobal, ...next });
+    }
+    setTimeout(() => setSaveStatus('saved'), 200);
+  };
+
+  const onRevertToInherit = () => {
+    if (activeCustomerId) {
+      resetCustomerFilters(activeCustomerId);
+      // We stay in 'customer' scope, but now it will show inherited values
+    }
+  };
+
+  const onResetGlobal = () => {
+    setSaveStatus('pending');
+    setCssFilters(defaultFilters);
+    setTimeout(() => setSaveStatus('saved'), 200);
+  };
+
+  const onResetCustomerProducts = () => {
+    if (!activeCustomerId) return;
+    const confirmMessage =
+      'Attenzione: questa azione resetterà i prodotti e le configurazioni del cliente selezionato, allineandolo ai filtri globali attuali. Gli override specifici verranno rimossi. Vuoi procedere con il reset del SOLO cliente corrente?';
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+
+    // 1. Reset overrides for filters (inherit mode)
+    resetCustomerFilters(activeCustomerId);
+
+    // 2. Destructively reset Customer record fields
+    const customer = customers[activeCustomerId];
+    if (customer) {
+      const resetCustomer = {
+        ...customer,
+        selectedProducts: normalizedGlobal.products, // or defaultFilters.products depending on requirement. using normalizedGlobal baseline
+        overrides: {
+          sources: normalizedGlobal.sources as ReleaseSource[],
+          statuses: normalizedGlobal.statuses,
+          horizonMonths: normalizedGlobal.horizonMonths,
+          historyMonths: normalizedGlobal.historyMonths
+        }
+      };
+      updateCustomer(resetCustomer);
+    }
+    setSaveStatus('pending');
+    setTimeout(() => setSaveStatus('saved'), 500);
+  };
+
+  const activeSources = resolveActiveSources(
+    (currentFilters.sources ?? []) as ReleaseSource[]
+  );
+  const matchAllSources = false;
+  const hasOptionsForSources = (
+    options: { value: string; sources: ReleaseSource[] }[]
+  ): boolean => optionValuesForSources(options, activeSources, matchAllSources).length > 0;
+  const sourcesFromOptions = (options: { sources: ReleaseSource[] }[]): ReleaseSource[] => {
+    const set = new Set<ReleaseSource>();
+    options.forEach((option) => option.sources.forEach((source) => set.add(source)));
+    return Array.from(set);
+  };
+  const formatSourceBadge = (sources: ReleaseSource[]): string | undefined => {
+    const ordered = (['Microsoft', 'EOS'] as ReleaseSource[]).filter((source) =>
+      sources.includes(source)
+    );
+    if (ordered.length === 2) {
+      return `${RELEASE_SOURCE_LABELS[ordered[0]]} + ${RELEASE_SOURCE_LABELS[ordered[1]]}`;
+    }
+    if (ordered.length === 1) {
+      return RELEASE_SOURCE_LABELS[ordered[0]];
+    }
+    return undefined;
+  };
+  const sourceTagFor = (
+    key: FilterKey,
+    availableSources?: ReleaseSource[]
+  ): string | undefined => {
+    const supported = availableSources ?? getActiveSupportedSources(activeSources, key);
+    const activeSupported = supported.filter((source) => activeSources.includes(source));
+    if (activeSources.length > 1 && activeSupported.length > 0) {
+      return formatSourceBadge(activeSupported);
+    }
+    return undefined;
+  };
+  const isFilterVisible = (key: FilterKey): boolean =>
+    getActiveSupportedSources(activeSources, key).length > 0;
+  const showProductSplit = activeSources.length > 1;
+  const microsoftProducts = metadata.products.filter((option) =>
+    option.sources.includes('Microsoft')
+  );
+  const eosProducts = metadata.products.filter((option) => option.sources.includes('EOS'));
+
+  const updateProductsForSource = (source: ReleaseSource, next: string[]) => {
+    const toKeep = currentFilters.products.filter(
+      (product) => productSourceMap.get(product) !== source
+    );
+    const merged = Array.from(new Set([...toKeep, ...next]));
+    updateFilters({ products: merged });
+  };
+
   const targetCustomerIds = useMemo(() => {
     const selected = new Set<string>(normalizedGlobal.targetCustomerIds);
     const groupMap = new Map(groups.map((group) => [group.id, group.customerIds]));
@@ -498,6 +495,12 @@ const GlobalFiltersPage = () => {
     [activeIndex]
   );
   const includedCustomerIds = useMemo(() => {
+    // CONSTRAINT: In Customer Scope, we ONLY operate on the active customer.
+    // This prevents accidental preview/actions on other customers while editing an override.
+    if (filterScope === 'customer' && activeCustomerId) {
+      return new Set([activeCustomerId]);
+    }
+
     if (normalizedGlobal.targetCssOwners.length > 0 && targetCustomerIds.size > 0) {
       return new Set(
         Array.from(ownerCustomerIds).filter((id) => targetCustomerIds.has(id))
@@ -511,6 +514,8 @@ const GlobalFiltersPage = () => {
     }
     return new Set(activeIndex.map((entry) => entry.id));
   }, [
+    filterScope,
+    activeCustomerId,
     activeIndex,
     normalizedGlobal.targetCssOwners.length,
     ownerCustomerIds,
@@ -550,7 +555,7 @@ const GlobalFiltersPage = () => {
       if (!raw) {
         return;
       }
-      const normalized = normalizeFiltersForOverrides(raw);
+      const normalized = normalizeFiltersInternal(raw);
       overrideCounts.set(id, filterReleaseItems(items, normalized).length);
     });
     const entries = activeIndex
@@ -596,7 +601,13 @@ const GlobalFiltersPage = () => {
     activeIncludedCustomerIds,
     activeIndex,
     items,
-    normalizedGlobal
+    normalizedGlobal,
+    // dependencies for normalizeFiltersInternal
+    defaultFilters,
+    sourceOptions,
+    metadata,
+    productSourceMap,
+    productsBySource
   ]);
   const pageSize = 20;
   const totalPages = Math.max(1, Math.ceil(customerPreview.entries.length / pageSize));
@@ -609,31 +620,33 @@ const GlobalFiltersPage = () => {
   const avgProductsLabel = Number.isInteger(avgProductsValue)
     ? String(avgProductsValue)
     : avgProductsValue.toFixed(1);
-  const hasGroupSelection = normalizedGlobal.targetGroupIds.length > 0;
-  const hasOwnerSelection = normalizedGlobal.targetCssOwners.length > 0;
-  const isOwnerDisabled = hasGroupSelection;
-  const isGroupDisabled = hasOwnerSelection;
+  const hasGroupSelection = currentFilters.targetGroupIds.length > 0;
+  const hasOwnerSelection = currentFilters.targetCssOwners.length > 0;
+  // Symmetrical disabling for Customer Scope or Mutual Exclusion
+  const isGroupDisabled = hasOwnerSelection || (filterScope === 'customer');
+  const isOwnerDisabled = hasGroupSelection || (filterScope === 'customer');
+
   const ownerBadgeLabel = isOwnerDisabled
-    ? 'Owner CSS: disabilitato per conflitto'
-    : normalizedGlobal.targetCssOwners.length === 0
+    ? (filterScope === 'customer' ? 'Owner CSS: Disabilitato (Scope cliente)' : 'Owner CSS: disabilitato per conflitto')
+    : currentFilters.targetCssOwners.length === 0
       ? 'Owner CSS: Tutti'
-      : `Owner CSS: ${normalizedGlobal.targetCssOwners.length} selezionati`;
+      : `Owner CSS: ${currentFilters.targetCssOwners.length} selezionati`;
   const groupBadgeLabel = isGroupDisabled
-    ? 'Gruppi clienti: disabilitato per conflitto'
-    : normalizedGlobal.targetGroupIds.length === 0
+    ? (filterScope === 'customer' ? 'Gruppi clienti: Disabilitato (Scope cliente)' : 'Gruppi clienti: disabilitato per conflitto')
+    : currentFilters.targetGroupIds.length === 0
       ? 'Gruppi clienti: Tutti'
-      : `Gruppi clienti: ${normalizedGlobal.targetGroupIds.length} selezionati`;
+      : `Gruppi clienti: ${currentFilters.targetGroupIds.length} selezionati`;
 
   const onChangeGroupIds = (next: string[]) => {
     updateFilters({
       targetGroupIds: next,
-      targetCssOwners: next.length > 0 ? [] : normalizedGlobal.targetCssOwners
+      targetCssOwners: next.length > 0 ? [] : currentFilters.targetCssOwners
     });
   };
   const onChangeCssOwnerIds = (next: string[]) => {
     updateFilters({
       targetCssOwners: next,
-      targetGroupIds: next.length > 0 ? [] : normalizedGlobal.targetGroupIds
+      targetGroupIds: next.length > 0 ? [] : currentFilters.targetGroupIds
     });
   };
 
@@ -645,8 +658,44 @@ const GlobalFiltersPage = () => {
           <p className="mt-2 text-sm text-muted-foreground">
             Questi filtri sono il default del sistema e vengono ereditati dai clienti.
           </p>
+          {activeCustomerId && (
+            <div className="mt-4 flex items-center rounded-lg border bg-surface p-1">
+              <button
+                className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${filterScope === 'global'
+                  ? 'bg-primary text-primary-foreground shadow'
+                  : 'text-muted-foreground hover:bg-muted'
+                  }`}
+                onClick={() => setFilterScope('global')}
+              >
+                Globale
+              </button>
+              <button
+                className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${filterScope === 'customer'
+                  ? 'bg-primary text-primary-foreground shadow'
+                  : 'text-muted-foreground hover:bg-muted'
+                  }`}
+                onClick={() => setFilterScope('customer')}
+              >
+                Cliente: {customers[activeCustomerId]?.name ?? '...'} (Overdrive)
+              </button>
+            </div>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+          {filterScope === 'customer' && activeCustomerId && (
+            (customerFilterMode[activeCustomerId] === 'custom') ? (
+              <button
+                className="ul-button ul-button-secondary text-xs"
+                onClick={onRevertToInherit}
+              >
+                Torna a ereditare
+              </button>
+            ) : (
+              <span className="text-xs italic text-muted-foreground">
+                (Eredita da Global)
+              </span>
+            )
+          )}
           <span className="inline-flex items-center rounded-full bg-secondary px-2 py-1 text-[11px] text-muted-foreground">
             {groupBadgeLabel}
           </span>
@@ -655,15 +704,33 @@ const GlobalFiltersPage = () => {
           </span>
           <span>Salvataggio automatico: ON</span>
           <span>{saveStatus === 'saved' ? 'Salvato' : 'Non salvato'}</span>
-          <button className="ul-button ul-button-ghost" onClick={onReset}>
-            Ripristina filtri
-          </button>
-          <button
-            className="ul-button ul-button-primary"
-            onClick={() => navigate('/')}
-          >
-            Applica ora e torna alla dashboard
-          </button>
+
+          {filterScope === 'global' && (
+            <button className="ul-button ul-button-ghost" onClick={onResetGlobal}>
+              Ripristina filtri globali
+            </button>
+          )}
+
+          {filterScope === 'customer' && activeCustomerId && (
+            <button className="ul-button ul-button-ghost text-red-500 hover:bg-red-50 hover:text-red-600" onClick={onResetCustomerProducts}>
+              Reset prodotti cliente
+            </button>
+          )}
+
+          {console.log('[GlobalFiltersPage] Render Bulk Button Check:', { filterScope, activeCustomerId, isCustomerScope: filterScope === 'customer' })}
+          {filterScope !== 'customer' && (
+            <button
+              className="ul-button ul-button-secondary"
+              disabled={activeIncludedCustomerIds.size === 0}
+              onClick={() => {
+                if (filterScope === 'customer') return; // Guard: NEVER allow bulk apply in customer scope
+                applyGlobalToCustomers(Array.from(activeIncludedCustomerIds), normalizedGlobal);
+                alert(`Filtri applicati a ${activeIncludedCustomerIds.size} clienti.`);
+              }}
+            >
+              Applica ai clienti inclusi
+            </button>
+          )}
         </div>
       </header>
       {snapshotErrors.length > 0 && (
@@ -686,7 +753,7 @@ const GlobalFiltersPage = () => {
           <FilterListSection
             title="Owner CSS"
             options={cssOwnerOptions}
-            selected={normalizedGlobal.targetCssOwners}
+            selected={currentFilters.targetCssOwners}
             onChange={onChangeCssOwnerIds}
             defaultOpen
             activeSources={ALL_RELEASE_SOURCES}
@@ -695,7 +762,9 @@ const GlobalFiltersPage = () => {
           />
           {isOwnerDisabled && (
             <div className="mt-2 text-xs text-amber-400">
-              Owner CSS disabilitato: è attivo il filtro Gruppi clienti.
+              {filterScope === 'customer'
+                ? 'Owner CSS non modificabile in modalità Cliente (Overdrive)'
+                : 'Owner CSS disabilitato: è attivo il filtro Gruppi clienti.'}
             </div>
           )}
           <div className="mt-3 text-xs text-muted-foreground">
@@ -827,7 +896,7 @@ const GlobalFiltersPage = () => {
           <FilterListSection
             title="Clienti"
             options={customerOptions}
-            selected={normalizedGlobal.targetCustomerIds}
+            selected={currentFilters.targetCustomerIds}
             onChange={(next) => updateFilters({ targetCustomerIds: next })}
             defaultOpen
             activeSources={ALL_RELEASE_SOURCES}
@@ -838,7 +907,7 @@ const GlobalFiltersPage = () => {
               <FilterListSection
                 title="Gruppi clienti"
                 options={groupOptions}
-                selected={normalizedGlobal.targetGroupIds}
+                selected={currentFilters.targetGroupIds}
                 onChange={onChangeGroupIds}
                 defaultOpen
                 activeSources={ALL_RELEASE_SOURCES}
@@ -847,7 +916,9 @@ const GlobalFiltersPage = () => {
               />
               {isGroupDisabled && (
                 <div className="mt-2 text-xs text-amber-400">
-                  Gruppi clienti disabilitati: è attivo il filtro Owner CSS.
+                  {filterScope === 'customer'
+                    ? 'Gruppi clienti non modificabili in modalità Cliente (Overdrive)'
+                    : 'Gruppi clienti disabilitati: è attivo il filtro Owner CSS.'}
                 </div>
               )}
             </>
@@ -868,7 +939,7 @@ const GlobalFiltersPage = () => {
         <h2 className="text-lg font-semibold">Fonte dati</h2>
         <div className="mt-3 space-y-3">
           <FilterSourceToggle
-            selected={normalizedGlobal.sources as ReleaseSource[]}
+            selected={currentFilters.sources as ReleaseSource[]}
             onChange={(next) => updateFilters({ sources: next })}
           />
           <div className="text-xs text-muted-foreground">
@@ -884,7 +955,7 @@ const GlobalFiltersPage = () => {
             <FilterListSection
               title="Stato"
               options={metadata.statuses}
-              selected={normalizedGlobal.statuses}
+              selected={currentFilters.statuses}
               onChange={(next) => updateFilters({ statuses: next })}
               defaultOpen
               searchable={false}
@@ -901,7 +972,7 @@ const GlobalFiltersPage = () => {
                     <FilterListSection
                       title="Prodotti (Microsoft)"
                       options={microsoftProducts}
-                      selected={normalizedGlobal.products}
+                      selected={currentFilters.products}
                       onChange={(next) => updateProductsForSource('Microsoft', next)}
                       defaultOpen
                       activeSources={['Microsoft']}
@@ -911,7 +982,7 @@ const GlobalFiltersPage = () => {
                     <FilterListSection
                       title="App (EOS)"
                       options={eosProducts}
-                      selected={normalizedGlobal.products}
+                      selected={currentFilters.products}
                       onChange={(next) => updateProductsForSource('EOS', next)}
                       defaultOpen
                       activeSources={['EOS']}
@@ -922,7 +993,7 @@ const GlobalFiltersPage = () => {
                 <FilterListSection
                   title={activeSources[0] === 'EOS' ? 'App' : 'Prodotti'}
                   options={metadata.products}
-                  selected={normalizedGlobal.products}
+                  selected={currentFilters.products}
                   onChange={(next) => updateFilters({ products: next })}
                   defaultOpen
                   activeSources={activeSources}
@@ -936,17 +1007,17 @@ const GlobalFiltersPage = () => {
             <div className="mt-4">
               <div className="text-xs uppercase text-muted-foreground">
                 BC Version
-                  {sourceTagFor('bcMinVersion', ['EOS']) && (
-                    <span className="ml-2 inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">
-                      {sourceTagFor('bcMinVersion', ['EOS'])}
-                    </span>
-                  )}
-                </div>
+                {sourceTagFor('bcMinVersion', ['EOS']) && (
+                  <span className="ml-2 inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">
+                    {sourceTagFor('bcMinVersion', ['EOS'])}
+                  </span>
+                )}
+              </div>
               <select
                 className="ul-input mt-2 text-xs"
                 value={
-                  normalizedGlobal.minBcVersionMin !== null
-                    ? String(normalizedGlobal.minBcVersionMin)
+                  currentFilters.minBcVersionMin !== null
+                    ? String(currentFilters.minBcVersionMin)
                     : ''
                 }
                 onChange={(event) =>
@@ -968,7 +1039,7 @@ const GlobalFiltersPage = () => {
             <FilterListSection
               title="Mese"
               options={metadata.months}
-              selected={normalizedGlobal.months}
+              selected={currentFilters.months}
               onChange={(next) => updateFilters({ months: next })}
               searchable={false}
               maxVisible={24}
@@ -982,7 +1053,7 @@ const GlobalFiltersPage = () => {
               <div className="text-xs uppercase text-muted-foreground">Ricerca</div>
               <input
                 className="ul-input mt-2"
-                value={normalizedGlobal.query}
+                value={currentFilters.query}
                 onChange={(event) => updateFilters({ query: event.target.value })}
                 placeholder="Ricerca"
               />
@@ -996,7 +1067,7 @@ const GlobalFiltersPage = () => {
             <FilterListSection
               title="Categorie"
               options={metadata.categories}
-              selected={normalizedGlobal.categories}
+              selected={currentFilters.categories}
               onChange={(next) => updateFilters({ categories: next })}
               activeSources={activeSources}
               sourceTag={sourceTagFor('categories', sourcesFromOptions(metadata.categories))}
@@ -1007,7 +1078,7 @@ const GlobalFiltersPage = () => {
             <FilterListSection
               title="Tag"
               options={metadata.tags}
-              selected={normalizedGlobal.tags}
+              selected={currentFilters.tags}
               onChange={(next) => updateFilters({ tags: next })}
               activeSources={activeSources}
               sourceTag={sourceTagFor('tags', sourcesFromOptions(metadata.tags))}
@@ -1018,7 +1089,7 @@ const GlobalFiltersPage = () => {
             <FilterListSection
               title="Wave"
               options={metadata.waves}
-              selected={normalizedGlobal.waves}
+              selected={currentFilters.waves}
               onChange={(next) => updateFilters({ waves: next })}
               searchable={false}
               activeSources={activeSources}
@@ -1028,12 +1099,12 @@ const GlobalFiltersPage = () => {
           )}
           {isFilterVisible('availabilityType') &&
             hasOptionsForSources(metadata.availabilityTypes) && (
-            <FilterListSection
-              title="Availability type"
-              options={metadata.availabilityTypes}
-              selected={normalizedGlobal.availabilityTypes}
-              onChange={(next) => updateFilters({ availabilityTypes: next })}
-              activeSources={activeSources}
+              <FilterListSection
+                title="Availability type"
+                options={metadata.availabilityTypes}
+                selected={currentFilters.availabilityTypes}
+                onChange={(next) => updateFilters({ availabilityTypes: next })}
+                activeSources={activeSources}
                 sourceTag={sourceTagFor(
                   'availabilityType',
                   sourcesFromOptions(metadata.availabilityTypes)
@@ -1045,7 +1116,7 @@ const GlobalFiltersPage = () => {
             <FilterListSection
               title="Enabled for"
               options={metadata.enabledFor}
-              selected={normalizedGlobal.enabledFor}
+              selected={currentFilters.enabledFor}
               onChange={(next) => updateFilters({ enabledFor: next })}
               activeSources={activeSources}
               sourceTag={sourceTagFor('enabledFor', sourcesFromOptions(metadata.enabledFor))}
@@ -1056,7 +1127,7 @@ const GlobalFiltersPage = () => {
             <FilterListSection
               title="Geografia"
               options={metadata.geography}
-              selected={normalizedGlobal.geography}
+              selected={currentFilters.geography}
               onChange={(next) => updateFilters({ geography: next })}
               activeSources={activeSources}
               sourceTag={sourceTagFor('geography', sourcesFromOptions(metadata.geography))}
@@ -1067,7 +1138,7 @@ const GlobalFiltersPage = () => {
             <FilterListSection
               title="Lingua"
               options={metadata.language}
-              selected={normalizedGlobal.language}
+              selected={currentFilters.language}
               onChange={(next) => updateFilters({ language: next })}
               activeSources={activeSources}
               sourceTag={sourceTagFor('language', sourcesFromOptions(metadata.language))}
@@ -1079,126 +1150,124 @@ const GlobalFiltersPage = () => {
             isFilterVisible('periodChangedDays') ||
             isFilterVisible('releaseInDays') ||
             isFilterVisible('releaseDateRange')) && (
-            <details className="mt-4" open>
-              <summary className="cursor-pointer text-xs uppercase text-muted-foreground">
-                Periodi
-                {sourceTagFor('periodNewDays') && (
-                  <span className="ml-2 inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">
-                    {sourceTagFor('periodNewDays')}
-                  </span>
-                )}
-              </summary>
-              <div className="mt-2 space-y-3 text-xs">
-                {isFilterVisible('periodNewDays') && (
-                  <label className="flex items-center gap-2 text-muted-foreground">
-                    <span className="min-w-[110px]">Nuovi</span>
-                    <select
-                      className="ul-input text-xs"
-                      value={normalizedGlobal.periodNewDays}
-                      onChange={(event) =>
-                        updateFilters({ periodNewDays: Number(event.target.value) })
-                      }
-                    >
-                      <option value={0}>Tutti</option>
-                      <option value={7}>Ultimi 7 giorni</option>
-                      <option value={30}>Ultimi 30 giorni</option>
-                    </select>
-                  </label>
-                )}
-                {isFilterVisible('periodChangedDays') && (
-                  <label className="flex items-center gap-2 text-muted-foreground">
-                    <span className="min-w-[110px]">Modificati</span>
-                    <select
-                      className="ul-input text-xs"
-                      value={normalizedGlobal.periodChangedDays}
-                      onChange={(event) =>
-                        updateFilters({ periodChangedDays: Number(event.target.value) })
-                      }
-                    >
-                      <option value={0}>Tutti</option>
-                      <option value={7}>Ultimi 7 giorni</option>
-                      <option value={30}>Ultimi 30 giorni</option>
-                    </select>
-                  </label>
-                )}
-                {isFilterVisible('releaseInDays') && (
-                  <label className="flex items-center gap-2 text-muted-foreground">
-                    <span className="min-w-[110px]">Release entro</span>
-                    <select
-                      className="ul-input text-xs"
-                      value={normalizedGlobal.releaseInDays}
-                      onChange={(event) =>
-                        updateFilters({ releaseInDays: Number(event.target.value) })
-                      }
-                    >
-                      <option value={0}>Tutte</option>
-                      <option value={30}>30 giorni</option>
-                    </select>
-                  </label>
-                )}
-                {isFilterVisible('releaseDateRange') && (
-                  <>
+              <details className="mt-4" open>
+                <summary className="cursor-pointer text-xs uppercase text-muted-foreground">
+                  Periodi
+                  {sourceTagFor('periodNewDays') && (
+                    <span className="ml-2 inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">
+                      {sourceTagFor('periodNewDays')}
+                    </span>
+                  )}
+                </summary>
+                <div className="mt-2 space-y-3 text-xs">
+                  {isFilterVisible('periodNewDays') && (
                     <label className="flex items-center gap-2 text-muted-foreground">
-                      <span className="min-w-[110px]">Da</span>
-                      <input
-                        type="date"
+                      <span className="min-w-[110px]">Nuovi</span>
+                      <select
                         className="ul-input text-xs"
-                        value={normalizedGlobal.releaseDateFrom}
+                        value={currentFilters.periodNewDays}
                         onChange={(event) =>
-                          updateFilters({ releaseDateFrom: event.target.value })
+                          updateFilters({ periodNewDays: Number(event.target.value) })
                         }
-                      />
+                      >
+                        <option value={0}>Tutti</option>
+                        <option value={7}>Ultimi 7 giorni</option>
+                        <option value={30}>Ultimi 30 giorni</option>
+                      </select>
                     </label>
+                  )}
+                  {isFilterVisible('periodChangedDays') && (
                     <label className="flex items-center gap-2 text-muted-foreground">
-                      <span className="min-w-[110px]">A</span>
-                      <input
-                        type="date"
+                      <span className="min-w-[110px]">Modificati</span>
+                      <select
                         className="ul-input text-xs"
-                        value={normalizedGlobal.releaseDateTo}
+                        value={currentFilters.periodChangedDays}
                         onChange={(event) =>
-                          updateFilters({ releaseDateTo: event.target.value })
+                          updateFilters({ periodChangedDays: Number(event.target.value) })
                         }
-                      />
+                      >
+                        <option value={0}>Tutti</option>
+                        <option value={7}>Ultimi 7 giorni</option>
+                        <option value={30}>Ultimi 30 giorni</option>
+                      </select>
                     </label>
-                  </>
-                )}
-              </div>
-            </details>
-          )}
-          {isFilterVisible('sortOrder') && (
-            <div className="mt-4">
-              <div className="text-xs uppercase text-muted-foreground">Ordinamento</div>
-              <select
-                className="ul-input mt-2 text-xs"
-                value={normalizedGlobal.sortOrder}
-                onChange={(event) =>
-                  updateFilters({ sortOrder: event.target.value as 'newest' | 'oldest' })
-                }
-              >
-                <option value="newest">Dal piu recente</option>
-                <option value="oldest">Dal piu vecchio</option>
-              </select>
-            </div>
-          )}
+                  )}
+                  {isFilterVisible('releaseInDays') && (
+                    <label className="flex items-center gap-2 text-muted-foreground">
+                      <span className="min-w-[110px]">Rilascio entro</span>
+                      <select
+                        className="ul-input text-xs"
+                        value={currentFilters.releaseInDays}
+                        onChange={(event) =>
+                          updateFilters({ releaseInDays: Number(event.target.value) })
+                        }
+                      >
+                        <option value={0}>Tutti</option>
+                        <option value={7}>7 giorni</option>
+                        <option value={14}>14 giorni</option>
+                        <option value={30}>30 giorni</option>
+                        <option value={60}>60 giorni</option>
+                        <option value={90}>90 giorni</option>
+                      </select>
+                    </label>
+                  )}
+                  {isFilterVisible('releaseDateRange') && (
+                    <div className="space-y-2">
+                      <label className="flex items-center gap-2 text-muted-foreground">
+                        <span className="min-w-[110px]">Data rilascio (da)</span>
+                        <input
+                          type="date"
+                          className="ul-input text-xs"
+                          value={currentFilters.releaseDateFrom}
+                          onChange={(event) =>
+                            updateFilters({ releaseDateFrom: event.target.value })
+                          }
+                        />
+                      </label>
+                      <label className="flex items-center gap-2 text-muted-foreground">
+                        <span className="min-w-[110px]">Data rilascio (a)</span>
+                        <input
+                          type="date"
+                          className="ul-input text-xs"
+                          value={currentFilters.releaseDateTo}
+                          onChange={(event) =>
+                            updateFilters({ releaseDateTo: event.target.value })
+                          }
+                        />
+                      </label>
+                    </div>
+                  )}
+                </div>
+              </details>
+            )}
 
-          {isFilterVisible('historyMonths') && (
+          {isFilterVisible('horizonMonths') && (
             <div className="mt-4">
-              <div className="text-xs uppercase text-muted-foreground">
-                Storico (mesi)
+              <div className="text-xs uppercase text-muted-foreground">Orizzonte temporale</div>
+              <div className="mt-2 space-y-3 text-xs">
+                <label className="flex items-center gap-2 text-muted-foreground">
+                  <span className="min-w-[110px]">Horizon (mesi)</span>
+                  <input
+                    type="number"
+                    className="ul-input text-xs"
+                    value={currentFilters.horizonMonths}
+                    onChange={(event) =>
+                      updateFilters({ horizonMonths: Number(event.target.value) })
+                    }
+                  />
+                </label>
+                <label className="flex items-center gap-2 text-muted-foreground">
+                  <span className="min-w-[110px]">History (mesi)</span>
+                  <input
+                    type="number"
+                    className="ul-input text-xs"
+                    value={currentFilters.historyMonths}
+                    onChange={(event) =>
+                      updateFilters({ historyMonths: Number(event.target.value) })
+                    }
+                  />
+                </label>
               </div>
-              <select
-                className="ul-input mt-2 text-xs"
-                value={normalizedGlobal.historyMonths}
-                onChange={(event) =>
-                  updateFilters({ historyMonths: Number(event.target.value) })
-                }
-              >
-                {[6, 12, 24, 60, 120].map((value) => (
-                  <option key={value} value={value}>
-                    Ultimi {value} mesi
-                  </option>
-                ))}
-              </select>
             </div>
           )}
         </div>

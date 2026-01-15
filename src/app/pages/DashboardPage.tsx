@@ -11,20 +11,17 @@ import {
 import { useCustomerStore } from '../store/useCustomerStore';
 import { useFilterStore, type FilterState } from '../store/useFilterStore';
 import { buildFilterMetadata } from '../../services/FilterMetadata';
+import {
+  normalizeFilters,
+  createDefaultFilters,
+  buildNormalizationContext
+} from '../../services/FilterNormalization';
 import FilterListSection from '../components/FilterListSection';
 import FilterSourceToggle from '../components/FilterSourceToggle';
 import { isValidHttpUrl } from '../../utils/url';
 import { isReleasePlansUrl, isValidGuid } from '../../utils/releaseplans';
 import { getProductColor } from '../../utils/productColors';
 import type { FilterKey } from '../../services/FilterDefinitions';
-
-const normalizeSelection = (values: string[], options: string[]): string[] => {
-  if (values.length === 0) {
-    return [];
-  }
-  const valid = values.filter((value) => options.includes(value));
-  return valid.length > 0 ? valid : options;
-};
 
 const optionValuesForSources = (
   options: { value: string; sources: ReleaseSource[] }[],
@@ -39,13 +36,6 @@ const optionValuesForSources = (
     )
     .map((option) => option.value);
 };
-
-const normalizeSelectionForSources = (
-  values: string[],
-  options: { value: string; sources: ReleaseSource[] }[],
-  sources: ReleaseSource[],
-  matchAllSources: boolean
-): string[] => normalizeSelection(values, optionValuesForSources(options, sources, matchAllSources));
 
 type Chip = {
   label: string;
@@ -86,26 +76,7 @@ const DashboardPage = () => {
 
   const items = snapshotItems;
   const metadata = useMemo(() => buildFilterMetadata(items), [items]);
-  const productSourceMap = useMemo(() => {
-    const map = new Map<string, ReleaseSource>();
-    items.forEach((item) => {
-      if (!map.has(item.productName)) {
-        map.set(item.productName, item.source);
-      }
-    });
-    return map;
-  }, [items]);
-  const productsBySource = useMemo(() => {
-    const map = new Map<ReleaseSource, string[]>();
-    items.forEach((item) => {
-      const list = map.get(item.source) ?? [];
-      if (!list.includes(item.productName)) {
-        list.push(item.productName);
-        map.set(item.source, list);
-      }
-    });
-    return map;
-  }, [items]);
+
   const sourceOptions = useMemo(
     () =>
       metadata.sources.length
@@ -131,33 +102,22 @@ const DashboardPage = () => {
     return versions.sort((a, b) => b - a);
   }, [items]);
 
+  const normContext = useMemo(
+    () => buildNormalizationContext(items, metadata, sourceOptions),
+    [items, metadata, sourceOptions]
+  );
+
+  const productSourceMap = normContext.productSourceMap;
+
   const defaultFilters: FilterState = useMemo(
-    () => ({
-      targetCustomerIds: [],
-      targetGroupIds: [],
-      targetCssOwners: [],
-      products: productOptions,
-      sources: sourceOptions,
-      statuses: statusOptions,
-      categories: [],
-      tags: [],
-      waves: [],
-      months: [],
-      availabilityTypes: [],
-      enabledFor: [],
-      geography: [],
-      language: [],
-      periodNewDays: 0,
-      periodChangedDays: 0,
-      releaseInDays: 0,
-      minBcVersionMin: null,
-      releaseDateFrom: '',
-      releaseDateTo: '',
-      sortOrder: 'newest',
-      query: '',
-      horizonMonths: rulesConfig.defaults.horizonMonths,
-      historyMonths: rulesConfig.defaults.historyMonths
-    }),
+    () =>
+      createDefaultFilters(
+        productOptions,
+        sourceOptions,
+        statusOptions,
+        rulesConfig.defaults.horizonMonths,
+        rulesConfig.defaults.historyMonths
+      ),
     [
       productOptions,
       sourceOptions,
@@ -177,105 +137,14 @@ const DashboardPage = () => {
   const activeMode =
     activeCustomerId ? customerFilterMode[activeCustomerId] ?? 'inherit' : 'inherit';
 
-  const normalizeFilters = (raw: FilterState): FilterState => {
-    const merged = { ...defaultFilters, ...raw };
-    const sources = normalizeSelection(merged.sources, sourceOptions) as ReleaseSource[];
-    const matchAllSources = false;
-    const productSelection = normalizeSelectionForSources(
-      merged.products,
-      metadata.products,
-      sources,
-      matchAllSources
-    );
-    const expandedProducts = new Set(productSelection);
-    sources.forEach((source) => {
-      const hasProduct = productSelection.some(
-        (product) => productSourceMap.get(product) === source
-      );
-      if (!hasProduct) {
-        (productsBySource.get(source) ?? []).forEach((product) =>
-          expandedProducts.add(product)
-        );
-      }
-    });
-    return {
-      ...merged,
-      products: Array.from(expandedProducts),
-      sources,
-      statuses: normalizeSelectionForSources(
-        merged.statuses,
-        metadata.statuses,
-        sources,
-        matchAllSources
-      ),
-      categories: normalizeSelectionForSources(
-        merged.categories,
-        metadata.categories,
-        sources,
-        matchAllSources
-      ),
-      tags: normalizeSelectionForSources(merged.tags, metadata.tags, sources, matchAllSources),
-      waves: normalizeSelectionForSources(
-        merged.waves,
-        metadata.waves,
-        sources,
-        matchAllSources
-      ),
-      months: normalizeSelectionForSources(
-        merged.months,
-        metadata.months,
-        sources,
-        matchAllSources
-      ),
-      availabilityTypes: normalizeSelectionForSources(
-        merged.availabilityTypes,
-        metadata.availabilityTypes,
-        sources,
-        matchAllSources
-      ),
-      enabledFor: normalizeSelectionForSources(
-        merged.enabledFor,
-        metadata.enabledFor,
-        sources,
-        matchAllSources
-      ),
-      geography: normalizeSelectionForSources(
-        merged.geography,
-        metadata.geography,
-        sources,
-        matchAllSources
-      ),
-      language: normalizeSelectionForSources(
-        merged.language,
-        metadata.language,
-        sources,
-        matchAllSources
-      )
-    };
-  };
-
+  // Usa la normalizzazione centralizzata - aspetta che i dati siano caricati
   const normalizedCssFilters = useMemo(() => {
-    if (!cssFilters) {
-      return null;
+    // Se i dati non sono ancora caricati, usa i default
+    if (!snapshotsLoaded || items.length === 0) {
+      return cssFilters ? { ...defaultFilters, ...cssFilters } : defaultFilters;
     }
-    return normalizeFilters(cssFilters);
-  }, [
-    defaultFilters,
-    cssFilters,
-    sourceOptions,
-    metadata.products,
-    metadata.statuses,
-    metadata.categories,
-    metadata.tags,
-    metadata.waves,
-    metadata.months,
-    metadata.availabilityTypes,
-    metadata.enabledFor,
-    metadata.geography,
-    metadata.language,
-    productSourceMap,
-    productsBySource
-  ]);
+    return normalizeFilters(cssFilters, defaultFilters, normContext);
+  }, [cssFilters, defaultFilters, normContext, snapshotsLoaded, items.length]);
 
   const activeFilters = useMemo(() => {
     if (!activeCustomerId) {
@@ -288,16 +157,20 @@ const DashboardPage = () => {
     if (!custom) {
       return normalizedCssFilters;
     }
-    return normalizeFilters(custom);
+    // Se i dati non sono ancora caricati, usa i custom filters direttamente
+    if (!snapshotsLoaded || items.length === 0) {
+      return { ...defaultFilters, ...custom };
+    }
+    return normalizeFilters(custom, defaultFilters, normContext);
   }, [
     activeCustomerId,
     activeMode,
     customerFilters,
     defaultFilters,
     normalizedCssFilters,
-    productSourceMap,
-    productsBySource,
-    sourceOptions
+    normContext,
+    snapshotsLoaded,
+    items.length
   ]);
 
   const activeSources = resolveActiveSources(
@@ -348,19 +221,6 @@ const DashboardPage = () => {
     );
     updateFilters({ products: Array.from(new Set([...toKeep, ...next])) });
   };
-
-  useEffect(() => {
-    if (!normalizedCssFilters || !cssFilters) {
-      return;
-    }
-    if (
-      normalizedCssFilters.products.join('|') !== cssFilters.products.join('|') ||
-      normalizedCssFilters.sources.join('|') !== cssFilters.sources.join('|') ||
-      normalizedCssFilters.statuses.join('|') !== cssFilters.statuses.join('|')
-    ) {
-      setCssFilters(normalizedCssFilters);
-    }
-  }, [cssFilters, normalizedCssFilters, setCssFilters]);
 
   const updateFilters = (nextFilters: Partial<FilterState>) => {
     if (!activeCustomerId) {

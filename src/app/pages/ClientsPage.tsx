@@ -107,7 +107,11 @@ const ClientsPage = () => {
     customerFilters,
     customerFilterMode,
     ensureCssFilters,
-    removeGroupFromFilters
+    removeGroupFromFilters,
+    applyGlobalToCustomers,
+    clearOverridesForCustomers,
+    setCustomerFilters,
+    setCustomerMode
   } = useFilterStore();
 
   const [search, setSearch] = useState('');
@@ -620,7 +624,7 @@ const ClientsPage = () => {
   };
 
   const onExportJson = () => {
-    const content = exportCustomers(index, customers);
+    const content = exportCustomers(index, customers, customerFilters, customerFilterMode);
     const blob = new Blob([content], { type: 'application/json;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -638,7 +642,31 @@ const ClientsPage = () => {
     }
     const parsed = importCustomers(jsonImport);
     replaceAll(parsed.index, parsed.customers);
+
+    if (parsed.customerFilters) {
+      Object.entries(parsed.customerFilters).forEach(([id, filters]) => {
+        setCustomerFilters(id, filters);
+      });
+    }
+    if (parsed.customerFilterMode) {
+      Object.entries(parsed.customerFilterMode).forEach(([id, mode]) => {
+        setCustomerMode(id, mode);
+      });
+    }
+
     setJsonImport('');
+  };
+
+  const onBulkApplyGlobal = () => {
+    const ids = filteredIndex.map((entry) => entry.id);
+    if (ids.length === 0) return;
+    applyGlobalToCustomers(ids, normalizedCssFilters);
+  };
+
+  const onBulkClearOverrides = () => {
+    const ids = filteredIndex.map((entry) => entry.id);
+    if (ids.length === 0) return;
+    clearOverridesForCustomers(ids);
   };
 
   const groupToDelete = groupDeleteId
@@ -703,12 +731,29 @@ const ClientsPage = () => {
           </div>
 
           <div className="mt-4 space-y-2 text-sm">
+            {/* Bulk Actions */}
+            <div className="mb-4 flex flex-col gap-2 border-b pb-4">
+              <button
+                className="ul-button ul-button-secondary text-xs"
+                onClick={onBulkApplyGlobal}
+                disabled={filteredIndex.length === 0}
+              >
+                Applica filtri globali ({filteredIndex.length})
+              </button>
+              <button
+                className="ul-button ul-button-ghost text-xs"
+                onClick={onBulkClearOverrides}
+                disabled={filteredIndex.length === 0}
+              >
+                Rimuovi override custom ({filteredIndex.length})
+              </button>
+            </div>
+
             {filteredIndex.map((entry) => (
               <button
                 key={entry.id}
-                className={`w-full rounded-xl px-3 py-2 text-left ${
-                  entry.id === editingId ? 'bg-accent text-accent-foreground' : 'text-muted-foreground'
-                }`}
+                className={`w-full rounded-xl px-3 py-2 text-left ${entry.id === editingId ? 'bg-accent text-accent-foreground' : 'text-muted-foreground'
+                  }`}
                 onClick={() => resetForm(customers[entry.id])}
               >
                 <div className="flex items-center justify-between gap-2">
@@ -804,9 +849,8 @@ const ClientsPage = () => {
                 {sortedGroups.map((group) => (
                   <div
                     key={group.id}
-                    className={`rounded-xl border border-border/60 p-4 ${
-                      group.id === groupFormId ? 'bg-accent/40' : ''
-                    }`}
+                    className={`rounded-xl border border-border/60 p-4 ${group.id === groupFormId ? 'bg-accent/40' : ''
+                      }`}
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>

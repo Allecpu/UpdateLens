@@ -16,12 +16,13 @@ type FilterStoreState = {
   resetAllFilters: (defaults: FilterState) => void;
   resetCustomerFilters: (customerId: string) => void;
   removeGroupFromFilters: (groupId: string) => void;
+  applyGlobalToCustomers: (customerIds: string[], globalFilters: FilterState) => void;
+  clearOverridesForCustomers: (customerIds: string[]) => void;
 };
 
 const CSS_KEY = 'updatelens.filters.css.v3';
-const LEGACY_GLOBAL_KEY = 'updatelens.filters.global.v2';
-const CUSTOM_KEY = 'updatelens.filters.custom.v3';
-const MODE_KEY = 'updatelens.filters.mode.v3';
+const CUSTOM_KEY = 'updatelens_filters_v1_custom'; // Stable key requests
+const MODE_KEY = 'updatelens_filters_v1_mode'; // Stable key requests
 
 const readJson = <T,>(key: string, fallback: T): T => {
   const raw = localStorage.getItem(key);
@@ -53,9 +54,7 @@ const loadInitial = (): {
   customerFilterMode: Record<string, FilterMode>;
 } => {
   return {
-    cssFilters:
-      readJson<FilterState | null>(CSS_KEY, null) ??
-      readJson<FilterState | null>(LEGACY_GLOBAL_KEY, null),
+    cssFilters: readJson<FilterState | null>(CSS_KEY, null),
     customerFilters: readJson<Record<string, FilterState>>(CUSTOM_KEY, {}),
     customerFilterMode: readJson<Record<string, FilterMode>>(MODE_KEY, {})
   };
@@ -115,6 +114,32 @@ export const useFilterStore = create<FilterStoreState>((set, get) => {
       );
       persist(nextCss, nextCustomerFilters, customerFilterMode);
       set({ cssFilters: nextCss, customerFilters: nextCustomerFilters });
+    },
+    applyGlobalToCustomers: (customerIds, globalFilters) => {
+      const { cssFilters, customerFilters, customerFilterMode } = get();
+      const nextFilters = { ...customerFilters };
+      const nextMode = { ...customerFilterMode };
+
+      customerIds.forEach(id => {
+        nextFilters[id] = globalFilters;
+        nextMode[id] = 'custom';
+      });
+
+      persist(cssFilters, nextFilters, nextMode);
+      set({ customerFilters: nextFilters, customerFilterMode: nextMode });
+    },
+    clearOverridesForCustomers: (customerIds) => {
+      const { cssFilters, customerFilters, customerFilterMode } = get();
+      const nextFilters = { ...customerFilters };
+      const nextMode = { ...customerFilterMode };
+
+      customerIds.forEach(id => {
+        delete nextFilters[id];
+        delete nextMode[id]; // or set to 'inherit' explicitly if we kept the key
+      });
+
+      persist(cssFilters, nextFilters, nextMode);
+      set({ customerFilters: nextFilters, customerFilterMode: nextMode });
     }
   };
 });
