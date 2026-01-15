@@ -1,4 +1,7 @@
 import type { Customer, CustomerIndexEntry } from '../models/Customer';
+import type { FilterState } from '../models/Filters';
+
+type FilterMode = 'inherit' | 'custom';
 
 const INDEX_KEY = 'updatelens.customers.index';
 const CUSTOMER_KEY_PREFIX = 'updatelens.customer.';
@@ -41,13 +44,17 @@ export const deleteCustomer = (id: string): void => {
 
 export const exportCustomers = (
   index: CustomerIndexEntry[],
-  customers: Record<string, Customer>
+  customers: Record<string, Customer>,
+  customerFilters: Record<string, FilterState>,
+  customerFilterMode: Record<string, FilterMode>
 ): string => {
   return JSON.stringify(
     {
       version: 1,
       index,
-      customers
+      customers,
+      customerFilters,
+      customerFilterMode
     },
     null,
     2
@@ -56,13 +63,22 @@ export const exportCustomers = (
 
 export const importCustomers = (
   payload: string
-): { index: CustomerIndexEntry[]; customers: Record<string, Customer> } => {
+): {
+  index: CustomerIndexEntry[];
+  customers: Record<string, Customer>;
+  customerFilters: Record<string, FilterState>;
+  customerFilterMode: Record<string, FilterMode>;
+} => {
   const parsed = JSON.parse(payload) as {
     index?: CustomerIndexEntry[];
     customers?: Record<string, Customer>;
+    customerFilters?: Record<string, FilterState>;
+    customerFilterMode?: Record<string, FilterMode>;
   };
   return {
     index: parsed.index ?? [],
-    customers: parsed.customers ?? {}
+    customers: parsed.customers ?? {},
+    customerFilters: parsed.customerFilters ?? {},
+    customerFilterMode: parsed.customerFilterMode ?? {}
   };
 };

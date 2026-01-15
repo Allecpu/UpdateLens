@@ -55,8 +55,7 @@ const resolveActiveCustomerId = (
       return currentId;
     }
   }
-  const firstActive = entries.find((entry) => isEntryActive(entry));
-  return firstActive ? firstActive.id : null;
+  return null;
 };
 
 const loadInitialState = (): {

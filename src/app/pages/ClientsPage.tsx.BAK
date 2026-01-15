@@ -1,0 +1,40 @@
+    return {
+      ...merged,
+      products: productSelection,
+      sources,
+      statuses,
+      categories,
+      tags,
+      waves,
+      months,
+      availabilityTypes,
+      enabledFor,
+      geography,
+      language
+    };
+  };
+
+  const normalizedCssFilters = useMemo(() => {
+    return normalizeFilters(cssFilters ?? defaultFilters);
+  }, [
+    defaultFilters,
+    cssFilters,
+    productOptions,
+    sourceOptions,
+    statusOptions,
+    metadata.products,
+    metadata.statuses,
+    metadata.categories,
+    metadata.tags,
+    metadata.waves,
+    metadata.months,
+    metadata.availabilityTypes,
+    metadata.enabledFor,
+    metadata.geography,
+    metadata.language,
+    productSourceMap,
+    productsBySource
+  ]);
+
+  const customerMode =
+    editingId ? customerFilterMode[editingId] ?? 'inherit' : 'inherit';
