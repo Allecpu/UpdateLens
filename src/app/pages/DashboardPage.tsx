@@ -451,6 +451,21 @@ const DashboardPage = () => {
     downloadMarkdown(content, 'update-lens-export.md');
   };
 
+  const asChip = (label: string, value: string | number | null | undefined) => {
+    if (value === null || value === undefined) {
+      return null;
+    }
+    const text = typeof value === 'string' ? value.trim() : value;
+    if (text === '') {
+      return null;
+    }
+    return (
+      <span className="ul-chip">
+        {label}: {text}
+      </span>
+    );
+  };
+
   const visibleChips = chips.slice(0, 8);
   const hiddenCount = chips.length - visibleChips.length;
 
@@ -708,6 +723,21 @@ const DashboardPage = () => {
           ) : (
             sortedDrilledItems.map((item: ReleaseItem) => {
               const productColor = getProductColor(item.productName);
+              const availabilityTypes = (item.availabilityTypes ?? [])
+                .map((value) => value.trim())
+                .filter((value) => value.length > 0);
+              const availabilityTypeValues = availabilityTypes.filter((value) =>
+                /preview/i.test(value)
+              );
+              const releaseTypeValues = availabilityTypes.filter(
+                (value) => !/preview/i.test(value)
+              );
+              const infoChips = [
+                asChip('Wave', item.wave),
+                ...availabilityTypeValues.map((value) => asChip('Availability', value)),
+                ...releaseTypeValues.map((value) => asChip('Release', value)),
+                asChip('BC', item.minBcVersion)
+              ].filter(Boolean);
               return (
                 <article
                   key={item.id}
@@ -725,6 +755,11 @@ const DashboardPage = () => {
                         {item.productName}
                       </span>
                       <h2 className="mt-2 text-lg font-semibold">{item.title}</h2>
+                      {infoChips.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {infoChips}
+                        </div>
+                      )}
                     </div>
                     <span className="ul-chip">{item.status}</span>
                   </div>
