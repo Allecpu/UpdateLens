@@ -8,6 +8,96 @@ export type FilterOption = {
   sources: ReleaseSource[];
 };
 
+/**
+ * Normalize a product label for display.
+ * - Removes markdown links: [text](url) → text
+ * - Removes standalone URLs
+ * - Trims whitespace
+ * - Converts to Title Case
+ */
+export const normalizeProductLabel = (raw: string): string => {
+  if (!raw) return '';
+
+  let label = raw;
+
+  // Remove markdown links: [text](url) → text
+  label = label.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+
+  // Remove standalone URLs (http/https)
+  label = label.replace(/https?:\/\/[^\s]+/gi, '');
+
+  // Remove any remaining brackets
+  label = label.replace(/[[\]()]/g, '');
+
+  // Trim and collapse whitespace
+  label = label.trim().replace(/\s+/g, ' ');
+
+  // Convert to Title Case (each word capitalized)
+  label = label
+    .toLowerCase()
+    .split(' ')
+    .map((word) => (word.length > 0 ? word.charAt(0).toUpperCase() + word.slice(1) : ''))
+    .join(' ');
+
+  return label;
+};
+
+/**
+ * Create a case-insensitive key for deduplication.
+ */
+const normalizedKey = (label: string): string => label.toLowerCase().trim();
+
+/**
+ * Count product values with normalization and deduplication.
+ * Products with the same normalized label are merged.
+ *
+ * IMPORTANT: Uses normalized label as `value` for consistent filtering.
+ * FilterService must also normalize item.productName when comparing.
+ */
+const countProductsWithNormalization = (
+  items: ReleaseItem[]
+): FilterOption[] => {
+  // Map: normalizedKey → { label, count, sources }
+  const groups = new Map<
+    string,
+    {
+      label: string;
+      count: number;
+      sources: Set<ReleaseSource>;
+    }
+  >();
+
+  items.forEach((item) => {
+    const rawValue = item.productName;
+    if (!rawValue) return;
+
+    const label = normalizeProductLabel(rawValue);
+    const key = normalizedKey(label);
+    if (!key) return;
+
+    const existing = groups.get(key);
+    if (existing) {
+      existing.count += 1;
+      existing.sources.add(item.source);
+    } else {
+      groups.set(key, {
+        label,
+        count: 1,
+        sources: new Set([item.source])
+      });
+    }
+  });
+
+  return Array.from(groups.values())
+    .map((group) => ({
+      value: group.label, // Use normalized label as value for filtering
+      label: group.label,
+      count: group.count,
+      sources: Array.from(group.sources)
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+};
+
 export type FilterMetadata = {
   sources: FilterOption[];
   products: FilterOption[];
@@ -75,7 +165,7 @@ const sortMonthsDesc = (
 export const buildFilterMetadata = (items: ReleaseItem[]): FilterMetadata => {
   return {
     sources: countValues(items, (item) => [item.source]),
-    products: countValues(items, (item) => [item.productName]),
+    products: countProductsWithNormalization(items), // Use normalized/deduplicated products
     statuses: countValues(items, (item) => [item.status]),
     categories: countValues(items, (item) => [item.category ?? '']),
     tags: countValues(items, (item) => item.tags ?? []),

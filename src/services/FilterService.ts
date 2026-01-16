@@ -3,6 +3,7 @@ import type { ReleaseSource } from '../models/ReleaseItem';
 import type { FilterState } from '../models/Filters';
 import { isFilterSupported } from './FilterDefinitions';
 import { extractCountriesFromHtml } from '../utils/geography';
+import { normalizeProductLabel } from './FilterMetadata';
 
 const toMonthDate = (value: string): Date | null => {
   const [yearRaw, monthRaw] = value.split('-');
@@ -53,10 +54,12 @@ export const filterReleaseItems = (
   const query = filters.query.trim().toLowerCase();
   const releaseDateFrom = parseDateAny(filters.releaseDateFrom);
   const releaseDateTo = parseDateAny(filters.releaseDateTo);
+  // Build product source map using NORMALIZED product names as keys
   const productSourceMap = new Map<string, ReleaseSource>();
   items.forEach((item) => {
-    if (!productSourceMap.has(item.productName)) {
-      productSourceMap.set(item.productName, item.source);
+    const normalizedName = normalizeProductLabel(item.productName);
+    if (!productSourceMap.has(normalizedName)) {
+      productSourceMap.set(normalizedName, item.source);
     }
   });
 
@@ -89,14 +92,18 @@ export const filterReleaseItems = (
   });
   debugCounts.afterStatuses = remaining.length;
 
-  // 3. Products filter
+  // 3. Products filter (uses normalized product names for comparison)
   remaining = remaining.filter(item => {
     if (isFilterSupported(item.source, 'productOrApp') && filters.products.length) {
+      // Normalize item's product name for comparison
+      const normalizedItemProduct = normalizeProductLabel(item.productName);
+      // Check if there's any selected product for this source
       const hasProductForSource = filters.products.some(
         (product) => productSourceMap.get(product) === item.source
       );
       if (hasProductForSource) {
-        return filters.products.includes(item.productName);
+        // Compare normalized names (filters.products contains normalized values)
+        return filters.products.includes(normalizedItemProduct);
       }
     }
     return true;

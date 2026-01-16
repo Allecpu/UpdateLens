@@ -1,6 +1,6 @@
 import type { FilterState } from '../models/Filters';
 import type { ReleaseSource } from '../models/ReleaseItem';
-import type { FilterMetadata } from './FilterMetadata';
+import { type FilterMetadata, normalizeProductLabel } from './FilterMetadata';
 
 export type NormalizationContext = {
   sourceOptions: string[];
@@ -204,16 +204,20 @@ export const buildNormalizationContext = (
   metadata: FilterMetadata,
   sourceOptions: string[]
 ): NormalizationContext => {
+  // Use NORMALIZED product names as keys for consistent filtering
   const productSourceMap = new Map<string, ReleaseSource>();
   const productsBySource = new Map<ReleaseSource, string[]>();
 
   items.forEach((item) => {
-    if (!productSourceMap.has(item.productName)) {
-      productSourceMap.set(item.productName, item.source);
+    const normalizedName = normalizeProductLabel(item.productName);
+    if (!normalizedName) return;
+
+    if (!productSourceMap.has(normalizedName)) {
+      productSourceMap.set(normalizedName, item.source);
     }
     const list = productsBySource.get(item.source) ?? [];
-    if (!list.includes(item.productName)) {
-      list.push(item.productName);
+    if (!list.includes(normalizedName)) {
+      list.push(normalizedName);
       productsBySource.set(item.source, list);
     }
   });
