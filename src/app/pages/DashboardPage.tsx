@@ -5,7 +5,7 @@ import { buildMarkdown, downloadMarkdown } from '../../services/ExportService';
 import type { ReleaseItem, ReleaseSource, ReleaseStatus } from '../../models/ReleaseItem';
 import { useCustomerStore } from '../store/useCustomerStore';
 import { useFilterStore, type FilterState } from '../store/useFilterStore';
-import { buildFilterMetadata } from '../../services/FilterMetadata';
+import { buildFilterMetadata, normalizeProductLabel } from '../../services/FilterMetadata';
 import {
   createDefaultFilters,
   buildNormalizationContext,
@@ -22,6 +22,8 @@ type Chip = {
   onRemove: () => void;
 };
 
+type DrillSource = ReleaseSource | null;
+
 const DashboardPage = () => {
   const [snapshotItems, setSnapshotItems] = useState<ReleaseItem[]>([]);
   const [snapshotErrors, setSnapshotErrors] = useState<string[]>([]);
@@ -37,6 +39,12 @@ const DashboardPage = () => {
   const [tempFilters, setTempFilters] = useState<Partial<FilterState>>({});
   const activeCustomer = activeCustomerId ? customers[activeCustomerId] : null;
   const debugLoggedRef = useRef(false);
+
+  // =====================================================================
+  // DRILL-DOWN STATE (UI only, no persistence)
+  // =====================================================================
+  const [drillSource, setDrillSource] = useState<DrillSource>(null);
+  const [drillProduct, setDrillProduct] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -148,9 +156,11 @@ const DashboardPage = () => {
     normContext
   ]);
 
-  // Reset tempFilters when activeCustomerId changes to avoid stale overrides
+  // Reset tempFilters and drill state when activeCustomerId changes
   useEffect(() => {
     setTempFilters({});
+    setDrillSource(null);
+    setDrillProduct(null);
   }, [activeCustomerId]);
 
   // =====================================================================
@@ -276,6 +286,97 @@ const DashboardPage = () => {
       order === 'oldest' ? toDate(a) - toDate(b) : toDate(b) - toDate(a)
     );
   }, [dashboardFilters, filteredItems]);
+
+  // =====================================================================
+  // DRILL-DOWN PIPELINE
+  // baseItems = filteredItems (already filtered by sidebar)
+  // drilledItems = baseItems filtered by drillSource and drillProduct
+  // =====================================================================
+  const drilledItems = useMemo(() => {
+    let result = filteredItems;
+    if (drillSource) {
+      result = result.filter((item) => item.source === drillSource);
+    }
+    if (drillProduct) {
+      result = result.filter(
+        (item) => normalizeProductLabel(item.productName) === drillProduct
+      );
+    }
+    return result;
+  }, [filteredItems, drillSource, drillProduct]);
+
+  // Sort drilled items (same logic as sortedItems)
+  const sortedDrilledItems = useMemo(() => {
+    const order = dashboardFilters?.sortOrder ?? 'newest';
+    const toDate = (item: ReleaseItem): number => {
+      const parsed = new Date(item.releaseDate).getTime();
+      if (!Number.isNaN(parsed)) {
+        return parsed;
+      }
+      const [year, month] = item.availabilityDate.split('-').map(Number);
+      return new Date(year, (month || 1) - 1, 1).getTime();
+    };
+    return [...drilledItems].sort((a, b) =>
+      order === 'oldest' ? toDate(a) - toDate(b) : toDate(b) - toDate(a)
+    );
+  }, [dashboardFilters, drilledItems]);
+
+  // Product breakdown for drill-down (Top products with count)
+  const drillProductBreakdown = useMemo(() => {
+    const sourceItems = drillSource
+      ? filteredItems.filter((item) => item.source === drillSource)
+      : filteredItems;
+
+    const counts = new Map<string, { count: number; byStatus: Map<string, number> }>();
+    sourceItems.forEach((item) => {
+      const normalizedName = normalizeProductLabel(item.productName);
+      const existing = counts.get(normalizedName);
+      if (existing) {
+        existing.count += 1;
+        existing.byStatus.set(item.status, (existing.byStatus.get(item.status) ?? 0) + 1);
+      } else {
+        const byStatus = new Map<string, number>();
+        byStatus.set(item.status, 1);
+        counts.set(normalizedName, { count: 1, byStatus });
+      }
+    });
+
+    return Array.from(counts.entries())
+      .map(([name, data]) => ({
+        name,
+        count: data.count,
+        byStatus: Array.from(data.byStatus.entries()).map(([status, cnt]) => ({ status, count: cnt }))
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10); // Top 10 products
+  }, [filteredItems, drillSource]);
+
+  // Drill-down handlers
+  const handleDrillSource = (source: ReleaseSource) => {
+    if (drillSource === source) {
+      // Toggle off
+      setDrillSource(null);
+      setDrillProduct(null);
+    } else {
+      setDrillSource(source);
+      setDrillProduct(null); // Reset product when changing source
+    }
+  };
+
+  const handleDrillProduct = (productName: string) => {
+    if (drillProduct === productName) {
+      setDrillProduct(null); // Toggle off
+    } else {
+      setDrillProduct(productName);
+    }
+  };
+
+  const resetDrill = () => {
+    setDrillSource(null);
+    setDrillProduct(null);
+  };
+
+  const isDrillActive = drillSource !== null || drillProduct !== null;
 
   const chips = useMemo<Chip[]>(() => {
     if (!dashboardFilters) {
@@ -455,32 +556,144 @@ const DashboardPage = () => {
           </div>
         )}
 
+        {/* Drill-down badge */}
+        {isDrillActive && (
+          <div className="mt-4 flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Drill attivo:</span>
+            {drillSource && (
+              <button
+                className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/20"
+                onClick={() => setDrillSource(null)}
+              >
+                {drillSource}
+                <span className="ml-1">&times;</span>
+              </button>
+            )}
+            {drillProduct && (
+              <button
+                className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground hover:bg-secondary/80"
+                onClick={() => setDrillProduct(null)}
+              >
+                {drillProduct}
+                <span className="ml-1">&times;</span>
+              </button>
+            )}
+            <button
+              className="text-xs text-muted-foreground hover:text-foreground"
+              onClick={resetDrill}
+            >
+              Reset tutto
+            </button>
+          </div>
+        )}
+
+        {/* KPI Cards - Clickable for drill-down */}
         <section className="mt-6 grid gap-4 md:grid-cols-3">
-          <div className="ul-surface p-5">
+          <button
+            className={`ul-surface p-5 text-left transition-all hover:ring-2 hover:ring-primary/50 ${
+              !isDrillActive ? 'ring-2 ring-primary' : ''
+            }`}
+            onClick={resetDrill}
+          >
             <div className="text-xs uppercase text-muted-foreground">Totale</div>
             <div className="mt-3 text-3xl font-semibold">{filteredItems.length}</div>
-          </div>
-          <div className="ul-surface p-5">
+            {isDrillActive && (
+              <div className="mt-1 text-xs text-muted-foreground">
+                Drilled: {drilledItems.length}
+              </div>
+            )}
+          </button>
+          <button
+            className={`ul-surface p-5 text-left transition-all hover:ring-2 hover:ring-blue-500/50 ${
+              drillSource === 'Microsoft' ? 'ring-2 ring-blue-500' : ''
+            }`}
+            onClick={() => handleDrillSource('Microsoft')}
+          >
             <div className="text-xs uppercase text-muted-foreground">Microsoft</div>
-            <div className="mt-3 text-3xl font-semibold">
+            <div className="mt-3 text-3xl font-semibold text-blue-600">
               {filteredItems.filter((item) => item.source === 'Microsoft').length}
             </div>
-          </div>
-          <div className="ul-surface p-5">
+            {drillSource === 'Microsoft' && drillProduct && (
+              <div className="mt-1 text-xs text-muted-foreground">
+                Prodotto: {drilledItems.length}
+              </div>
+            )}
+          </button>
+          <button
+            className={`ul-surface p-5 text-left transition-all hover:ring-2 hover:ring-amber-500/50 ${
+              drillSource === 'EOS' ? 'ring-2 ring-amber-500' : ''
+            }`}
+            onClick={() => handleDrillSource('EOS')}
+          >
             <div className="text-xs uppercase text-muted-foreground">EOS</div>
-            <div className="mt-3 text-3xl font-semibold">
+            <div className="mt-3 text-3xl font-semibold text-amber-600">
               {filteredItems.filter((item) => item.source === 'EOS').length}
             </div>
-          </div>
+            {drillSource === 'EOS' && drillProduct && (
+              <div className="mt-1 text-xs text-muted-foreground">
+                Prodotto: {drilledItems.length}
+              </div>
+            )}
+          </button>
         </section>
 
+        {/* Product breakdown (shown when drill source is active) */}
+        {drillSource && (
+          <section className="mt-4 ul-surface p-5">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold">
+                Top prodotti {drillSource}
+              </h3>
+              <span className="text-xs text-muted-foreground">
+                {drillProductBreakdown.length} prodotti
+              </span>
+            </div>
+            <div className="mt-3 grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+              {drillProductBreakdown.map((product) => (
+                <button
+                  key={product.name}
+                  className={`flex items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-all hover:bg-secondary/50 ${
+                    drillProduct === product.name
+                      ? 'bg-primary/10 ring-1 ring-primary'
+                      : 'bg-secondary/30'
+                  }`}
+                  onClick={() => handleDrillProduct(product.name)}
+                >
+                  <span className="truncate font-medium">{product.name}</span>
+                  <span className="ml-2 flex-shrink-0 rounded-full bg-secondary px-2 py-0.5 text-xs">
+                    {product.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+            {drillProduct && (
+              <div className="mt-3 text-xs text-muted-foreground">
+                Filtro prodotto attivo: {drillProduct} ({drilledItems.length} items)
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* Card list - uses drilledItems when drill is active */}
         <section className="mt-6 grid gap-4">
-          {sortedItems.length === 0 ? (
+          {sortedDrilledItems.length === 0 ? (
             <div className="ul-surface p-8 text-sm text-muted-foreground">
               <div className="text-center font-medium">
-                Nessun aggiornamento corrisponde ai filtri selezionati.
+                {isDrillActive
+                  ? 'Nessun aggiornamento corrisponde al drill-down selezionato.'
+                  : 'Nessun aggiornamento corrisponde ai filtri selezionati.'}
               </div>
-              {dashboardFilters && (
+              {isDrillActive && (
+                <div className="mt-4 text-center">
+                  <button
+                    className="text-primary hover:underline"
+                    onClick={resetDrill}
+                  >
+                    Reset drill-down
+                  </button>
+                </div>
+              )}
+              {!isDrillActive && dashboardFilters && (
                 <div className="mt-4 rounded-lg bg-amber-50 p-4 text-xs text-amber-800">
                   <div className="font-semibold">Diagnostica filtri:</div>
                   <ul className="mt-2 space-y-1">
@@ -493,7 +706,7 @@ const DashboardPage = () => {
               )}
             </div>
           ) : (
-            sortedItems.map((item: ReleaseItem) => {
+            sortedDrilledItems.map((item: ReleaseItem) => {
               const productColor = getProductColor(item.productName);
               return (
                 <article
