@@ -60,28 +60,71 @@ export const filterReleaseItems = (
     }
   });
 
-  return items.filter((item) => {
-    if (filters.sources.length && !filters.sources.includes(item.source)) {
-      return false;
-    }
+  // DEBUG: Track which filters are eliminating items
+  const debugCounts = {
+    total: items.length,
+    afterSources: 0,
+    afterStatuses: 0,
+    afterProducts: 0,
+    afterHorizon: 0,
+    afterHistory: 0,
+    final: 0
+  };
 
-    if (
-      isFilterSupported(item.source, 'status') &&
-      filters.statuses.length &&
-      !filters.statuses.includes(item.status)
-    ) {
-      return false;
-    }
+  // Step-by-step filtering with debug counts
+  let remaining = [...items];
 
+  // 1. Sources filter
+  if (filters.sources.length) {
+    remaining = remaining.filter(item => filters.sources.includes(item.source));
+  }
+  debugCounts.afterSources = remaining.length;
+
+  // 2. Statuses filter
+  remaining = remaining.filter(item => {
+    if (isFilterSupported(item.source, 'status') && filters.statuses.length) {
+      return filters.statuses.includes(item.status);
+    }
+    return true;
+  });
+  debugCounts.afterStatuses = remaining.length;
+
+  // 3. Products filter
+  remaining = remaining.filter(item => {
     if (isFilterSupported(item.source, 'productOrApp') && filters.products.length) {
       const hasProductForSource = filters.products.some(
         (product) => productSourceMap.get(product) === item.source
       );
-      if (hasProductForSource && !filters.products.includes(item.productName)) {
-        return false;
+      if (hasProductForSource) {
+        return filters.products.includes(item.productName);
       }
     }
+    return true;
+  });
+  debugCounts.afterProducts = remaining.length;
 
+  // 4. Horizon filter
+  remaining = remaining.filter(item => {
+    const itemDate = toMonthDate(item.availabilityDate);
+    if (itemDate && itemDate > horizon) {
+      return false;
+    }
+    return true;
+  });
+  debugCounts.afterHorizon = remaining.length;
+
+  // 5. History filter
+  remaining = remaining.filter(item => {
+    const itemDate = toMonthDate(item.availabilityDate);
+    if (itemDate && itemDate < historyLimit) {
+      return false;
+    }
+    return true;
+  });
+  debugCounts.afterHistory = remaining.length;
+
+  // 6. All other filters
+  const result = remaining.filter((item) => {
     if (isFilterSupported(item.source, 'categories') && filters.categories.length) {
       if (!item.category || !filters.categories.includes(item.category)) {
         return false;
@@ -148,14 +191,6 @@ export const filterReleaseItems = (
       }
     }
 
-    const itemDate = toMonthDate(item.availabilityDate);
-    if (itemDate && itemDate > horizon) {
-      return false;
-    }
-    if (itemDate && itemDate < historyLimit) {
-      return false;
-    }
-
     if (isFilterSupported(item.source, 'periodNewDays') && filters.periodNewDays > 0) {
       const firstDate = parseDateAny(item.releaseDate);
       if (!withinLastDays(firstDate, filters.periodNewDays)) {
@@ -178,9 +213,9 @@ export const filterReleaseItems = (
       if (!releaseDate) {
         return false;
       }
-      const now = new Date();
-      const limit = new Date(now.getTime() + filters.releaseInDays * 24 * 60 * 60 * 1000);
-      if (releaseDate < now || releaseDate > limit) {
+      const nowTime = new Date();
+      const limit = new Date(nowTime.getTime() + filters.releaseInDays * 24 * 60 * 60 * 1000);
+      if (releaseDate < nowTime || releaseDate > limit) {
         return false;
       }
     }
@@ -209,4 +244,38 @@ export const filterReleaseItems = (
 
     return true;
   });
+
+  debugCounts.final = result.length;
+
+  // Log debug info when results are 0 but input > 0
+  if (result.length === 0 && items.length > 0) {
+    console.log('[FilterService] DEBUG_PIPELINE', {
+      ...debugCounts,
+      'filters.sources': filters.sources,
+      'filters.statuses': filters.statuses,
+      'filters.products.length': filters.products.length,
+      'filters.horizonMonths': filters.horizonMonths,
+      'filters.historyMonths': filters.historyMonths,
+      'horizon': horizon.toISOString(),
+      'historyLimit': historyLimit.toISOString(),
+      // Secondary filters that might be eliminating items
+      'filters.categories.length': filters.categories.length,
+      'filters.waves.length': filters.waves.length,
+      'filters.availabilityTypes.length': filters.availabilityTypes.length,
+      'filters.enabledFor.length': filters.enabledFor.length,
+      'filters.geography.length': filters.geography.length,
+      'filters.language.length': filters.language.length,
+      'filters.tags.length': filters.tags.length,
+      'filters.months.length': filters.months.length,
+      'filters.months': filters.months.slice(0, 5),
+      'filters.periodNewDays': filters.periodNewDays,
+      'filters.periodChangedDays': filters.periodChangedDays,
+      'filters.releaseInDays': filters.releaseInDays,
+      'filters.releaseDateFrom': filters.releaseDateFrom,
+      'filters.releaseDateTo': filters.releaseDateTo,
+      'filters.query': filters.query
+    });
+  }
+
+  return result;
 };

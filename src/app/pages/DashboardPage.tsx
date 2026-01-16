@@ -1,41 +1,21 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { loadAllSnapshots, loadRulesConfig } from '../../services/DataLoader';
 import { filterReleaseItems } from '../../services/FilterService';
 import { buildMarkdown, downloadMarkdown } from '../../services/ExportService';
 import type { ReleaseItem, ReleaseSource, ReleaseStatus } from '../../models/ReleaseItem';
-import {
-  RELEASE_SOURCE_LABELS,
-  getActiveSupportedSources,
-  resolveActiveSources
-} from '../../services/FilterDefinitions';
 import { useCustomerStore } from '../store/useCustomerStore';
 import { useFilterStore, type FilterState } from '../store/useFilterStore';
 import { buildFilterMetadata } from '../../services/FilterMetadata';
 import {
-  normalizeFilters,
   createDefaultFilters,
-  buildNormalizationContext
+  buildNormalizationContext,
+  selectEffectiveFilters,
+  stripTargetingFields
 } from '../../services/FilterNormalization';
-import FilterListSection from '../components/FilterListSection';
-import FilterSourceToggle from '../components/FilterSourceToggle';
+import FiltersPanel from '../components/FiltersPanel';
 import { isValidHttpUrl } from '../../utils/url';
 import { isReleasePlansUrl, isValidGuid } from '../../utils/releaseplans';
 import { getProductColor } from '../../utils/productColors';
-import type { FilterKey } from '../../services/FilterDefinitions';
-
-const optionValuesForSources = (
-  options: { value: string; sources: ReleaseSource[] }[],
-  sources: ReleaseSource[],
-  matchAllSources: boolean
-): string[] => {
-  return options
-    .filter((option) =>
-      matchAllSources
-        ? sources.every((source) => option.sources.includes(source))
-        : option.sources.some((source) => sources.includes(source))
-    )
-    .map((option) => option.value);
-};
 
 type Chip = {
   label: string;
@@ -52,12 +32,11 @@ const DashboardPage = () => {
     cssFilters,
     customerFilters,
     customerFilterMode,
-    setCssFilters,
-    setCustomerFilters,
-    setCustomerMode,
     ensureCssFilters
   } = useFilterStore();
+  const [tempFilters, setTempFilters] = useState<Partial<FilterState>>({});
   const activeCustomer = activeCustomerId ? customers[activeCustomerId] : null;
+  const debugLoggedRef = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -127,6 +106,7 @@ const DashboardPage = () => {
     ]
   );
 
+  // Ensure cssFilters are initialized (only once when data is ready)
   useEffect(() => {
     if (!snapshotsLoaded) {
       return;
@@ -137,166 +117,153 @@ const DashboardPage = () => {
   const activeMode =
     activeCustomerId ? customerFilterMode[activeCustomerId] ?? 'inherit' : 'inherit';
 
-  // Usa la normalizzazione centralizzata - aspetta che i dati siano caricati
-  const normalizedCssFilters = useMemo(() => {
-    // Se i dati non sono ancora caricati, usa i default
-    if (!snapshotsLoaded || items.length === 0) {
-      return cssFilters ? { ...defaultFilters, ...cssFilters } : defaultFilters;
-    }
-    return normalizeFilters(cssFilters, defaultFilters, normContext);
-  }, [cssFilters, defaultFilters, normContext, snapshotsLoaded, items.length]);
+  // Check if context is ready for filtering
+  const contextReady =
+    normContext.sourceOptions.length > 0 && normContext.metadata.products.length > 0;
+  const filtersReady = snapshotsLoaded && contextReady && cssFilters !== null;
 
-  const activeFilters = useMemo(() => {
-    if (!activeCustomerId) {
-      return normalizedCssFilters;
+  // =====================================================================
+  // SINGLE SOURCE OF TRUTH: Use selectEffectiveFilters
+  // This is the SAME function used by GlobalFiltersPage
+  // =====================================================================
+  const persistentBaseFilters = useMemo(() => {
+    if (!filtersReady) {
+      return null;
     }
-    if (activeMode === 'inherit') {
-      return normalizedCssFilters;
-    }
-    const custom = customerFilters[activeCustomerId];
-    if (!custom) {
-      return normalizedCssFilters;
-    }
-    // Se i dati non sono ancora caricati, usa i custom filters direttamente
-    if (!snapshotsLoaded || items.length === 0) {
-      return { ...defaultFilters, ...custom };
-    }
-    return normalizeFilters(custom, defaultFilters, normContext);
+    return selectEffectiveFilters(
+      activeCustomerId,
+      cssFilters,
+      customerFilters,
+      customerFilterMode,
+      defaultFilters,
+      normContext
+    );
   }, [
+    filtersReady,
     activeCustomerId,
-    activeMode,
+    cssFilters,
     customerFilters,
+    customerFilterMode,
     defaultFilters,
-    normalizedCssFilters,
-    normContext,
-    snapshotsLoaded,
-    items.length
+    normContext
   ]);
 
-  const activeSources = resolveActiveSources(
-    (activeFilters?.sources ?? []) as ReleaseSource[]
-  );
-  const matchAllSources = false;
-  const hasOptionsForSources = (
-    options: { value: string; sources: ReleaseSource[] }[]
-  ): boolean => optionValuesForSources(options, activeSources, matchAllSources).length > 0;
-  const sourcesFromOptions = (options: { sources: ReleaseSource[] }[]): ReleaseSource[] => {
-    const set = new Set<ReleaseSource>();
-    options.forEach((option) => option.sources.forEach((source) => set.add(source)));
-    return Array.from(set);
-  };
-  const formatSourceBadge = (sources: ReleaseSource[]): string | undefined => {
-    const ordered = (['Microsoft', 'EOS'] as ReleaseSource[]).filter((source) =>
-      sources.includes(source)
-    );
-    if (ordered.length === 2) {
-      return `${RELEASE_SOURCE_LABELS[ordered[0]]} + ${RELEASE_SOURCE_LABELS[ordered[1]]}`;
-    }
-    if (ordered.length === 1) {
-      return RELEASE_SOURCE_LABELS[ordered[0]];
-    }
-    return undefined;
-  };
-  const sourceTagFor = (
-    key: FilterKey,
-    availableSources?: ReleaseSource[]
-  ): string | undefined => {
-    const supported = availableSources ?? getActiveSupportedSources(activeSources, key);
-    const activeSupported = supported.filter((source) => activeSources.includes(source));
-    if (activeSources.length > 1 && activeSupported.length > 0) {
-      return formatSourceBadge(activeSupported);
-    }
-    return undefined;
-  };
-  const isFilterVisible = (key: FilterKey): boolean =>
-    getActiveSupportedSources(activeSources, key).length > 0;
-  const showProductSplit = activeSources.length > 1;
-  const microsoftProducts = metadata.products.filter((option) =>
-    option.sources.includes('Microsoft')
-  );
-  const eosProducts = metadata.products.filter((option) => option.sources.includes('EOS'));
-  const updateProductsForSource = (source: ReleaseSource, next: string[]) => {
-    const toKeep = (activeFilters?.products ?? []).filter(
-      (product) => productSourceMap.get(product) !== source
-    );
-    updateFilters({ products: Array.from(new Set([...toKeep, ...next])) });
-  };
+  // Reset tempFilters when activeCustomerId changes to avoid stale overrides
+  useEffect(() => {
+    setTempFilters({});
+  }, [activeCustomerId]);
 
+  // =====================================================================
+  // Dashboard filters (REGOLA 1, 2, 3, 5):
+  // - "Tutti clienti" → exact copy of cssFilters (global filters)
+  // - Cliente inherit → exact copy of cssFilters
+  // - Cliente custom → exact copy of customerFilters[id]
+  // - tempFilters overlaid for temporary view changes only
+  // - Targeting fields always stripped (REGOLA 5)
+  // =====================================================================
+  const dashboardFilters = useMemo(() => {
+    if (!persistentBaseFilters) {
+      return null;
+    }
+    // Merge with tempFilters (temporary view changes only, no persistence)
+    const merged = Object.keys(tempFilters).length > 0
+      ? { ...persistentBaseFilters, ...tempFilters }
+      : persistentBaseFilters;
+    // Strip targeting fields - Dashboard ignores customer targeting (REGOLA 5)
+    return stripTargetingFields(merged);
+  }, [persistentBaseFilters, tempFilters]);
+
+
+  // updateFilters: local-only, does NOT persist to store
+  // NEVER calls setCssFilters/setCustomerFilters/setCustomerMode/applyGlobalToCustomers
   const updateFilters = (nextFilters: Partial<FilterState>) => {
-    if (!activeCustomerId) {
-      if (!normalizedCssFilters) {
-        return;
-      }
-      setCssFilters({ ...normalizedCssFilters, ...nextFilters });
-      return;
-    }
-
-    if (activeMode === 'inherit') {
-      const base = normalizedCssFilters;
-      if (!base) {
-        return;
-      }
-      setCustomerMode(activeCustomerId, 'custom');
-      setCustomerFilters(activeCustomerId, { ...base, ...nextFilters });
-      return;
-    }
-
-    const current = customerFilters[activeCustomerId] ?? normalizedCssFilters;
-    if (!current) {
-      return;
-    }
-    setCustomerFilters(activeCustomerId, { ...current, ...nextFilters });
+    setTempFilters((prev) => ({ ...prev, ...nextFilters }));
   };
 
-  const setMode = (mode: 'inherit' | 'custom') => {
-    if (!activeCustomerId) {
-      return;
-    }
-    if (mode === 'custom' && !customerFilters[activeCustomerId]) {
-      if (normalizedCssFilters) {
-        setCustomerFilters(activeCustomerId, normalizedCssFilters);
-      }
-    }
-    setCustomerMode(activeCustomerId, mode);
+  // Reset temporary filters to baseline
+  const resetTempFilters = () => {
+    setTempFilters({});
   };
 
+  // =====================================================================
+  // Filter items using dashboardFilters (with targeting fields stripped)
+  // =====================================================================
   const filteredItems = useMemo(() => {
-    if (!activeFilters) {
-      return [];
+    if (!dashboardFilters) {
+      // Pass-through: if filters not ready, show all items
+      return items;
     }
     return filterReleaseItems(items, {
-      targetCustomerIds: activeFilters.targetCustomerIds,
-      targetGroupIds: activeFilters.targetGroupIds,
-      targetCssOwners: activeFilters.targetCssOwners,
-      products: activeFilters.products,
-      sources: activeFilters.sources as ReleaseSource[],
-      statuses: activeFilters.statuses as ReleaseStatus[],
-      categories: activeFilters.categories,
-      tags: activeFilters.tags,
-      waves: activeFilters.waves,
-      months: activeFilters.months,
-      availabilityTypes: activeFilters.availabilityTypes,
-      enabledFor: activeFilters.enabledFor,
-      geography: activeFilters.geography,
-      language: activeFilters.language,
-      periodNewDays: activeFilters.periodNewDays,
-      periodChangedDays: activeFilters.periodChangedDays,
-      releaseInDays: activeFilters.releaseInDays,
-      minBcVersionMin: activeFilters.minBcVersionMin,
-      releaseDateFrom: activeFilters.releaseDateFrom,
-      releaseDateTo: activeFilters.releaseDateTo,
-      sortOrder: activeFilters.sortOrder,
-      query: activeFilters.query,
-      horizonMonths: activeFilters.horizonMonths,
-      historyMonths: activeFilters.historyMonths
+      targetCustomerIds: dashboardFilters.targetCustomerIds,
+      targetGroupIds: dashboardFilters.targetGroupIds,
+      targetCssOwners: dashboardFilters.targetCssOwners,
+      products: dashboardFilters.products,
+      sources: dashboardFilters.sources as ReleaseSource[],
+      statuses: dashboardFilters.statuses as ReleaseStatus[],
+      categories: dashboardFilters.categories,
+      tags: dashboardFilters.tags,
+      waves: dashboardFilters.waves,
+      months: dashboardFilters.months,
+      availabilityTypes: dashboardFilters.availabilityTypes,
+      enabledFor: dashboardFilters.enabledFor,
+      geography: dashboardFilters.geography,
+      language: dashboardFilters.language,
+      periodNewDays: dashboardFilters.periodNewDays,
+      periodChangedDays: dashboardFilters.periodChangedDays,
+      releaseInDays: dashboardFilters.releaseInDays,
+      minBcVersionMin: dashboardFilters.minBcVersionMin,
+      releaseDateFrom: dashboardFilters.releaseDateFrom,
+      releaseDateTo: dashboardFilters.releaseDateTo,
+      sortOrder: dashboardFilters.sortOrder,
+      query: dashboardFilters.query,
+      horizonMonths: dashboardFilters.horizonMonths,
+      historyMonths: dashboardFilters.historyMonths
     });
-  }, [activeFilters, items]);
+  }, [dashboardFilters, items]);
+
+  // =====================================================================
+  // MANDATORY DEBUG LOG - one-shot per customer change (per specification)
+  // =====================================================================
+  useEffect(() => {
+    if (!filtersReady || !persistentBaseFilters || !dashboardFilters) {
+      return;
+    }
+    if (debugLoggedRef.current) {
+      return;
+    }
+    debugLoggedRef.current = true;
+
+    console.log('[Dashboard] FILTER_DEBUG', {
+      // Core context
+      activeCustomerId,
+      customerFilterMode: activeCustomerId ? customerFilterMode[activeCustomerId] ?? 'inherit' : null,
+      // Filter sources
+      'cssFilters.products.length': cssFilters?.products?.length ?? 0,
+      'baseFilters.products.length': persistentBaseFilters.products.length,
+      'dashboardFilters.products.length': dashboardFilters.products.length,
+      'tempFilters.keys': Object.keys(tempFilters),
+      // Results
+      'items.length': items.length,
+      'filteredItems.length': filteredItems.length,
+      // Secondary filters (the ones that might eliminate items)
+      'dashboardFilters.categories.length': dashboardFilters.categories.length,
+      'dashboardFilters.months.length': dashboardFilters.months.length,
+      'dashboardFilters.waves.length': dashboardFilters.waves.length,
+      'dashboardFilters.availabilityTypes.length': dashboardFilters.availabilityTypes.length,
+      'dashboardFilters.enabledFor.length': dashboardFilters.enabledFor.length,
+      'dashboardFilters.geography.length': dashboardFilters.geography.length,
+      'dashboardFilters.horizonMonths': dashboardFilters.horizonMonths,
+      'dashboardFilters.historyMonths': dashboardFilters.historyMonths
+    });
+  }, [filtersReady, persistentBaseFilters, dashboardFilters, activeCustomerId, customerFilterMode, cssFilters, tempFilters, items.length, filteredItems.length]);
+
+  // Reset debug flag when customer changes
+  useEffect(() => {
+    debugLoggedRef.current = false;
+  }, [activeCustomerId]);
 
   const sortedItems = useMemo(() => {
-    if (!activeFilters) {
-      return filteredItems;
-    }
-    const order = activeFilters.sortOrder;
+    const order = dashboardFilters?.sortOrder ?? 'newest';
     const toDate = (item: ReleaseItem): number => {
       const parsed = new Date(item.releaseDate).getTime();
       if (!Number.isNaN(parsed)) {
@@ -308,15 +275,15 @@ const DashboardPage = () => {
     return [...filteredItems].sort((a, b) =>
       order === 'oldest' ? toDate(a) - toDate(b) : toDate(b) - toDate(a)
     );
-  }, [activeFilters, filteredItems]);
+  }, [dashboardFilters, filteredItems]);
 
   const chips = useMemo<Chip[]>(() => {
-    if (!activeFilters) {
+    if (!dashboardFilters) {
       return [];
     }
     const entries: Chip[] = [];
     const removeFrom = (key: keyof FilterState, value: string) => {
-      const current = activeFilters[key] as string[];
+      const current = dashboardFilters[key] as string[];
       updateFilters({ [key]: current.filter((item) => item !== value) });
     };
     const pushValues = (label: string, key: keyof FilterState, values: string[]) => {
@@ -327,63 +294,55 @@ const DashboardPage = () => {
         });
       });
     };
-    pushValues('Fonte', 'sources', activeFilters.sources);
-    if (isFilterVisible('status')) {
-      pushValues('Stato', 'statuses', activeFilters.statuses);
-    }
-    if (isFilterVisible('productOrApp')) {
-      pushValues('Prodotto', 'products', activeFilters.products);
-    }
-    if (isFilterVisible('tags')) {
-      pushValues('Tag', 'tags', activeFilters.tags);
-    }
-    if (isFilterVisible('months')) {
-      pushValues('Mese', 'months', activeFilters.months);
-    }
-    if (isFilterVisible('query') && activeFilters.query) {
+    pushValues('Fonte', 'sources', dashboardFilters.sources);
+    pushValues('Stato', 'statuses', dashboardFilters.statuses);
+    pushValues('Prodotto', 'products', dashboardFilters.products);
+    pushValues('Tag', 'tags', dashboardFilters.tags);
+    pushValues('Mese', 'months', dashboardFilters.months);
+    if (dashboardFilters.query) {
       entries.push({
-        label: `Ricerca: ${activeFilters.query}`,
+        label: `Ricerca: ${dashboardFilters.query}`,
         onRemove: () => updateFilters({ query: '' })
       });
     }
-    if (isFilterVisible('periodNewDays') && activeFilters.periodNewDays > 0) {
+    if (dashboardFilters.periodNewDays > 0) {
       entries.push({
-        label: `Nuovi: ${activeFilters.periodNewDays} giorni`,
+        label: `Nuovi: ${dashboardFilters.periodNewDays} giorni`,
         onRemove: () => updateFilters({ periodNewDays: 0 })
       });
     }
-    if (isFilterVisible('periodChangedDays') && activeFilters.periodChangedDays > 0) {
+    if (dashboardFilters.periodChangedDays > 0) {
       entries.push({
-        label: `Modificati: ${activeFilters.periodChangedDays} giorni`,
+        label: `Modificati: ${dashboardFilters.periodChangedDays} giorni`,
         onRemove: () => updateFilters({ periodChangedDays: 0 })
       });
     }
-    if (isFilterVisible('releaseInDays') && activeFilters.releaseInDays > 0) {
+    if (dashboardFilters.releaseInDays > 0) {
       entries.push({
-        label: `Release entro: ${activeFilters.releaseInDays} giorni`,
+        label: `Release entro: ${dashboardFilters.releaseInDays} giorni`,
         onRemove: () => updateFilters({ releaseInDays: 0 })
       });
     }
-    if (isFilterVisible('bcMinVersion') && activeFilters.minBcVersionMin !== null) {
+    if (dashboardFilters.minBcVersionMin !== null) {
       entries.push({
-        label: `BC Min Version >= ${activeFilters.minBcVersionMin}`,
+        label: `BC Min Version >= ${dashboardFilters.minBcVersionMin}`,
         onRemove: () => updateFilters({ minBcVersionMin: null })
       });
     }
-    if (isFilterVisible('releaseDateRange') && activeFilters.releaseDateFrom) {
+    if (dashboardFilters.releaseDateFrom) {
       entries.push({
-        label: `Da: ${activeFilters.releaseDateFrom}`,
+        label: `Da: ${dashboardFilters.releaseDateFrom}`,
         onRemove: () => updateFilters({ releaseDateFrom: '' })
       });
     }
-    if (isFilterVisible('releaseDateRange') && activeFilters.releaseDateTo) {
+    if (dashboardFilters.releaseDateTo) {
       entries.push({
-        label: `A: ${activeFilters.releaseDateTo}`,
+        label: `A: ${dashboardFilters.releaseDateTo}`,
         onRemove: () => updateFilters({ releaseDateTo: '' })
       });
     }
     return entries;
-  }, [activeFilters, updateFilters]);
+  }, [dashboardFilters, updateFilters]);
 
   const onExport = () => {
     const name = activeCustomer?.name || 'Cliente';
@@ -402,30 +361,17 @@ const DashboardPage = () => {
           {activeCustomerId ? 'Filtri cliente' : 'Filtri CSS attivi'}
         </div>
         {activeCustomerId && (
-          <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-            <span>
+          <div className="mt-3 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5">
+              <span
+                className={`inline-block h-2 w-2 rounded-full ${
+                  activeMode === 'inherit' ? 'bg-blue-500' : 'bg-amber-500'
+                }`}
+              />
               {activeMode === 'inherit'
                 ? 'Eredita filtri CSS'
-                : 'Filtri personalizzati per cliente'}
+                : 'Filtri personalizzati'}
             </span>
-            <div className="flex rounded-full bg-secondary p-1">
-              <button
-                className={`rounded-full px-2 py-1 ${
-                  activeMode === 'inherit' ? 'bg-card text-foreground' : ''
-                }`}
-                onClick={() => setMode('inherit')}
-              >
-                Eredita
-              </button>
-              <button
-                className={`rounded-full px-2 py-1 ${
-                  activeMode === 'custom' ? 'bg-card text-foreground' : ''
-                }`}
-                onClick={() => setMode('custom')}
-              >
-                Personalizza
-              </button>
-            </div>
           </div>
         )}
 
@@ -435,259 +381,35 @@ const DashboardPage = () => {
             : 'Scope: CSS'}
         </div>
 
-        <div className="mt-4 space-y-2">
-          <FilterSourceToggle
-            selected={(activeFilters?.sources ?? []) as ReleaseSource[]}
-            onChange={(next) => updateFilters({ sources: next })}
-          />
-          <div className="text-xs text-muted-foreground">
-            Attive: {activeSources.map((source) => RELEASE_SOURCE_LABELS[source]).join(', ')}
-          </div>
+        {/* Reset filtri Dashboard button */}
+        {Object.keys(tempFilters).length > 0 && (
+          <button
+            className="mt-3 w-full rounded-md bg-secondary px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80"
+            onClick={resetTempFilters}
+          >
+            Reset filtri Dashboard
+          </button>
+        )}
+
+        <div className="mt-4">
+          {dashboardFilters && (
+            <FiltersPanel
+              filters={dashboardFilters}
+              onChange={updateFilters}
+              metadata={metadata}
+              options={{
+                minBcVersions
+              }}
+              hideSections={{
+                ownerCss: true,
+                includedCustomers: true,
+                targetCustomers: true
+              }}
+              productSourceMap={productSourceMap}
+              variant="sidebar"
+            />
+          )}
         </div>
-
-        <div className="mt-4 text-[10px] uppercase tracking-wide text-muted-foreground">
-          Cerca
-        </div>
-        {isFilterVisible('query') && (
-          <input
-            className="ul-input mt-2 text-xs"
-            placeholder="Cerca aggiornamenti"
-            value={activeFilters?.query ?? ''}
-            onChange={(event) => updateFilters({ query: event.target.value })}
-          />
-        )}
-
-        {isFilterVisible('productOrApp') && hasOptionsForSources(metadata.products) && (
-          <>
-            {showProductSplit ? (
-              <>
-                {microsoftProducts.length > 0 && (
-                  <FilterListSection
-                    title="Prodotti (Microsoft)"
-                    options={microsoftProducts}
-                    selected={activeFilters?.products ?? []}
-                    onChange={(next) => updateProductsForSource('Microsoft', next)}
-                    activeSources={['Microsoft']}
-                  />
-                )}
-                {eosProducts.length > 0 && (
-                  <FilterListSection
-                    title="App (EOS)"
-                    options={eosProducts}
-                    selected={activeFilters?.products ?? []}
-                    onChange={(next) => updateProductsForSource('EOS', next)}
-                    activeSources={['EOS']}
-                  />
-                )}
-              </>
-            ) : (
-              <FilterListSection
-                title={activeSources[0] === 'EOS' ? 'App' : 'Prodotti'}
-                options={metadata.products}
-                selected={activeFilters?.products ?? []}
-                onChange={(next) => updateFilters({ products: next })}
-                activeSources={activeSources}
-                sourceTag={sourceTagFor('productOrApp', sourcesFromOptions(metadata.products))}
-                matchAllSources={matchAllSources}
-              />
-            )}
-          </>
-        )}
-        {isFilterVisible('status') && hasOptionsForSources(metadata.statuses) && (
-          <FilterListSection
-            title="Stato"
-            options={metadata.statuses}
-            selected={activeFilters?.statuses ?? []}
-            onChange={(next) => updateFilters({ statuses: next })}
-            defaultOpen
-            searchable={false}
-            activeSources={activeSources}
-            sourceTag={sourceTagFor('status', sourcesFromOptions(metadata.statuses))}
-            matchAllSources={matchAllSources}
-          />
-        )}
-        {isFilterVisible('bcMinVersion') && minBcVersions.length > 0 && (
-          <div className="mt-4">
-            <div className="text-xs uppercase text-muted-foreground">
-              BC Version
-              {sourceTagFor('bcMinVersion', ['EOS']) && (
-                <span className="ml-2 inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">
-                  {sourceTagFor('bcMinVersion', ['EOS'])}
-                </span>
-              )}
-            </div>
-            <select
-              className="ul-input mt-2 text-xs"
-              value={
-                activeFilters?.minBcVersionMin !== null &&
-                activeFilters?.minBcVersionMin !== undefined
-                  ? String(activeFilters.minBcVersionMin)
-                  : ''
-              }
-              onChange={(event) =>
-                updateFilters({
-                  minBcVersionMin: event.target.value ? Number(event.target.value) : null
-                })
-              }
-            >
-              <option value="">Tutte</option>
-              {minBcVersions.map((value) => (
-                <option key={value} value={value}>
-                  BC {value}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-        {isFilterVisible('months') && hasOptionsForSources(metadata.months) && (
-          <FilterListSection
-            title="Mese"
-            options={metadata.months}
-            selected={activeFilters?.months ?? []}
-            onChange={(next) => updateFilters({ months: next })}
-            searchable={false}
-            maxVisible={12}
-            activeSources={activeSources}
-            sourceTag={sourceTagFor('months', sourcesFromOptions(metadata.months))}
-            matchAllSources={matchAllSources}
-          />
-        )}
-        {isFilterVisible('tags') && hasOptionsForSources(metadata.tags) && (
-          <FilterListSection
-            title="Tag"
-            options={metadata.tags}
-            selected={activeFilters?.tags ?? []}
-            onChange={(next) => updateFilters({ tags: next })}
-            activeSources={activeSources}
-            sourceTag={sourceTagFor('tags', sourcesFromOptions(metadata.tags))}
-            matchAllSources={matchAllSources}
-          />
-        )}
-        {(isFilterVisible('periodNewDays') ||
-          isFilterVisible('periodChangedDays') ||
-          isFilterVisible('releaseInDays') ||
-          isFilterVisible('releaseDateRange')) && (
-          <details className="mt-4">
-            <summary className="cursor-pointer text-xs uppercase text-muted-foreground">
-              Periodi
-              {sourceTagFor('periodNewDays') && (
-                <span className="ml-2 inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">
-                  {sourceTagFor('periodNewDays')}
-                </span>
-              )}
-            </summary>
-            <div className="mt-2 space-y-3 text-xs">
-              {isFilterVisible('periodNewDays') && (
-                <label className="flex items-center gap-2 text-muted-foreground">
-                  <span className="min-w-[110px]">Nuovi</span>
-                  <select
-                    className="ul-input text-xs"
-                    value={activeFilters?.periodNewDays ?? 0}
-                    onChange={(event) =>
-                      updateFilters({ periodNewDays: Number(event.target.value) })
-                    }
-                  >
-                    <option value={0}>Tutti</option>
-                    <option value={7}>Ultimi 7 giorni</option>
-                    <option value={30}>Ultimi 30 giorni</option>
-                  </select>
-                </label>
-              )}
-              {isFilterVisible('periodChangedDays') && (
-                <label className="flex items-center gap-2 text-muted-foreground">
-                  <span className="min-w-[110px]">Modificati</span>
-                  <select
-                    className="ul-input text-xs"
-                    value={activeFilters?.periodChangedDays ?? 0}
-                    onChange={(event) =>
-                      updateFilters({ periodChangedDays: Number(event.target.value) })
-                    }
-                  >
-                    <option value={0}>Tutti</option>
-                    <option value={7}>Ultimi 7 giorni</option>
-                    <option value={30}>Ultimi 30 giorni</option>
-                  </select>
-                </label>
-              )}
-              {isFilterVisible('releaseInDays') && (
-                <label className="flex items-center gap-2 text-muted-foreground">
-                  <span className="min-w-[110px]">Release entro</span>
-                  <select
-                    className="ul-input text-xs"
-                    value={activeFilters?.releaseInDays ?? 0}
-                    onChange={(event) =>
-                      updateFilters({ releaseInDays: Number(event.target.value) })
-                    }
-                  >
-                    <option value={0}>Tutte</option>
-                    <option value={30}>30 giorni</option>
-                  </select>
-                </label>
-              )}
-              {isFilterVisible('releaseDateRange') && (
-                <>
-                  <label className="flex items-center gap-2 text-muted-foreground">
-                    <span className="min-w-[110px]">Da</span>
-                    <input
-                      type="date"
-                      className="ul-input text-xs"
-                      value={activeFilters?.releaseDateFrom ?? ''}
-                      onChange={(event) =>
-                        updateFilters({ releaseDateFrom: event.target.value })
-                      }
-                    />
-                  </label>
-                  <label className="flex items-center gap-2 text-muted-foreground">
-                    <span className="min-w-[110px]">A</span>
-                    <input
-                      type="date"
-                      className="ul-input text-xs"
-                      value={activeFilters?.releaseDateTo ?? ''}
-                      onChange={(event) =>
-                        updateFilters({ releaseDateTo: event.target.value })
-                      }
-                    />
-                  </label>
-                </>
-              )}
-            </div>
-          </details>
-        )}
-
-        {isFilterVisible('sortOrder') && (
-          <div className="mt-4">
-            <div className="text-xs uppercase text-muted-foreground">Ordinamento</div>
-            <select
-              className="ul-input mt-2 text-xs"
-              value={activeFilters?.sortOrder ?? 'newest'}
-              onChange={(event) =>
-                updateFilters({ sortOrder: event.target.value as 'newest' | 'oldest' })
-              }
-            >
-              <option value="newest">Dal piu recente</option>
-              <option value="oldest">Dal piu vecchio</option>
-            </select>
-          </div>
-        )}
-
-        {isFilterVisible('historyMonths') && (
-          <div className="mt-4">
-            <div className="text-xs uppercase text-muted-foreground">Storico (mesi)</div>
-            <select
-              className="ul-input mt-2 text-xs"
-              value={activeFilters?.historyMonths ?? rulesConfig.defaults.historyMonths}
-              onChange={(event) =>
-                updateFilters({ historyMonths: Number(event.target.value) })
-              }
-            >
-              {[6, 12, 24, 60, 120].map((value) => (
-                <option key={value} value={value}>
-                  Ultimi {value} mesi
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
       </aside>
 
       <main className="flex-1">
@@ -754,8 +476,21 @@ const DashboardPage = () => {
 
         <section className="mt-6 grid gap-4">
           {sortedItems.length === 0 ? (
-            <div className="ul-surface p-8 text-center text-sm text-muted-foreground">
-              Nessun aggiornamento corrisponde ai filtri selezionati.
+            <div className="ul-surface p-8 text-sm text-muted-foreground">
+              <div className="text-center font-medium">
+                Nessun aggiornamento corrisponde ai filtri selezionati.
+              </div>
+              {dashboardFilters && (
+                <div className="mt-4 rounded-lg bg-amber-50 p-4 text-xs text-amber-800">
+                  <div className="font-semibold">Diagnostica filtri:</div>
+                  <ul className="mt-2 space-y-1">
+                    <li>Sources: {dashboardFilters.sources?.join(', ') || 'nessuna'}</li>
+                    <li>Statuses: {dashboardFilters.statuses?.join(', ') || 'nessuno'}</li>
+                    <li>Prodotti selezionati: {dashboardFilters.products?.length ?? 0} / {productOptions.length} disponibili</li>
+                    <li>Items totali: {items.length}</li>
+                  </ul>
+                </div>
+              )}
             </div>
           ) : (
             sortedItems.map((item: ReleaseItem) => {

@@ -717,13 +717,11 @@ const GlobalFiltersPage = () => {
             </button>
           )}
 
-          {console.log('[GlobalFiltersPage] Render Bulk Button Check:', { filterScope, activeCustomerId, isCustomerScope: filterScope === 'customer' })}
           {filterScope !== 'customer' && (
             <button
               className="ul-button ul-button-secondary"
               disabled={activeIncludedCustomerIds.size === 0}
               onClick={() => {
-                if (filterScope === 'customer') return; // Guard: NEVER allow bulk apply in customer scope
                 applyGlobalToCustomers(Array.from(activeIncludedCustomerIds), normalizedGlobal);
                 alert(`Filtri applicati a ${activeIncludedCustomerIds.size} clienti.`);
               }}

@@ -9,10 +9,21 @@ export type NormalizationContext = {
   productsBySource: Map<ReleaseSource, string[]>;
 };
 
+/**
+ * Normalize a selection array.
+ * CRITICAL: Empty values array means "no filter" → return empty (filter won't apply).
+ * This matches GlobalFiltersPage behavior where empty = no restriction.
+ */
 const normalizeSelection = (values: string[], options: string[]): string[] => {
-  if (values.length === 0 || options.length === 0) {
-    return options;
+  // Empty values = "no filter" (don't restrict by this field)
+  if (values.length === 0) {
+    return [];
   }
+  // No options available = return empty (nothing to select from)
+  if (options.length === 0) {
+    return [];
+  }
+  // Keep only valid values; if all invalid, return all options as fallback
   const valid = values.filter((value) => options.includes(value));
   return valid.length > 0 ? valid : options;
 };
@@ -214,3 +225,58 @@ export const buildNormalizationContext = (
     productsBySource
   };
 };
+
+export type FilterMode = 'inherit' | 'custom';
+
+/**
+ * SINGLE SOURCE OF TRUTH for effective persistent filters.
+ * Used by BOTH GlobalFiltersPage and DashboardPage.
+ *
+ * Logic:
+ * - If no activeCustomerId ("Tutti clienti"): use normalized cssFilters
+ * - If activeCustomerId with mode 'custom' and override exists: use normalized customerFilters[id]
+ * - Otherwise: use normalized cssFilters (inherit mode)
+ */
+export const selectEffectiveFilters = (
+  activeCustomerId: string | null,
+  cssFilters: FilterState | null,
+  customerFilters: Record<string, FilterState>,
+  customerFilterMode: Record<string, FilterMode>,
+  defaultFilters: FilterState,
+  normContext: NormalizationContext
+): FilterState => {
+  // Normalize global filters first
+  const normalizedGlobal = normalizeFilters(cssFilters, defaultFilters, normContext);
+
+  // No customer selected -> use global
+  if (!activeCustomerId) {
+    return normalizedGlobal;
+  }
+
+  // Check customer mode
+  const mode = customerFilterMode[activeCustomerId] ?? 'inherit';
+  if (mode === 'inherit') {
+    return normalizedGlobal;
+  }
+
+  // Custom mode - check if override exists
+  const customerOverride = customerFilters[activeCustomerId];
+  if (!customerOverride) {
+    return normalizedGlobal;
+  }
+
+  // Use customer override
+  return normalizeFilters(customerOverride, defaultFilters, normContext);
+};
+
+/**
+ * Strip customer-targeting fields for Dashboard filtering.
+ * Dashboard shows ALL items matching filters, not scoped to specific customers.
+ */
+export const stripTargetingFields = (filters: FilterState): FilterState => ({
+  ...filters,
+  targetCustomerIds: [],
+  targetGroupIds: [],
+  targetCssOwners: []
+});
+
