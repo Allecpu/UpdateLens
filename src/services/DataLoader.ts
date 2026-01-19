@@ -179,8 +179,11 @@ type SnapshotModule = {
   default: SnapshotPayload;
 };
 
+// Use { eager: true } to inline all snapshot data into the main bundle.
+// This avoids dynamic import issues on file:// protocol (CORS blocks separate chunk requests).
 const snapshotModules = import.meta.glob<SnapshotModule>(
-  '../data/snapshots/*.json'
+  '../data/snapshots/*.json',
+  { eager: true }
 );
 
 const selectLatest = async (prefix: string): Promise<SnapshotPayload | null> => {
@@ -191,10 +194,10 @@ const selectLatest = async (prefix: string): Promise<SnapshotPayload | null> => 
   if (entries.length === 0) {
     return null;
   }
-  const latest = entries[entries.length - 1][1];
+  // With eager: true, modules are already loaded (not promises)
+  const latestModule = entries[entries.length - 1][1];
   try {
-    const module = await latest();
-    return module.default ?? null;
+    return latestModule.default ?? null;
   } catch {
     return null;
   }

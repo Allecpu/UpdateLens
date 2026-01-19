@@ -1,4 +1,4 @@
-import { readFile, writeFile, mkdir, cp } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, cp, rm } from 'node:fs/promises';
 import path from 'node:path';
 
 const distDir = path.resolve('dist');
@@ -15,6 +15,7 @@ const readAsset = async (href: string): Promise<string> => {
 };
 
 const inlineAssets = async (): Promise<void> => {
+  await rm(releaseDir, { recursive: true, force: true });
   await mkdir(releaseDir, { recursive: true });
   await cp(distDir, releaseDir, { recursive: true, force: true, filter: (src) => !src.endsWith(`${path.sep}index.html`) });
   await mkdir(path.join(releaseDir, 'data'), { recursive: true });

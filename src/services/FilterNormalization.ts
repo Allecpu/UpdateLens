@@ -23,9 +23,9 @@ const normalizeSelection = (values: string[], options: string[]): string[] => {
   if (options.length === 0) {
     return [];
   }
-  // Keep only valid values; if all invalid, return all options as fallback
+  // Keep only valid values; if all invalid, return empty (no filter)
   const valid = values.filter((value) => options.includes(value));
-  return valid.length > 0 ? valid : options;
+  return valid;
 };
 
 const optionValuesForSources = (

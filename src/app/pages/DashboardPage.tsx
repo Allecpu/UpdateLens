@@ -243,6 +243,14 @@ const DashboardPage = () => {
     }
     debugLoggedRef.current = true;
 
+    console.log('[Dashboard] FILTER_STATE', {
+      'baseline.availabilityTypes': persistentBaseFilters.availabilityTypes,
+      'temp.availabilityTypes': tempFilters.availabilityTypes ?? null,
+      'effective.availabilityTypes': dashboardFilters.availabilityTypes,
+      itemsBefore: items.length,
+      itemsAfter: filteredItems.length
+    });
+
     console.log('[Dashboard] FILTER_DEBUG', {
       // Core context
       activeCustomerId,
