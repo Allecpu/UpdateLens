@@ -22,6 +22,7 @@ export type SnapshotPayload = {
 type LatestSnapshots = {
   microsoft?: string;
   eos?: string;
+  fabric?: string;
 };
 
 export type SnapshotLoadResult = {
@@ -129,6 +130,10 @@ const resolveSourceUrl = (item: ReleaseItem): string | null => {
   if (item.source === 'Microsoft') {
     return resolveMicrosoftSourceUrl(item);
   }
+  if (item.source === 'Fabric') {
+    const fabricId = item.id.replace('fabric-', '');
+    return `https://fabric-gps.com/releases/${fabricId}`;
+  }
   return resolveGenericSourceUrl(item);
 };
 
@@ -145,6 +150,29 @@ const parseSnapshot = (payload: SnapshotPayload): ReleaseItem[] => {
         releaseDate: normalizeEosReleaseDate(item),
         tryNow: false,
         minBcVersion: item.minBcVersion ?? null
+      };
+      const parsed = ReleaseItemSchema.parse(normalized);
+      return {
+        ...parsed,
+        sourceUrl: resolveSourceUrl(parsed),
+        learnUrl:
+          parsed.learnUrl && isValidHttpUrl(parsed.learnUrl)
+            ? parsed.learnUrl
+            : null
+      };
+    }
+
+    if (item.source === 'Fabric') {
+      const normalized = {
+        ...item,
+        productName: item.product,
+        description: item.summary,
+        releaseDate:
+          item.availabilityDateFull ??
+          toIsoDateFromMonth(item.availabilityDate) ??
+          new Date().toISOString().slice(0, 10),
+        tryNow: item.status === 'Try now',
+        minBcVersion: null
       };
       const parsed = ReleaseItemSchema.parse(normalized);
       return {
@@ -264,8 +292,13 @@ export const loadAllSnapshots = async (): Promise<SnapshotLoadResult> => {
     isFileProtocol ? undefined : manifest?.eos,
     'eos_whatsnew_'
   );
-  const items: ReleaseItem[] = [...microsoft.items, ...eos.items];
-  const errors = [microsoft.error, eos.error].filter(Boolean) as string[];
+  const fabric = await loadSnapshotWithFallback(
+    'Fabric',
+    isFileProtocol ? undefined : manifest?.fabric,
+    'fabric_roadmap_'
+  );
+  const items: ReleaseItem[] = [...microsoft.items, ...eos.items, ...fabric.items];
+  const errors = [microsoft.error, eos.error, fabric.error].filter(Boolean) as string[];
 
   const missingSource = items.filter((item) => !item.sourceUrl);
   if (missingSource.length > 0) {

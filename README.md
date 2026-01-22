@@ -1,8 +1,8 @@
 # UpdateLens
 
-**UpdateLens** e un portale web statico e offline per analizzare, filtrare e presentare gli aggiornamenti dei Microsoft Release Plans e delle EOS Apps.
+**UpdateLens** è un portale web statico e offline per analizzare, filtrare e presentare gli aggiornamenti da tre fonti: **Microsoft Release Plans**, **EOS Apps** e **Microsoft Fabric Roadmap**.
 
-Funziona completamente offline con snapshot locali. In alternativa, e disponibile un backend opzionale per ingestione e API interne.
+Funziona completamente offline con snapshot locali. In alternativa, è disponibile un backend opzionale per ingestione e API interne.
 
 ---
 
@@ -77,9 +77,29 @@ Poi apri `release/index.html`.
 
 I connettori per aggiornare le snapshot sono in `tools/` e non vengono eseguiti dai clienti.
 
+### Fonti dati
+
+**1. Microsoft Release Plans**
+- Source: https://releaseplans.microsoft.com/
+- Prodotti: Dynamics 365, Power Platform
+- Refresh: `npm run refresh:microsoft`
+
+**2. EOS What's New**
+- Source: https://docs.eos-solutions.it/
+- Prodotti: EOS Apps for Business Central
+- Refresh: `npm run refresh:eos`
+
+**3. Microsoft Fabric Roadmap**
+- Source: https://fabric-gps.com/api/releases (Fabric GPS API)
+- Prodotti: Data Factory, Power BI, OneLake, Data Warehouse, Real-Time Intelligence, etc.
+- Refresh: `npm run refresh:fabric`
+
+### Esecuzione refresh
+
 ```bash
 npm run refresh:microsoft
 npm run refresh:eos
+npm run refresh:fabric
 ```
 
 ---

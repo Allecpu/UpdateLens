@@ -18,8 +18,86 @@
       "label": "EOS Apps",
       "source": "EOS",
       "category": "EOS"
+    },
+    {
+      "id": "fabric-data-factory",
+      "label": "Data Factory",
+      "source": "Fabric",
+      "category": "Microsoft Fabric"
+    },
+    {
+      "id": "fabric-data-science",
+      "label": "Data Science",
+      "source": "Fabric",
+      "category": "Microsoft Fabric"
+    },
+    {
+      "id": "fabric-data-warehouse",
+      "label": "Data Warehouse",
+      "source": "Fabric",
+      "category": "Microsoft Fabric"
+    },
+    {
+      "id": "fabric-onelake",
+      "label": "OneLake",
+      "source": "Fabric",
+      "category": "Microsoft Fabric"
+    },
+    {
+      "id": "fabric-data-engineering",
+      "label": "Data Engineering",
+      "source": "Fabric",
+      "category": "Microsoft Fabric"
+    },
+    {
+      "id": "fabric-power-bi",
+      "label": "Power BI",
+      "source": "Fabric",
+      "category": "Microsoft Fabric"
+    },
+    {
+      "id": "fabric-real-time-intelligence",
+      "label": "Real-Time Intelligence",
+      "source": "Fabric",
+      "category": "Microsoft Fabric"
+    },
+    {
+      "id": "fabric-admin-governance",
+      "label": "Administration, Governance and Security",
+      "source": "Fabric",
+      "category": "Microsoft Fabric"
+    },
+    {
+      "id": "fabric-cosmos-db",
+      "label": "Cosmos DB (NoSQL)",
+      "source": "Fabric",
+      "category": "Microsoft Fabric"
+    },
+    {
+      "id": "fabric-sql-database",
+      "label": "SQL database",
+      "source": "Fabric",
+      "category": "Microsoft Fabric"
+    },
+    {
+      "id": "fabric-developer-experiences",
+      "label": "Fabric Developer Experiences",
+      "source": "Fabric",
+      "category": "Microsoft Fabric"
+    },
+    {
+      "id": "fabric-ecosystem",
+      "label": "Fabric Ecosystem",
+      "source": "Fabric",
+      "category": "Microsoft Fabric"
+    },
+    {
+      "id": "fabric-iq",
+      "label": "IQ",
+      "source": "Fabric",
+      "category": "Microsoft Fabric"
     }
   ],
-  "categories": ["Dynamics 365", "Power Platform", "EOS"],
+  "categories": ["Dynamics 365", "Power Platform", "EOS", "Microsoft Fabric"],
   "tags": []
 }

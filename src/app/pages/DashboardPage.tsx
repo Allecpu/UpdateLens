@@ -611,7 +611,7 @@ const DashboardPage = () => {
         )}
 
         {/* KPI Cards - Clickable for drill-down */}
-        <section className="mt-6 grid gap-4 md:grid-cols-3">
+        <section className="mt-6 grid gap-4 md:grid-cols-4">
           <button
             className={`ul-surface p-5 text-left transition-all hover:ring-2 hover:ring-primary/50 ${
               !isDrillActive ? 'ring-2 ring-primary' : ''
@@ -653,6 +653,22 @@ const DashboardPage = () => {
               {filteredItems.filter((item) => item.source === 'EOS').length}
             </div>
             {drillSource === 'EOS' && drillProduct && (
+              <div className="mt-1 text-xs text-muted-foreground">
+                Prodotto: {drilledItems.length}
+              </div>
+            )}
+          </button>
+          <button
+            className={`ul-surface p-5 text-left transition-all hover:ring-2 hover:ring-teal-500/50 ${
+              drillSource === 'Fabric' ? 'ring-2 ring-teal-500' : ''
+            }`}
+            onClick={() => handleDrillSource('Fabric')}
+          >
+            <div className="text-xs uppercase text-muted-foreground">Fabric</div>
+            <div className="mt-3 text-3xl font-semibold text-teal-600">
+              {filteredItems.filter((item) => item.source === 'Fabric').length}
+            </div>
+            {drillSource === 'Fabric' && drillProduct && (
               <div className="mt-1 text-xs text-muted-foreground">
                 Prodotto: {drilledItems.length}
               </div>

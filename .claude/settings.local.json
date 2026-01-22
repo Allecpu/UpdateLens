@@ -11,7 +11,11 @@
       "Bash(if [ ! -d \"docs\" ])",
       "Bash(then mkdir docs)",
       "Bash(else echo \"Cartella docs già esistente\")",
-      "Bash(fi)"
+      "Bash(fi)",
+      "Bash(python:*)",
+      "Bash(npm run refresh:fabric:*)",
+      "Bash(ls:*)",
+      "Bash(node -e:*)"
     ]
   }
 }

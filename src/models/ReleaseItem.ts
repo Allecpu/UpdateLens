@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const ReleaseSourceSchema = z.enum(['Microsoft', 'EOS']);
+export const ReleaseSourceSchema = z.enum(['Microsoft', 'EOS', 'Fabric']);
 export const ReleaseStatusSchema = z.enum([
   'Planned',
   'Rolling out',
