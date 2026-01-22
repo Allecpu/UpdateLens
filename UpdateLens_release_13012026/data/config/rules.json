@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "defaults": {
+    "sources": ["Microsoft", "EOS"],
+    "statuses": ["Planned", "Rolling out", "Try now", "Launched", "Unknown"],
+    "horizonMonths": 120,
+    "historyMonths": 120
+  }
+}

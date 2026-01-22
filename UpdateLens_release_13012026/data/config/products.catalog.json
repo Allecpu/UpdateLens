@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "items": [
+    {
+      "id": "dynamics-365-sales",
+      "label": "Dynamics 365 Sales",
+      "source": "Microsoft",
+      "category": "Dynamics 365"
+    },
+    {
+      "id": "power-platform",
+      "label": "Power Platform",
+      "source": "Microsoft",
+      "category": "Power Platform"
+    },
+    {
+      "id": "eos-apps",
+      "label": "EOS Apps",
+      "source": "EOS",
+      "category": "EOS"
+    }
+  ],
+  "categories": ["Dynamics 365", "Power Platform", "EOS"],
+  "tags": []
+}

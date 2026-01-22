@@ -6,7 +6,12 @@
       "Bash(git commit:*)",
       "Bash(npm run build:*)",
       "Bash(npm run lint:*)",
-      "Bash(npx tsx:*)"
+      "Bash(npx tsx:*)",
+      "Bash(curl:*)",
+      "Bash(if [ ! -d \"docs\" ])",
+      "Bash(then mkdir docs)",
+      "Bash(else echo \"Cartella docs già esistente\")",
+      "Bash(fi)"
     ]
   }
 }
