@@ -459,7 +459,11 @@ const DashboardPage = () => {
     downloadMarkdown(content, 'update-lens-export.md');
   };
 
-  const asChip = (label: string, value: string | number | null | undefined) => {
+  const asChip = (
+    label: string,
+    value: string | number | null | undefined,
+    key: string
+  ) => {
     if (value === null || value === undefined) {
       return null;
     }
@@ -468,7 +472,7 @@ const DashboardPage = () => {
       return null;
     }
     return (
-      <span className="ul-chip">
+      <span className="ul-chip" key={key}>
         {label}: {text}
       </span>
     );
@@ -674,6 +678,24 @@ const DashboardPage = () => {
               </div>
             )}
           </button>
+          <button
+            className={`ul-surface p-5 text-left transition-all hover:ring-2 hover:ring-purple-500/50 ${
+              drillSource === 'M365Roadmap' ? 'ring-2 ring-purple-500' : ''
+            }`}
+            onClick={() => handleDrillSource('M365Roadmap')}
+          >
+            <div className="text-xs uppercase text-muted-foreground">
+              Microsoft 365 Roadmap
+            </div>
+            <div className="mt-3 text-3xl font-semibold text-purple-600">
+              {filteredItems.filter((item) => item.source === 'M365Roadmap').length}
+            </div>
+            {drillSource === 'M365Roadmap' && drillProduct && (
+              <div className="mt-1 text-xs text-muted-foreground">
+                Prodotto: {drilledItems.length}
+              </div>
+            )}
+          </button>
         </section>
 
         {/* Product breakdown (shown when drill source is active) */}
@@ -757,10 +779,14 @@ const DashboardPage = () => {
                 (value) => !/preview/i.test(value)
               );
               const infoChips = [
-                asChip('Wave', item.wave),
-                ...availabilityTypeValues.map((value) => asChip('Availability', value)),
-                ...releaseTypeValues.map((value) => asChip('Release', value)),
-                asChip('BC', item.minBcVersion)
+                asChip('Wave', item.wave, `wave-${item.wave ?? 'none'}`),
+                ...availabilityTypeValues.map((value, index) =>
+                  asChip('Availability', value, `availability-${value}-${index}`)
+                ),
+                ...releaseTypeValues.map((value, index) =>
+                  asChip('Release', value, `release-${value}-${index}`)
+                ),
+                asChip('BC', item.minBcVersion, `bc-${item.minBcVersion ?? 'none'}`)
               ].filter(Boolean);
               return (
                 <article

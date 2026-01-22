@@ -23,6 +23,7 @@ type LatestSnapshots = {
   microsoft?: string;
   eos?: string;
   fabric?: string;
+  m365roadmap?: string;
 };
 
 export type SnapshotLoadResult = {
@@ -134,6 +135,12 @@ const resolveSourceUrl = (item: ReleaseItem): string | null => {
     const fabricId = item.id.replace('fabric-', '');
     return `https://fabric-gps.com/releases/${fabricId}`;
   }
+  if (item.source === 'M365Roadmap') {
+    // Extract feature ID from id (format: m365roadmap-{id}-{productSlug})
+    const match = item.id.match(/^m365roadmap-(\d+)-/);
+    const featureId = match ? match[1] : item.id.replace('m365roadmap-', '');
+    return `https://www.microsoft.com/microsoft-365/roadmap?featureid=${featureId}`;
+  }
   return resolveGenericSourceUrl(item);
 };
 
@@ -172,6 +179,29 @@ const parseSnapshot = (payload: SnapshotPayload): ReleaseItem[] => {
           toIsoDateFromMonth(item.availabilityDate) ??
           new Date().toISOString().slice(0, 10),
         tryNow: item.status === 'Try now',
+        minBcVersion: null
+      };
+      const parsed = ReleaseItemSchema.parse(normalized);
+      return {
+        ...parsed,
+        sourceUrl: resolveSourceUrl(parsed),
+        learnUrl:
+          parsed.learnUrl && isValidHttpUrl(parsed.learnUrl)
+            ? parsed.learnUrl
+            : null
+      };
+    }
+
+    if (item.source === 'M365Roadmap') {
+      const normalized = {
+        ...item,
+        productName: item.product,
+        description: item.summary,
+        releaseDate:
+          item.availabilityDateFull ??
+          toIsoDateFromMonth(item.availabilityDate) ??
+          new Date().toISOString().slice(0, 10),
+        tryNow: false, // M365 roadmap doesn't have public preview
         minBcVersion: null
       };
       const parsed = ReleaseItemSchema.parse(normalized);
@@ -297,8 +327,20 @@ export const loadAllSnapshots = async (): Promise<SnapshotLoadResult> => {
     isFileProtocol ? undefined : manifest?.fabric,
     'fabric_roadmap_'
   );
-  const items: ReleaseItem[] = [...microsoft.items, ...eos.items, ...fabric.items];
-  const errors = [microsoft.error, eos.error, fabric.error].filter(Boolean) as string[];
+  const m365roadmap = await loadSnapshotWithFallback(
+    'M365Roadmap',
+    isFileProtocol ? undefined : manifest?.m365roadmap,
+    'm365roadmap_data_'
+  );
+  const items: ReleaseItem[] = [
+    ...microsoft.items,
+    ...eos.items,
+    ...fabric.items,
+    ...m365roadmap.items
+  ];
+  const errors = [microsoft.error, eos.error, fabric.error, m365roadmap.error].filter(
+    Boolean
+  ) as string[];
 
   const missingSource = items.filter((item) => !item.sourceUrl);
   if (missingSource.length > 0) {

@@ -431,9 +431,15 @@ const GlobalFiltersPage = () => {
     return Array.from(set);
   };
   const formatSourceBadge = (sources: ReleaseSource[]): string | undefined => {
-    const ordered = (['Microsoft', 'EOS'] as ReleaseSource[]).filter((source) =>
+    const ordered = (['Microsoft', 'EOS', 'Fabric', 'M365Roadmap'] as ReleaseSource[]).filter((source) =>
       sources.includes(source)
     );
+    if (ordered.length === 4) {
+      return 'Tutte le fonti';
+    }
+    if (ordered.length === 3) {
+      return `${RELEASE_SOURCE_LABELS[ordered[0]]} + ${RELEASE_SOURCE_LABELS[ordered[1]]} + ${RELEASE_SOURCE_LABELS[ordered[2]]}`;
+    }
     if (ordered.length === 2) {
       return `${RELEASE_SOURCE_LABELS[ordered[0]]} + ${RELEASE_SOURCE_LABELS[ordered[1]]}`;
     }
@@ -460,6 +466,8 @@ const GlobalFiltersPage = () => {
     option.sources.includes('Microsoft')
   );
   const eosProducts = metadata.products.filter((option) => option.sources.includes('EOS'));
+  const fabricProducts = metadata.products.filter((option) => option.sources.includes('Fabric'));
+  const m365RoadmapProducts = metadata.products.filter((option) => option.sources.includes('M365Roadmap'));
 
   const updateProductsForSource = (source: ReleaseSource, next: string[]) => {
     const toKeep = currentFilters.products.filter(
@@ -986,10 +994,34 @@ const GlobalFiltersPage = () => {
                       activeSources={['EOS']}
                     />
                   )}
+                  {fabricProducts.length > 0 && (
+                    <FilterListSection
+                      title="Workload (Fabric)"
+                      options={fabricProducts}
+                      selected={currentFilters.products}
+                      onChange={(next) => updateProductsForSource('Fabric', next)}
+                      defaultOpen
+                      activeSources={['Fabric']}
+                    />
+                  )}
+                  {m365RoadmapProducts.length > 0 && (
+                    <FilterListSection
+                      title="Prodotti (M365 Roadmap)"
+                      options={m365RoadmapProducts}
+                      selected={currentFilters.products}
+                      onChange={(next) => updateProductsForSource('M365Roadmap', next)}
+                      defaultOpen
+                      activeSources={['M365Roadmap']}
+                    />
+                  )}
                 </>
               ) : (
                 <FilterListSection
-                  title={activeSources[0] === 'EOS' ? 'App' : 'Prodotti'}
+                  title={
+                    activeSources[0] === 'EOS' ? 'App' :
+                    activeSources[0] === 'Fabric' ? 'Workload' :
+                    'Prodotti'
+                  }
                   options={metadata.products}
                   selected={currentFilters.products}
                   onChange={(next) => updateFilters({ products: next })}

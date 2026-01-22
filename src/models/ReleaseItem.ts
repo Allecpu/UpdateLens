@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const ReleaseSourceSchema = z.enum(['Microsoft', 'EOS', 'Fabric']);
+export const ReleaseSourceSchema = z.enum(['Microsoft', 'EOS', 'Fabric', 'M365Roadmap']);
 export const ReleaseStatusSchema = z.enum([
   'Planned',
   'Rolling out',

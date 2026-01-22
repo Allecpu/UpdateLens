@@ -12,6 +12,7 @@
     "refresh:microsoft": "tsx tools/refreshMicrosoft.ts",
     "refresh:eos": "tsx tools/refreshEos.ts",
     "refresh:fabric": "tsx tools/refreshFabric.ts",
+    "refresh:m365roadmap": "tsx tools/refreshM365Roadmap.ts",
     "test:releaseplans": "tsx tools/releaseplansUrlCheck.ts",
     "ingest:releaseplans": "tsx server/ingest.ts",
     "server:dev": "tsx server/index.ts"

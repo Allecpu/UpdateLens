@@ -15,7 +15,8 @@
       "Bash(python:*)",
       "Bash(npm run refresh:fabric:*)",
       "Bash(ls:*)",
-      "Bash(node -e:*)"
+      "Bash(node -e:*)",
+      "Bash(npm run:*)"
     ]
   }
 }

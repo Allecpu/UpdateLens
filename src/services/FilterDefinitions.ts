@@ -1,14 +1,20 @@
 import type { ReleaseSource } from '../models/ReleaseItem';
 
-export const ALL_RELEASE_SOURCES: ReleaseSource[] = ['Microsoft', 'EOS', 'Fabric'];
+export const ALL_RELEASE_SOURCES: ReleaseSource[] = [
+  'Microsoft',
+  'EOS',
+  'Fabric',
+  'M365Roadmap'
+];
 
 export const RELEASE_SOURCE_LABELS: Record<ReleaseSource, string> = {
   Microsoft: 'Microsoft Release Plans',
   EOS: 'EOS Apps',
-  Fabric: 'Microsoft Fabric Roadmap'
+  Fabric: 'Microsoft Fabric Roadmap',
+  M365Roadmap: 'Microsoft 365 Roadmap'
 };
 
-export type SourceKey = 'microsoft' | 'eos' | 'fabric';
+export type SourceKey = 'microsoft' | 'eos' | 'fabric' | 'm365roadmap';
 export type FilterKey =
   | 'status'
   | 'wave'
@@ -84,13 +90,30 @@ export const FILTER_CAPABILITIES: Record<SourceKey, FilterKey[]> = {
     'sortOrder',
     'historyMonths',
     'horizonMonths'
+  ],
+  m365roadmap: [
+    'status',
+    'categories',
+    'productOrApp',
+    'availabilityType',
+    'releaseDateRange',
+    'periodNewDays',
+    'periodChangedDays',
+    'releaseInDays',
+    'months',
+    'tags',
+    'query',
+    'sortOrder',
+    'historyMonths',
+    'horizonMonths'
   ]
 };
 
 export const toSourceKey = (source: ReleaseSource): SourceKey => {
   if (source === 'Microsoft') return 'microsoft';
   if (source === 'EOS') return 'eos';
-  return 'fabric';
+  if (source === 'Fabric') return 'fabric';
+  return 'm365roadmap';
 };
 
 export const isFilterSupported = (source: ReleaseSource, key: FilterKey): boolean =>
@@ -102,7 +125,8 @@ export const getSupportedSourcesForFilter = (key: FilterKey): ReleaseSource[] =>
     if (FILTER_CAPABILITIES[sourceKey].includes(key)) {
       if (sourceKey === 'microsoft') supported.push('Microsoft');
       else if (sourceKey === 'eos') supported.push('EOS');
-      else supported.push('Fabric');
+      else if (sourceKey === 'fabric') supported.push('Fabric');
+      else if (sourceKey === 'm365roadmap') supported.push('M365Roadmap');
     }
   });
   return supported;

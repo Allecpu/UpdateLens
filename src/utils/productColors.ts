@@ -80,6 +80,72 @@ export const PRODUCT_COLOR_MAP: Record<string, ProductColorConfig> = {
   IQ: {
     barClass: 'bg-cyan-500/80 dark:bg-cyan-400/90',
     badgeClass: 'bg-cyan-50 text-cyan-800 dark:bg-cyan-500/15 dark:text-cyan-200'
+  },
+  // M365 products - Purple theme
+  'Microsoft Copilot (Microsoft 365)': {
+    barClass: 'bg-purple-500/90 dark:bg-purple-400',
+    badgeClass:
+      'bg-purple-50 text-purple-800 dark:bg-purple-500/20 dark:text-purple-200'
+  },
+  'Microsoft Teams': {
+    barClass: 'bg-purple-600/90 dark:bg-purple-500',
+    badgeClass:
+      'bg-purple-50 text-purple-900 dark:bg-purple-600/20 dark:text-purple-100'
+  },
+  SharePoint: {
+    barClass: 'bg-purple-700/90 dark:bg-purple-600',
+    badgeClass:
+      'bg-purple-50 text-purple-900 dark:bg-purple-700/20 dark:text-purple-100'
+  },
+  'Microsoft 365': {
+    barClass: 'bg-purple-400/90 dark:bg-purple-300',
+    badgeClass:
+      'bg-purple-50 text-purple-700 dark:bg-purple-400/20 dark:text-purple-200'
+  },
+  Outlook: {
+    barClass: 'bg-purple-800/90 dark:bg-purple-700',
+    badgeClass:
+      'bg-purple-50 text-purple-900 dark:bg-purple-800/20 dark:text-purple-100'
+  },
+  Exchange: {
+    barClass: 'bg-purple-900/90 dark:bg-purple-800',
+    badgeClass:
+      'bg-purple-50 text-purple-900 dark:bg-purple-900/20 dark:text-purple-100'
+  },
+  OneDrive: {
+    barClass: 'bg-purple-500/80 dark:bg-purple-400/90',
+    badgeClass:
+      'bg-purple-50 text-purple-800 dark:bg-purple-500/15 dark:text-purple-200'
+  },
+  'Microsoft Viva': {
+    barClass: 'bg-purple-600/80 dark:bg-purple-500/90',
+    badgeClass:
+      'bg-purple-50 text-purple-900 dark:bg-purple-600/15 dark:text-purple-100'
+  },
+  'Microsoft Loop': {
+    barClass: 'bg-purple-700/80 dark:bg-purple-600/90',
+    badgeClass:
+      'bg-purple-50 text-purple-900 dark:bg-purple-700/15 dark:text-purple-100'
+  },
+  'Microsoft Planner': {
+    barClass: 'bg-purple-400/80 dark:bg-purple-300/90',
+    badgeClass:
+      'bg-purple-50 text-purple-700 dark:bg-purple-400/15 dark:text-purple-200'
+  },
+  'Microsoft Purview': {
+    barClass: 'bg-purple-800/80 dark:bg-purple-700/90',
+    badgeClass:
+      'bg-purple-50 text-purple-900 dark:bg-purple-800/15 dark:text-purple-100'
+  },
+  'Microsoft Bookings': {
+    barClass: 'bg-purple-500/70 dark:bg-purple-400/80',
+    badgeClass:
+      'bg-purple-50 text-purple-800 dark:bg-purple-500/15 dark:text-purple-200'
+  },
+  Yammer: {
+    barClass: 'bg-purple-600/70 dark:bg-purple-500/80',
+    badgeClass:
+      'bg-purple-50 text-purple-900 dark:bg-purple-600/15 dark:text-purple-100'
   }
 };
 
