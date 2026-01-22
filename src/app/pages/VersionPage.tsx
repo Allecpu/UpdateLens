@@ -27,6 +27,25 @@ type ToastInfo = {
   message: string;
 };
 
+type SourceStatus = 'ok' | 'failed' | 'missing';
+
+type SourceUpdateResult = {
+  source: 'microsoft' | 'eos' | 'fabric';
+  status: SourceStatus;
+  itemCount: number | null;
+  duration: number;
+  error?: string;
+  timestamp: string;
+};
+
+type UpdateAllState = 'idle' | 'running' | 'completed';
+
+type UpdateAllInfo = {
+  state: UpdateAllState;
+  results: SourceUpdateResult[] | null;
+  completedAt: string | null;
+};
+
 const REFRESH_STORAGE_KEY = 'updatelens.refresh.status';
 
 const loadRefreshInfo = (): RefreshInfo => {
@@ -82,6 +101,11 @@ const VersionPage = () => {
   const [refreshInfo, setRefreshInfo] = useState<RefreshInfo>(() => loadRefreshInfo());
   const [toast, setToast] = useState<ToastInfo | null>(null);
   const [releaseState, setReleaseState] = useState<ReleaseState>('idle');
+  const [updateAllInfo, setUpdateAllInfo] = useState<UpdateAllInfo>({
+    state: 'idle',
+    results: null,
+    completedAt: null
+  });
 
   const updateRefreshInfo = (next: RefreshInfo) => {
     setRefreshInfo(next);
@@ -209,6 +233,66 @@ const VersionPage = () => {
     }
   };
 
+  const handleUpdateAll = async () => {
+    if (updateAllInfo.state === 'running') {
+      return;
+    }
+
+    setUpdateAllInfo({
+      state: 'running',
+      results: null,
+      completedAt: null
+    });
+
+    triggerToast({ type: 'info', message: 'Aggiornamento di tutte le fonti in corso...' });
+
+    try {
+      const response = await fetch('/api/sources/update-all', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorPayload = await response.json().catch(() => null);
+        const errorMessage = errorPayload?.error || `Errore update-all (${response.status}).`;
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+
+      setUpdateAllInfo({
+        state: 'completed',
+        results: data.results,
+        completedAt: data.completedAt
+      });
+
+      const successCount = data.summary.successful;
+      const totalCount = data.summary.total;
+
+      if (successCount === totalCount) {
+        triggerToast({
+          type: 'success',
+          message: `Aggiornamento completato: ${successCount}/${totalCount} fonti aggiornate con successo.`
+        });
+      } else {
+        triggerToast({
+          type: 'error',
+          message: `Aggiornamento parziale: ${successCount}/${totalCount} fonti aggiornate.`
+        });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Errore inatteso.';
+      setUpdateAllInfo({
+        state: 'idle',
+        results: null,
+        completedAt: null
+      });
+      triggerToast({ type: 'error', message });
+    }
+  };
+
   return (
     <div className="space-y-6">
       {toast && (
@@ -327,6 +411,98 @@ const VersionPage = () => {
             </div>
           </div>
         </div>
+      </section>
+
+      <section className="ul-surface p-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold">Aggiorna tutte le fonti</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Esegue l'aggiornamento di Microsoft, EOS e Fabric in parallelo.
+            </p>
+          </div>
+          {!isFileProtocol && (
+            <button
+              className="ul-button ul-button-primary"
+              onClick={handleUpdateAll}
+              disabled={updateAllInfo.state === 'running'}
+            >
+              {updateAllInfo.state === 'running' ? (
+                <span className="inline-flex items-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  Aggiornamento in corso...
+                </span>
+              ) : (
+                'Aggiorna tutte le fonti'
+              )}
+            </button>
+          )}
+        </div>
+
+        {isFileProtocol && (
+          <div className="mt-4 text-sm text-muted-foreground">
+            Funzione disponibile solo con server attivo (non in versione locale).
+          </div>
+        )}
+
+        {updateAllInfo.results && (
+          <div className="mt-6">
+            <h3 className="text-sm font-semibold uppercase text-muted-foreground mb-3">
+              Risultati aggiornamento
+            </h3>
+            <div className="space-y-3">
+              {updateAllInfo.results.map((result) => (
+                <div
+                  key={result.source}
+                  className={`rounded-lg border p-4 ${
+                    result.status === 'ok'
+                      ? 'border-emerald-500/30 bg-emerald-500/5'
+                      : result.status === 'failed'
+                        ? 'border-rose-500/30 bg-rose-500/5'
+                        : 'border-amber-400/30 bg-amber-400/5'
+                  }`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold capitalize">{result.source}</span>
+                        <span
+                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                            result.status === 'ok'
+                              ? 'bg-emerald-500/20 text-emerald-500'
+                              : result.status === 'failed'
+                                ? 'bg-rose-500/20 text-rose-500'
+                                : 'bg-amber-400/20 text-amber-400'
+                          }`}
+                        >
+                          {result.status === 'ok' ? 'Successo' : result.status === 'failed' ? 'Errore' : 'Non disponibile'}
+                        </span>
+                      </div>
+                      <div className="mt-2 text-sm text-muted-foreground">
+                        {result.itemCount !== null ? `${result.itemCount} elementi` : 'N/D'}
+                        {' · '}
+                        {(result.duration / 1000).toFixed(1)}s
+                      </div>
+                      {result.error && (
+                        <div className="mt-2 text-xs text-rose-500">
+                          {result.error}
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {new Date(result.timestamp).toLocaleString('it-IT')}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {updateAllInfo.completedAt && (
+              <div className="mt-4 text-xs text-muted-foreground text-right">
+                Completato: {new Date(updateAllInfo.completedAt).toLocaleString('it-IT')}
+              </div>
+            )}
+          </div>
+        )}
       </section>
 
       <section className="ul-surface p-6">

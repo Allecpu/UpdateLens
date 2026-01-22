@@ -4,14 +4,14 @@ export const ALL_RELEASE_SOURCES: ReleaseSource[] = [
   'Microsoft',
   'EOS',
   'Fabric',
-  'M365Roadmap'
+  'MICROSOFT 365'
 ];
 
 export const RELEASE_SOURCE_LABELS: Record<ReleaseSource, string> = {
   Microsoft: 'Microsoft Release Plans',
   EOS: 'EOS Apps',
   Fabric: 'Microsoft Fabric Roadmap',
-  M365Roadmap: 'Microsoft 365 Roadmap'
+  'MICROSOFT 365': 'MICROSOFT 365'
 };
 
 export type SourceKey = 'microsoft' | 'eos' | 'fabric' | 'm365roadmap';
@@ -126,7 +126,7 @@ export const getSupportedSourcesForFilter = (key: FilterKey): ReleaseSource[] =>
       if (sourceKey === 'microsoft') supported.push('Microsoft');
       else if (sourceKey === 'eos') supported.push('EOS');
       else if (sourceKey === 'fabric') supported.push('Fabric');
-      else if (sourceKey === 'm365roadmap') supported.push('M365Roadmap');
+      else if (sourceKey === 'm365roadmap') supported.push('MICROSOFT 365');
     }
   });
   return supported;

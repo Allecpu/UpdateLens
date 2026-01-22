@@ -28,7 +28,7 @@ type RawM365RoadmapItem = {
 
 type ReleaseItem = {
   id: string;
-  source: 'M365Roadmap';
+  source: 'MICROSOFT 365';
   productId: string;
   product: string;
   productName: string;
@@ -274,7 +274,7 @@ const buildReleaseItem = (
 
   return {
     id: `m365roadmap-${featureId}-${productSlug}`,
-    source: 'M365Roadmap',
+    source: 'MICROSOFT 365',
     productId: `M365ROADMAP:${productSlug}`,
     product: productName,
     productName: productName,

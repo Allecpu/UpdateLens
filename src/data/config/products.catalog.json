@@ -96,8 +96,74 @@
       "label": "IQ",
       "source": "Fabric",
       "category": "Microsoft Fabric"
+    },
+    {
+      "id": "m365roadmap-copilot",
+      "label": "Microsoft Copilot (Microsoft 365)",
+      "source": "MICROSOFT 365",
+      "category": "Microsoft 365"
+    },
+    {
+      "id": "m365roadmap-teams",
+      "label": "Microsoft Teams",
+      "source": "MICROSOFT 365",
+      "category": "Microsoft 365"
+    },
+    {
+      "id": "m365roadmap-sharepoint",
+      "label": "SharePoint",
+      "source": "MICROSOFT 365",
+      "category": "Microsoft 365"
+    },
+    {
+      "id": "m365roadmap-outlook",
+      "label": "Outlook",
+      "source": "MICROSOFT 365",
+      "category": "Microsoft 365"
+    },
+    {
+      "id": "m365roadmap-exchange",
+      "label": "Exchange",
+      "source": "MICROSOFT 365",
+      "category": "Microsoft 365"
+    },
+    {
+      "id": "m365roadmap-onedrive",
+      "label": "OneDrive",
+      "source": "MICROSOFT 365",
+      "category": "Microsoft 365"
+    },
+    {
+      "id": "m365roadmap-viva",
+      "label": "Microsoft Viva",
+      "source": "MICROSOFT 365",
+      "category": "Microsoft 365"
+    },
+    {
+      "id": "m365roadmap-loop",
+      "label": "Microsoft Loop",
+      "source": "MICROSOFT 365",
+      "category": "Microsoft 365"
+    },
+    {
+      "id": "m365roadmap-planner",
+      "label": "Microsoft Planner",
+      "source": "MICROSOFT 365",
+      "category": "Microsoft 365"
+    },
+    {
+      "id": "m365roadmap-365",
+      "label": "Microsoft 365",
+      "source": "MICROSOFT 365",
+      "category": "Microsoft 365"
     }
   ],
-  "categories": ["Dynamics 365", "Power Platform", "EOS", "Microsoft Fabric"],
+  "categories": [
+    "Dynamics 365",
+    "Power Platform",
+    "EOS",
+    "Microsoft Fabric",
+    "Microsoft 365"
+  ],
   "tags": []
 }

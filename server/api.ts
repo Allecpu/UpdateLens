@@ -2,6 +2,34 @@ import express from 'express';
 import { createDb } from './db';
 import { buildRefreshZip, type RefreshSource } from './refreshZip';
 import { buildReleaseZip } from './releaseZip';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
+
+const execAsync = promisify(exec);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(__dirname, '..');
+
+type SourceUpdateResult = {
+  source: 'microsoft' | 'eos' | 'fabric';
+  status: 'ok' | 'failed' | 'missing';
+  itemCount: number | null;
+  duration: number;
+  error?: string;
+  timestamp: string;
+};
+
+type UpdateAllResponse = {
+  completedAt: string;
+  results: SourceUpdateResult[];
+  summary: {
+    total: number;
+    successful: number;
+    failed: number;
+  };
+};
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
@@ -12,6 +40,62 @@ const buildCacheKey = (query: Record<string, string | undefined>) => {
     .map(([key, value]) => `${key}=${value}`)
     .sort()
     .join('&');
+};
+
+const runSingleRefresh = async (
+  source: 'microsoft' | 'eos' | 'fabric'
+): Promise<SourceUpdateResult> => {
+  const startTime = Date.now();
+
+  try {
+    // Run the npm script for this source
+    await execAsync(`npm run refresh:${source}`, { cwd: repoRoot });
+
+    const duration = Date.now() - startTime;
+    const timestamp = new Date().toISOString();
+
+    // Read latest.json to verify the snapshot was created
+    const latestPath = path.resolve(repoRoot, 'public', 'data', 'latest.json');
+    const latestRaw = await readFile(latestPath, 'utf-8');
+    const latest = JSON.parse(latestRaw) as Record<string, string>;
+    const filename = latest[source];
+
+    if (!filename) {
+      return {
+        source,
+        status: 'missing',
+        itemCount: null,
+        duration,
+        timestamp,
+        error: 'File snapshot non trovato nel manifest'
+      };
+    }
+
+    // Read the snapshot to count items
+    const snapshotPath = path.resolve(repoRoot, 'public', 'data', filename);
+    const snapshotRaw = await readFile(snapshotPath, 'utf-8');
+    const snapshot = JSON.parse(snapshotRaw) as { version: number; items: unknown[] };
+
+    return {
+      source,
+      status: 'ok',
+      itemCount: snapshot.items.length,
+      duration,
+      timestamp
+    };
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    const errorMessage = error instanceof Error ? error.message : 'Errore sconosciuto';
+
+    return {
+      source,
+      status: 'failed',
+      itemCount: null,
+      duration,
+      timestamp: new Date().toISOString(),
+      error: errorMessage
+    };
+  }
 };
 
 export const createApi = () => {
@@ -199,6 +283,51 @@ export const createApi = () => {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Errore durante build release ZIP.';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  app.post('/api/sources/update-all', async (_req, res) => {
+    try {
+      const sources: Array<'microsoft' | 'eos' | 'fabric'> = ['microsoft', 'eos', 'fabric'];
+
+      // Run all refreshes in parallel with Promise.allSettled for resilience
+      const settledResults = await Promise.allSettled(
+        sources.map(source => runSingleRefresh(source))
+      );
+
+      // Extract results from settled promises
+      const results: SourceUpdateResult[] = settledResults.map((result, index) => {
+        if (result.status === 'fulfilled') {
+          return result.value;
+        } else {
+          // Handle rejected promises (shouldn't happen as runSingleRefresh catches errors)
+          return {
+            source: sources[index],
+            status: 'failed',
+            itemCount: null,
+            duration: 0,
+            timestamp: new Date().toISOString(),
+            error: result.reason instanceof Error ? result.reason.message : 'Promise rejected'
+          };
+        }
+      });
+
+      const summary = {
+        total: results.length,
+        successful: results.filter(r => r.status === 'ok').length,
+        failed: results.filter(r => r.status === 'failed' || r.status === 'missing').length
+      };
+
+      const response: UpdateAllResponse = {
+        completedAt: new Date().toISOString(),
+        results,
+        summary
+      };
+
+      res.json(response);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Errore durante update-all.';
       res.status(500).json({ error: message });
     }
   });

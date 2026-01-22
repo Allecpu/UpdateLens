@@ -135,7 +135,7 @@ const resolveSourceUrl = (item: ReleaseItem): string | null => {
     const fabricId = item.id.replace('fabric-', '');
     return `https://fabric-gps.com/releases/${fabricId}`;
   }
-  if (item.source === 'M365Roadmap') {
+  if (item.source === 'MICROSOFT 365') {
     // Extract feature ID from id (format: m365roadmap-{id}-{productSlug})
     const match = item.id.match(/^m365roadmap-(\d+)-/);
     const featureId = match ? match[1] : item.id.replace('m365roadmap-', '');
@@ -192,7 +192,7 @@ const parseSnapshot = (payload: SnapshotPayload): ReleaseItem[] => {
       };
     }
 
-    if (item.source === 'M365Roadmap') {
+    if (item.source === 'MICROSOFT 365') {
       const normalized = {
         ...item,
         productName: item.product,
@@ -328,7 +328,7 @@ export const loadAllSnapshots = async (): Promise<SnapshotLoadResult> => {
     'fabric_roadmap_'
   );
   const m365roadmap = await loadSnapshotWithFallback(
-    'M365Roadmap',
+    'MICROSOFT 365',
     isFileProtocol ? undefined : manifest?.m365roadmap,
     'm365roadmap_data_'
   );

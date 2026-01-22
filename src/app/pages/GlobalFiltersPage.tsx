@@ -431,7 +431,7 @@ const GlobalFiltersPage = () => {
     return Array.from(set);
   };
   const formatSourceBadge = (sources: ReleaseSource[]): string | undefined => {
-    const ordered = (['Microsoft', 'EOS', 'Fabric', 'M365Roadmap'] as ReleaseSource[]).filter((source) =>
+    const ordered = (['Microsoft', 'EOS', 'Fabric', 'MICROSOFT 365'] as ReleaseSource[]).filter((source) =>
       sources.includes(source)
     );
     if (ordered.length === 4) {
@@ -467,7 +467,7 @@ const GlobalFiltersPage = () => {
   );
   const eosProducts = metadata.products.filter((option) => option.sources.includes('EOS'));
   const fabricProducts = metadata.products.filter((option) => option.sources.includes('Fabric'));
-  const m365RoadmapProducts = metadata.products.filter((option) => option.sources.includes('M365Roadmap'));
+  const m365RoadmapProducts = metadata.products.filter((option) => option.sources.includes('MICROSOFT 365'));
 
   const updateProductsForSource = (source: ReleaseSource, next: string[]) => {
     const toKeep = currentFilters.products.filter(
@@ -1006,12 +1006,12 @@ const GlobalFiltersPage = () => {
                   )}
                   {m365RoadmapProducts.length > 0 && (
                     <FilterListSection
-                      title="Prodotti (M365 Roadmap)"
+                      title="Prodotti (MICROSOFT 365)"
                       options={m365RoadmapProducts}
                       selected={currentFilters.products}
-                      onChange={(next) => updateProductsForSource('M365Roadmap', next)}
+                      onChange={(next) => updateProductsForSource('MICROSOFT 365', next)}
                       defaultOpen
-                      activeSources={['M365Roadmap']}
+                      activeSources={['MICROSOFT 365']}
                     />
                   )}
                 </>

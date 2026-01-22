@@ -680,17 +680,17 @@ const DashboardPage = () => {
           </button>
           <button
             className={`ul-surface p-5 text-left transition-all hover:ring-2 hover:ring-purple-500/50 ${
-              drillSource === 'M365Roadmap' ? 'ring-2 ring-purple-500' : ''
+              drillSource === 'MICROSOFT 365' ? 'ring-2 ring-purple-500' : ''
             }`}
-            onClick={() => handleDrillSource('M365Roadmap')}
+            onClick={() => handleDrillSource('MICROSOFT 365')}
           >
             <div className="text-xs uppercase text-muted-foreground">
-              Microsoft 365 Roadmap
+              MICROSOFT 365
             </div>
             <div className="mt-3 text-3xl font-semibold text-purple-600">
-              {filteredItems.filter((item) => item.source === 'M365Roadmap').length}
+              {filteredItems.filter((item) => item.source === 'MICROSOFT 365').length}
             </div>
-            {drillSource === 'M365Roadmap' && drillProduct && (
+            {drillSource === 'MICROSOFT 365' && drillProduct && (
               <div className="mt-1 text-xs text-muted-foreground">
                 Prodotto: {drilledItems.length}
               </div>

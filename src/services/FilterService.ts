@@ -3,7 +3,7 @@ import type { ReleaseSource } from '../models/ReleaseItem';
 import type { FilterState } from '../models/Filters';
 import { isFilterSupported } from './FilterDefinitions';
 import { extractCountriesFromHtml } from '../utils/geography';
-import { normalizeProductLabel } from './FilterMetadata';
+import { normalizeProductLabel, normalizeAvailabilityType } from './FilterMetadata';
 
 const toMonthDate = (value: string): Date | null => {
   const [yearRaw, monthRaw] = value.split('-');
@@ -149,7 +149,10 @@ export const filterReleaseItems = (
       filters.availabilityTypes.length
     ) {
       const types = item.availabilityTypes ?? [];
-      const hasType = filters.availabilityTypes.some((type) => types.includes(type));
+      // Normalize both item types and filter types for consistent matching
+      const normalizedItemTypes = types.map(normalizeAvailabilityType);
+      const normalizedFilterTypes = filters.availabilityTypes.map(normalizeAvailabilityType);
+      const hasType = normalizedFilterTypes.some((type) => normalizedItemTypes.includes(type));
       if (!hasType) {
         return false;
       }

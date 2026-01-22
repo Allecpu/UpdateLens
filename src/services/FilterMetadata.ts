@@ -43,6 +43,20 @@ export const normalizeProductLabel = (raw: string): string => {
 };
 
 /**
+ * Normalize availability type values.
+ * Maps "GA" to "General Availability" for consistent filtering and display.
+ */
+export const normalizeAvailabilityType = (raw: string): string => {
+  if (!raw) return '';
+  const trimmed = raw.trim();
+  // Map "GA" to "General Availability"
+  if (trimmed === 'GA') {
+    return 'General Availability';
+  }
+  return trimmed;
+};
+
+/**
  * Create a case-insensitive key for deduplication.
  */
 const normalizedKey = (label: string): string => label.toLowerCase().trim();
@@ -114,7 +128,8 @@ export type FilterMetadata = {
 
 const countValues = (
   items: ReleaseItem[],
-  extractValues: (item: ReleaseItem) => string[]
+  extractValues: (item: ReleaseItem) => string[],
+  normalizeValue?: (value: string) => string
 ): FilterOption[] => {
   const counts = new Map<string, { count: number; sources: Set<ReleaseSource> }>();
   items.forEach((item) => {
@@ -122,10 +137,15 @@ const countValues = (
       if (!value) {
         return;
       }
-      const entry = counts.get(value) ?? { count: 0, sources: new Set<ReleaseSource>() };
+      // Apply normalization if provided
+      const normalizedValue = normalizeValue ? normalizeValue(value) : value;
+      if (!normalizedValue) {
+        return;
+      }
+      const entry = counts.get(normalizedValue) ?? { count: 0, sources: new Set<ReleaseSource>() };
       entry.count += 1;
       entry.sources.add(item.source);
-      counts.set(value, entry);
+      counts.set(normalizedValue, entry);
     });
   });
   return Array.from(counts.entries())
@@ -171,7 +191,7 @@ export const buildFilterMetadata = (items: ReleaseItem[]): FilterMetadata => {
     tags: countValues(items, (item) => item.tags ?? []),
     waves: countValues(items, (item) => [item.wave ?? '']),
     months: sortMonthsDesc(items, (item) => [item.availabilityDate]),
-    availabilityTypes: countValues(items, (item) => item.availabilityTypes ?? []),
+    availabilityTypes: countValues(items, (item) => item.availabilityTypes ?? [], normalizeAvailabilityType),
     enabledFor: countValues(items, (item) => [item.enabledFor ?? '']),
     geography: countValues(items, (item) => {
       if (item.geographyCountries && item.geographyCountries.length > 0) {
