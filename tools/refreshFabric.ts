@@ -212,6 +212,9 @@ function extractItems(rawItems: RawFabricItem[]): ReleaseItem[] {
       const releaseDate =
         availabilityDateFull ?? `${availabilityDate}-01`;
 
+      const releasePage = `https://fabric-gps.com/releases/${raw.release_item_id}`;
+      const blogUrl = raw.blog_url ?? null;
+
       const item: ReleaseItem = {
         id: `fabric-${raw.release_item_id}`,
         source: 'Fabric',
@@ -231,9 +234,9 @@ function extractItems(rawItems: RawFabricItem[]): ReleaseItem[] {
         availabilityTypes: buildAvailabilityTypes(raw),
         firstAvailableDate: availabilityDateFull,
         lastUpdatedDate: parseDateFull(raw.last_modified),
-        sourceUrl: `https://fabric-gps.com/releases/${raw.release_item_id}`,
-        learnUrl: raw.blog_url ?? null,
-        url: `https://fabric-gps.com/releases/${raw.release_item_id}`
+        sourceUrl: releasePage,
+        learnUrl: null,
+        url: blogUrl ?? releasePage
       };
 
       validItems.push(item);

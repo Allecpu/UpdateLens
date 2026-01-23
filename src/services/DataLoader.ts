@@ -132,14 +132,17 @@ const resolveSourceUrl = (item: ReleaseItem): string | null => {
     return resolveMicrosoftSourceUrl(item);
   }
   if (item.source === 'Fabric') {
-    const fabricId = item.id.replace('fabric-', '');
-    return `https://fabric-gps.com/releases/${fabricId}`;
+    const candidate = (item.url ?? '').trim();
+    if (!candidate || !isValidHttpUrl(candidate)) {
+      return null;
+    }
+    return candidate;
   }
   if (item.source === 'MICROSOFT 365') {
     // Extract feature ID from id (format: m365roadmap-{id}-{productSlug})
     const match = item.id.match(/^m365roadmap-(\d+)-/);
     const featureId = match ? match[1] : item.id.replace('m365roadmap-', '');
-    return `https://www.microsoft.com/microsoft-365/roadmap?featureid=${featureId}`;
+    return `https://www.microsoft.com/microsoft-365/roadmap?featureid=${featureId}&searchterms=${featureId}`;
   }
   return resolveGenericSourceUrl(item);
 };

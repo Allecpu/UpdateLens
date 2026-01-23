@@ -1,7 +1,7 @@
 {
   "version": 1,
   "defaults": {
-    "sources": ["Microsoft", "EOS"],
+    "sources": ["Microsoft", "EOS", "Fabric", "MICROSOFT 365"],
     "statuses": ["Planned", "Rolling out", "Try now", "Launched", "Unknown"],
     "horizonMonths": 120,
     "historyMonths": 120

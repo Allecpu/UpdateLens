@@ -788,6 +788,7 @@ const DashboardPage = () => {
                 ),
                 asChip('BC', item.minBcVersion, `bc-${item.minBcVersion ?? 'none'}`)
               ].filter(Boolean);
+              const sourceLink = item.sourceUrl ?? item.url;
               return (
                 <article
                   key={item.id}
@@ -818,26 +819,10 @@ const DashboardPage = () => {
                     Rilascio: {item.releaseDate}
                   </div>
                   <div className="mt-3 flex items-center gap-3 text-xs">
-                    {item.source === 'Microsoft' &&
-                    item.sourceUrl &&
-                    item.sourcePlanId &&
-                    isValidGuid(item.sourcePlanId) &&
-                    isReleasePlansUrl(item.sourceUrl) ? (
+                    {sourceLink && isValidHttpUrl(sourceLink) ? (
                       <a
                         className="text-primary underline-offset-4 hover:underline"
-                        href={item.sourceUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label={`Vai alla fonte di ${item.title}`}
-                      >
-                        Vai alla fonte
-                      </a>
-                    ) : item.source !== 'Microsoft' &&
-                      item.sourceUrl &&
-                      isValidHttpUrl(item.sourceUrl) ? (
-                      <a
-                        className="text-primary underline-offset-4 hover:underline"
-                        href={item.sourceUrl}
+                        href={sourceLink}
                         target="_blank"
                         rel="noopener noreferrer"
                         aria-label={`Vai alla fonte di ${item.title}`}
@@ -847,32 +832,34 @@ const DashboardPage = () => {
                     ) : (
                       <span className="text-muted-foreground">Fonte non disponibile</span>
                     )}
-                    {item.learnUrl && isValidHttpUrl(item.learnUrl) && (
-                      <a
-                        className="inline-flex items-center gap-1 text-primary hover:underline"
-                        href={item.learnUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label={`Apri documentazione per ${item.title}`}
-                      >
-                        <svg
-                          aria-hidden="true"
-                          viewBox="0 0 24 24"
-                          className="h-4 w-4"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.6"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
+                    {item.learnUrl &&
+                      isValidHttpUrl(item.learnUrl) &&
+                      item.learnUrl !== sourceLink && (
+                        <a
+                          className="inline-flex items-center gap-1 text-primary hover:underline"
+                          href={item.learnUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`Apri documentazione per ${item.title}`}
                         >
-                          <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5V5.5Z" />
-                          <path d="M20 3v16" />
-                          <path d="M7 7h8" />
-                          <path d="M7 10h8" />
-                        </svg>
-                        Documentazione
-                      </a>
-                    )}
+                          <svg
+                            aria-hidden="true"
+                            viewBox="0 0 24 24"
+                            className="h-4 w-4"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.6"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5V5.5Z" />
+                            <path d="M20 3v16" />
+                            <path d="M7 7h8" />
+                            <path d="M7 10h8" />
+                          </svg>
+                          Documentazione
+                        </a>
+                      )}
                   </div>
                 </article>
               );

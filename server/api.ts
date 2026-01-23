@@ -102,10 +102,71 @@ export const createApi = () => {
   const db = createDb();
   const app = express();
 
-  app.use(express.json());
+  app.use(express.json({ limit: '10mb' }));
 
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok' });
+  });
+
+  // GitHub Proxy for Web Mode
+  app.all('/api/github/*', async (req, res) => {
+    const envToken = process.env.GITHUB_ISSUES_TOKEN;
+    const owner = process.env.GITHUB_OWNER || 'Allecpu';
+    const repo = process.env.GITHUB_REPO || 'UpdateLens';
+    const inboundAuth = typeof req.headers.authorization === 'string' ? req.headers.authorization.trim() : '';
+    const normalizeAuth = (value?: string) => {
+      if (!value) return '';
+      return value.startsWith('Bearer ') ? value : `Bearer ${value}`;
+    };
+    const primaryAuth = inboundAuth ? normalizeAuth(inboundAuth) : normalizeAuth(envToken);
+    const fallbackAuth = inboundAuth && envToken ? normalizeAuth(envToken) : '';
+    const token = primaryAuth;
+
+    if (!token && req.path !== '/api/github/health') {
+      return res.status(503).json({
+        error: 'GitHub token non configurato sul server. Usa la modalità locale o configura GITHUB_ISSUES_TOKEN.'
+      });
+    }
+
+    if (req.path === '/api/github/health') {
+      return res.json({ ok: !!envToken, mode: 'web' });
+    }
+
+    const githubPath = (req.params as string[])[0];
+    const url = `https://api.github.com/repos/${owner}/${repo}/${githubPath}`;
+
+    try {
+      const body = ['POST', 'PUT', 'PATCH'].includes(req.method) ? JSON.stringify(req.body) : undefined;
+      const makeHeaders = (auth?: string) => {
+        const headers: Record<string, string> = {
+          'Accept': 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json',
+        };
+        if (auth) {
+          headers['Authorization'] = auth;
+        }
+        return headers;
+      };
+
+      let response = await fetch(url, {
+        method: req.method,
+        headers: makeHeaders(token),
+        body,
+      });
+
+      if ((response.status === 401 || response.status === 403) && fallbackAuth) {
+        response = await fetch(url, {
+          method: req.method,
+          headers: makeHeaders(fallbackAuth),
+          body,
+        });
+      }
+
+      const data = await response.json().catch(() => ({}));
+      res.status(response.status).json(data);
+    } catch (error) {
+      res.status(500).json({ error: 'Errore durante il proxy GitHub: ' + (error instanceof Error ? error.message : String(error)) });
+    }
   });
 
   app.get('/api/releaseplans', (req, res) => {
