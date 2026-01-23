@@ -26,15 +26,16 @@ export const buildTime =
 export const gitCommit =
   typeof __GIT_COMMIT__ === 'string' ? __GIT_COMMIT__ : '';
 
-export const lastUpdateTitle = 'Release locale allineata ai filtri globali';
+export const lastUpdateTitle = 'Integrazione GitHub Issues e persistenza Token';
 
-export const lastUpdateDate = '2026-01-16';
+export const lastUpdateDate = '2026-01-23';
 
 export const lastUpdateNotes = [
-  'Release locale allineata alla logica Filtri Globali/Dashboard.',
-  'Normalizzazione filtri aggiornata e coerente in offline.',
-  'Build release ripulita per evitare asset obsoleti.',
-  'Dataset locale aggiornato con snapshot correnti.'
+  'Nuova sezione Issues per la gestione diretta dei bug/richieste.',
+  'Configurazione persistente del GitHub PAT in locale (LocalStorage).',
+  'Interfaccia di validazione token con test preventivo.',
+  'Supporto Web: proxy server-side con GITHUB_ISSUES_TOKEN.',
+  'Supporto Web: upload immagini via GitHub Content API (main/public/uploads).'
 ];
 
 export const appEnvironment = resolveAppEnvironment();

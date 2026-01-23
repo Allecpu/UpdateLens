@@ -332,5 +332,127 @@ export const createApi = () => {
     }
   });
 
+  // GitHub API Proxy
+  const GITHUB_TOKEN = process.env.GITHUB_ISSUES_TOKEN || process.env.GITHUB_TOKEN;
+  const GITHUB_OWNER = process.env.GITHUB_OWNER || 'Allecpu';
+  const GITHUB_REPO = process.env.GITHUB_REPO || 'UpdateLens';
+
+  app.get('/api/github/issues', async (req, res) => {
+    try {
+      if (!GITHUB_TOKEN) {
+        return res.status(500).json({ error: 'GITHUB_TOKEN non configurato sul server.' });
+      }
+      const state = req.query.state || 'open';
+      const response = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/issues?state=${state}&per_page=100`, {
+        headers: {
+          'Authorization': `Bearer ${GITHUB_TOKEN}`,
+          'Accept': 'application/vnd.github.v3+json'
+        }
+      });
+      const data = await response.json();
+      res.status(response.status).json(data);
+    } catch (error) {
+      res.status(500).json({ error: 'Errore durante la comunicazione con GitHub.' });
+    }
+  });
+
+  app.post('/api/github/issues', async (req, res) => {
+    try {
+      if (!GITHUB_TOKEN) {
+        return res.status(500).json({ error: 'GITHUB_TOKEN non configurato sul server.' });
+      }
+      const response = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/issues`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${GITHUB_TOKEN}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(req.body)
+      });
+      const data = await response.json();
+      res.status(response.status).json(data);
+    } catch (error) {
+      res.status(500).json({ error: 'Errore durante la creazione della issue.' });
+    }
+  });
+
+  app.patch('/api/github/issues/:number', async (req, res) => {
+    try {
+      if (!GITHUB_TOKEN) {
+        return res.status(500).json({ error: 'GITHUB_TOKEN non configurato sul server.' });
+      }
+      const { number } = req.params;
+      const response = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/issues/${number}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${GITHUB_TOKEN}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(req.body)
+      });
+      const data = await response.json();
+      res.status(response.status).json(data);
+    } catch (error) {
+      res.status(500).json({ error: 'Errore durante l\'aggiornamento della issue.' });
+    }
+  });
+
+  app.get('/api/github/labels', async (_req, res) => {
+    try {
+      if (!GITHUB_TOKEN) {
+        return res.status(500).json({ error: 'GITHUB_TOKEN non configurato sul server.' });
+      }
+      const response = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/labels`, {
+        headers: {
+          'Authorization': `Bearer ${GITHUB_TOKEN}`,
+          'Accept': 'application/vnd.github.v3+json'
+        }
+      });
+      const data = await response.json();
+      res.status(response.status).json(data);
+    } catch (error) {
+      res.status(500).json({ error: 'Errore durante il caricamento delle label.' });
+    }
+  });
+
+  app.post('/api/github/upload', express.json({ limit: '10mb' }), async (req, res) => {
+    try {
+      if (!GITHUB_TOKEN) {
+        return res.status(500).json({ error: 'GITHUB_TOKEN non configurato sul server.' });
+      }
+      const { filename, content, message } = req.body;
+      if (!filename || !content) {
+        return res.status(400).json({ error: 'Nome file e contenuto (base64) richiesti.' });
+      }
+
+      const path = `public/uploads/${Date.now()}_${filename}`;
+      const response = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${path}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${GITHUB_TOKEN}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          message: message || `Upload image: ${filename}`,
+          content: content // must be base64
+        })
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        // Return the raw URL for markdown insertion
+        const rawUrl = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/main/${path}`;
+        res.status(201).json({ url: rawUrl, path: data.content.path });
+      } else {
+        res.status(response.status).json(data);
+      }
+    } catch (error) {
+      res.status(500).json({ error: 'Errore durante l\'upload dell\'immagine.' });
+    }
+  });
+
   return app;
 };
