@@ -6,6 +6,7 @@ import type { ReleaseItem, ReleaseSource, ReleaseStatus } from '../../models/Rel
 import { useCustomerStore } from '../store/useCustomerStore';
 import { useCustomerGroupStore } from '../store/useCustomerGroupStore';
 import { useFilterStore, type FilterState } from '../store/useFilterStore';
+import { computeDashboardKpis } from '../../services/KpiService';
 import {
   buildBcVersionOptions,
   buildFilterMetadata,
@@ -303,6 +304,10 @@ const DashboardPage = () => {
       historyMonths: dashboardFilters.historyMonths
     });
   }, [dashboardFilters, items]);
+  const dashboardKpis = useMemo(
+    () => computeDashboardKpis(filteredItems),
+    [filteredItems]
+  );
 
   // =====================================================================
   // MANDATORY DEBUG LOG - one-shot per customer change (per specification)
@@ -615,6 +620,26 @@ const DashboardPage = () => {
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-semibold">Dashboard</h1>
+            {chatFilters && Object.keys(chatFilters).length > 0 && (
+              <div className="mt-2 flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+                  <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                  </svg>
+                  Filtri da chat attivi
+                </span>
+                <button
+                  type="button"
+                  onClick={clearChatFilters}
+                  className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  title="Rimuovi filtri chat"
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M18 6 6 18M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            )}
             <p className="mt-2 text-sm text-muted-foreground">
               Analisi rapida degli aggiornamenti Microsoft ed EOS.
             </p>
@@ -694,7 +719,7 @@ const DashboardPage = () => {
             onClick={resetDrill}
           >
             <div className="text-xs uppercase text-muted-foreground">Totale</div>
-            <div className="mt-3 text-3xl font-semibold">{filteredItems.length}</div>
+            <div className="mt-3 text-3xl font-semibold">{dashboardKpis.total}</div>
             {isDrillActive && (
               <div className="mt-1 text-xs text-muted-foreground">
                 Drilled: {drilledItems.length}
@@ -709,7 +734,7 @@ const DashboardPage = () => {
           >
             <div className="text-xs uppercase text-muted-foreground">Microsoft</div>
             <div className="mt-3 text-3xl font-semibold text-blue-600">
-              {filteredItems.filter((item) => item.source === 'Microsoft').length}
+              {dashboardKpis.Microsoft}
             </div>
             {drillSource === 'Microsoft' && drillProduct && (
               <div className="mt-1 text-xs text-muted-foreground">
@@ -725,7 +750,7 @@ const DashboardPage = () => {
           >
             <div className="text-xs uppercase text-muted-foreground">EOS</div>
             <div className="mt-3 text-3xl font-semibold text-amber-600">
-              {filteredItems.filter((item) => item.source === 'EOS').length}
+              {dashboardKpis.EOS}
             </div>
             {drillSource === 'EOS' && drillProduct && (
               <div className="mt-1 text-xs text-muted-foreground">
@@ -741,7 +766,7 @@ const DashboardPage = () => {
           >
             <div className="text-xs uppercase text-muted-foreground">Fabric</div>
             <div className="mt-3 text-3xl font-semibold text-teal-600">
-              {filteredItems.filter((item) => item.source === 'Fabric').length}
+              {dashboardKpis.Fabric}
             </div>
             {drillSource === 'Fabric' && drillProduct && (
               <div className="mt-1 text-xs text-muted-foreground">
@@ -759,7 +784,7 @@ const DashboardPage = () => {
               MICROSOFT 365
             </div>
             <div className="mt-3 text-3xl font-semibold text-purple-600">
-              {filteredItems.filter((item) => item.source === 'MICROSOFT 365').length}
+              {dashboardKpis['MICROSOFT 365']}
             </div>
             {drillSource === 'MICROSOFT 365' && drillProduct && (
               <div className="mt-1 text-xs text-muted-foreground">

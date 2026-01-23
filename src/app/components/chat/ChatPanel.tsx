@@ -42,7 +42,7 @@ const DEFAULT_FILTERS: FilterState = {
 
 const ChatPanel = () => {
   const navigate = useNavigate();
-  const { isOpen, messages, toggleChat, closeChat, addMessage } =
+  const { isOpen, messages, queryHistory, toggleChat, closeChat, addMessage, addToHistory } =
     useChatStore();
   const { cssFilters, setChatFilters, clearChatFilters } = useFilterStore();
 
@@ -79,11 +79,12 @@ const ChatPanel = () => {
     (text: string) => {
       if (!metadata) return;
 
-      // Add user message
+      // Add user message and save to history
       addMessage({
         type: 'user',
         text
       });
+      addToHistory(text);
 
       // Parse intent
       const intent = parseIntent(text, metadata);
@@ -146,6 +147,7 @@ const ChatPanel = () => {
         <div className="mb-4">
           <ChatWindow
             messages={messages}
+            queryHistory={queryHistory}
             onClose={closeChat}
             onSend={handleSend}
             onApplyFilters={handleApplyFilters}

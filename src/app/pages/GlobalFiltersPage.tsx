@@ -9,6 +9,11 @@ import {
   getActiveSupportedSources,
   resolveActiveSources
 } from '../../services/FilterDefinitions';
+import {
+  computeDashboardKpis,
+  DASHBOARD_KPI_DEFINITIONS,
+  type DashboardKpiKey
+} from '../../services/KpiService';
 import { useFilterStore, type FilterState } from '../store/useFilterStore';
 import { useCustomerStore } from '../store/useCustomerStore';
 import { useCustomerGroupStore } from '../store/useCustomerGroupStore';
@@ -47,6 +52,14 @@ const normalizeSelectionForSources = (
 ): string[] => normalizeSelection(values, optionValuesForSources(options, sources, matchAllSources));
 
 const isEntryActive = (entry: { isActive?: boolean }): boolean => entry.isActive !== false;
+
+const DASHBOARD_KPI_VALUE_CLASSES: Record<DashboardKpiKey, string> = {
+  total: '',
+  Microsoft: 'text-blue-600',
+  EOS: 'text-amber-600',
+  Fabric: 'text-teal-600',
+  'MICROSOFT 365': 'text-purple-600'
+};
 
 const GlobalFiltersPage = () => {
   const [snapshotItems, setSnapshotItems] = useState<ReleaseItem[]>([]);
@@ -321,6 +334,14 @@ const GlobalFiltersPage = () => {
     metadata,
     bcVersionValues
   ]);
+  const kpiItems = useMemo(
+    () => filterReleaseItems(items, currentFilters),
+    [items, currentFilters]
+  );
+  const dashboardKpis = useMemo(
+    () => computeDashboardKpis(kpiItems),
+    [kpiItems]
+  );
 
   const updateFilters = (next: Partial<FilterState>) => {
     setSaveStatus('pending');
@@ -726,6 +747,21 @@ const GlobalFiltersPage = () => {
         </div>
       )}
 
+      <section className="grid gap-4 md:grid-cols-4">
+        {DASHBOARD_KPI_DEFINITIONS.map((definition) => (
+          <div key={definition.key} className="ul-surface p-5">
+            <div className="text-xs uppercase text-muted-foreground">
+              {definition.label}
+            </div>
+            <div
+              className={`mt-3 text-3xl font-semibold ${DASHBOARD_KPI_VALUE_CLASSES[definition.key]}`}
+            >
+              {dashboardKpis[definition.key]}
+            </div>
+          </div>
+        ))}
+      </section>
+
       <section className="ul-surface p-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
@@ -758,19 +794,11 @@ const GlobalFiltersPage = () => {
             Regola combinazione: Owner CSS usa logica OR. Il filtro Gruppi clienti
             è mutuamente esclusivo con Owner CSS.
           </div>
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
             <div className="ul-surface px-3 py-2">
               <div className="text-xs uppercase text-muted-foreground">Clienti inclusi</div>
               <div className="mt-1 text-lg font-semibold">
                 {customerPreview.entries.length}
-              </div>
-            </div>
-            <div className="ul-surface px-3 py-2">
-              <div className="text-xs uppercase text-muted-foreground">
-                Prodotti assegnati (totale)
-              </div>
-              <div className="mt-1 text-lg font-semibold">
-                {customerPreview.totalProductsCount}
               </div>
               {customerPreview.overridesCount > 0 && (
                 <div className="text-[11px] text-muted-foreground">

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import type { ChatMessage as ChatMessageData } from '../../store/useChatStore';
 import ChatMessage from './ChatMessage';
 import ChatInput from './ChatInput';
@@ -8,15 +8,24 @@ type QuickReply = {
   text: string;
 };
 
-const QUICK_REPLIES: QuickReply[] = [
-  { label: 'Novità Fabric', text: 'novità per Fabric' },
-  { label: 'GA ultimi 30gg', text: 'novità in GA' },
-  { label: 'Ultimi 7 giorni', text: 'ultimi 7 giorni' },
+const DEFAULT_QUICK_REPLIES: QuickReply[] = [
+  { label: 'Fabric + GA 30gg', text: 'Fabric ultimi 30 giorni in GA' },
+  { label: 'EOS preview', text: 'EOS in preview' },
+  { label: 'Quanti elementi?', text: 'quanti elementi ci sono?' },
   { label: 'Reset filtri', text: 'mostra tutto' }
 ];
 
+/**
+ * Truncate text to max length with ellipsis
+ */
+const truncate = (text: string, maxLen: number): string => {
+  if (text.length <= maxLen) return text;
+  return text.slice(0, maxLen - 1) + '\u2026';
+};
+
 type ChatWindowProps = {
   messages: ChatMessageData[];
+  queryHistory: string[];
   onClose: () => void;
   onSend: (text: string) => void;
   onApplyFilters: (filterPatch: Partial<Record<string, unknown>>) => void;
@@ -24,6 +33,7 @@ type ChatWindowProps = {
 
 const ChatWindow = ({
   messages,
+  queryHistory,
   onClose,
   onSend,
   onApplyFilters
@@ -39,6 +49,22 @@ const ChatWindow = ({
       onApplyFilters(message.filterPatch);
     }
   };
+
+  // Build quick replies: mix history and defaults
+  const quickReplies = useMemo(() => {
+    const historyReplies: QuickReply[] = queryHistory.slice(0, 2).map(q => ({
+      label: truncate(q, 16),
+      text: q
+    }));
+
+    // Get defaults that aren't in history
+    const historyTexts = new Set(queryHistory.map(q => q.toLowerCase()));
+    const filteredDefaults = DEFAULT_QUICK_REPLIES
+      .filter(r => !historyTexts.has(r.text.toLowerCase()))
+      .slice(0, 4 - historyReplies.length);
+
+    return [...historyReplies, ...filteredDefaults];
+  }, [queryHistory]);
 
   return (
     <div className="flex h-[500px] w-[380px] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-xl">
@@ -94,9 +120,14 @@ const ChatWindow = ({
       {/* Quick Replies */}
       {messages.length <= 1 && (
         <div className="flex flex-wrap gap-2 border-t border-border px-3 py-2">
-          {QUICK_REPLIES.map((reply) => (
+          {queryHistory.length > 0 && (
+            <span className="w-full text-[10px] text-muted-foreground mb-1">
+              Recenti:
+            </span>
+          )}
+          {quickReplies.map((reply, index) => (
             <button
-              key={reply.label}
+              key={`${reply.text}-${index}`}
               type="button"
               onClick={() => onSend(reply.text)}
               className="rounded-full border border-border bg-muted/50 px-3 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted"
