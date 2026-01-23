@@ -6,8 +6,30 @@ import { getAttachments, saveAttachments, removeAttachment as removeStoredAttach
 const isFileProtocol = typeof window !== 'undefined' && window.location.protocol === 'file:';
 const MAX_ATTACHMENT_SIZE_BYTES = 1 * 1024 * 1024;
 
+const encodePathSegments = (path: string) => path.split('/').map((segment) => encodeURIComponent(segment)).join('/');
+
+const normalizeGitHubContentUrl = (url: string, fallbackOwner: string, fallbackRepo: string) => {
+    try {
+        const parsed = new URL(url);
+        if (parsed.hostname !== 'api.github.com') return url;
+
+        const match = parsed.pathname.match(/^\/repos\/([^/]+)\/([^/]+)\/contents\/(.+)$/);
+        if (!match) return url;
+
+        const owner = match[1] || fallbackOwner;
+        const repo = match[2] || fallbackRepo;
+        const contentPath = match[3];
+        const ref = parsed.searchParams.get('ref') || 'main';
+        const decodedPath = decodeURIComponent(contentPath);
+
+        return `https://raw.githubusercontent.com/${owner}/${repo}/${ref}/${encodePathSegments(decodedPath)}`;
+    } catch {
+        return url;
+    }
+};
+
 // Basic Markdown to HTML helper
-const markdownToHtml = (md: string) => {
+const markdownToHtml = (md: string, owner: string, repo: string) => {
     if (!md) return '';
     let html = md
         // Basic escaping
@@ -15,7 +37,10 @@ const markdownToHtml = (md: string) => {
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         // Images: ![alt](url)
-        .replace(/!\[(.*?)\]\((.*?)\)/gim, '<img src="$2" alt="$1" style="max-width: 100%; height: auto; border-radius: 8px; margin: 12px 0; border: 1px solid var(--border);" />')
+        .replace(/!\[(.*?)\]\((.*?)\)/gim, (_match, alt, url) => {
+            const normalizedUrl = normalizeGitHubContentUrl(url, owner, repo);
+            return `<img src="${normalizedUrl}" alt="${alt}" style="max-width: 100%; height: auto; border-radius: 8px; margin: 12px 0; border: 1px solid var(--border);" />`;
+        })
         // Links: [text](url)
         .replace(/\[(.*?)\]\((.*?)\)/gim, '<a href="$2" class="text-primary hover:underline" target="_blank" rel="noopener noreferrer">$1</a>')
         // Typography
@@ -245,8 +270,13 @@ const IssuesPage = () => {
                         );
                         uploadedImages.push({ name: att.file.name, url: result.download_url });
                     } catch (err) {
-                        console.error(`Failed to upload ${att.file.name}`, err);
-                        uploadErrors.push(`Upload fallito per ${att.name}.`);
+                        const message = err instanceof Error ? err.message : String(err);
+                        if (/resource not accessible by personal access token/i.test(message)) {
+                            uploadErrors.push(`Upload fallito per ${att.name}: token senza permessi Contents (RW) sul repo.`);
+                        } else {
+                            console.error(`Failed to upload ${att.file.name}`, err);
+                            uploadErrors.push(`Upload fallito per ${att.name}.`);
+                        }
                     }
                 }
             }
@@ -668,7 +698,7 @@ const IssuesPage = () => {
                                 {isPreview ? (
                                     <div
                                         className="ul-textarea min-h-[220px] max-h-[400px] overflow-y-auto bg-accent/5"
-                                        dangerouslySetInnerHTML={{ __html: markdownToHtml(newBody) || '<span class="text-muted-foreground italic">Nulla da visualizzare. Scrivi qualcosa nella tab "Write".</span>' }}
+                                        dangerouslySetInnerHTML={{ __html: markdownToHtml(newBody, owner, repo) || '<span class="text-muted-foreground italic">Nulla da visualizzare. Scrivi qualcosa nella tab "Write".</span>' }}
                                     />
                                 ) : (
                                     <textarea

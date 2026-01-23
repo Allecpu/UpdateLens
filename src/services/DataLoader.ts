@@ -132,8 +132,11 @@ const resolveSourceUrl = (item: ReleaseItem): string | null => {
     return resolveMicrosoftSourceUrl(item);
   }
   if (item.source === 'Fabric') {
-    const fabricId = item.id.replace('fabric-', '');
-    return `https://fabric-gps.com/releases/${fabricId}`;
+    const candidate = (item.url ?? '').trim();
+    if (!candidate || !isValidHttpUrl(candidate)) {
+      return null;
+    }
+    return candidate;
   }
   if (item.source === 'MICROSOFT 365') {
     // Extract feature ID from id (format: m365roadmap-{id}-{productSlug})

@@ -155,7 +155,10 @@ export class GitHubIssuesClient {
             throw new Error(err.message || `GitHub API error: ${response.statusText}`);
         }
         const data = await response.json();
-        return { download_url: data.content.download_url };
+        const contentPath = data.content?.path || path;
+        const downloadUrl = data.content?.download_url
+            || `https://raw.githubusercontent.com/${this.owner}/${this.repo}/main/${contentPath}`;
+        return { download_url: downloadUrl };
     }
 
     async addComment(issueNumber: number, body: string): Promise<void> {
