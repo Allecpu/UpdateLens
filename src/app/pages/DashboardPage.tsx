@@ -14,7 +14,6 @@ import {
 } from '../../services/FilterNormalization';
 import FiltersPanel from '../components/FiltersPanel';
 import { isValidHttpUrl } from '../../utils/url';
-import { isReleasePlansUrl, isValidGuid } from '../../utils/releaseplans';
 import { getProductColor } from '../../utils/productColors';
 
 type Chip = {
