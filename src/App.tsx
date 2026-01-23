@@ -4,6 +4,7 @@ import ClientsPage from './app/pages/ClientsPage';
 import DashboardPage from './app/pages/DashboardPage';
 import GlobalFiltersPage from './app/pages/GlobalFiltersPage';
 import VersionPage from './app/pages/VersionPage';
+import IssuesPage from './app/pages/IssuesPage';
 import { useCustomerGroupStore } from './app/store/useCustomerGroupStore';
 import { useCustomerStore } from './app/store/useCustomerStore';
 import { useFilterStore } from './app/store/useFilterStore';
@@ -128,8 +129,7 @@ const App = () => {
                 to="/"
                 end
                 className={({ isActive }) =>
-                  `rounded-full px-3 py-1 ${
-                    isActive ? 'bg-accent text-accent-foreground' : ''
+                  `rounded-full px-3 py-1 ${isActive ? 'bg-accent text-accent-foreground' : ''
                   }`
                 }
               >
@@ -138,8 +138,7 @@ const App = () => {
               <NavLink
                 to="/clienti"
                 className={({ isActive }) =>
-                  `rounded-full px-3 py-1 ${
-                    isActive ? 'bg-accent text-accent-foreground' : ''
+                  `rounded-full px-3 py-1 ${isActive ? 'bg-accent text-accent-foreground' : ''
                   }`
                 }
               >
@@ -148,8 +147,7 @@ const App = () => {
               <NavLink
                 to="/filtri-globali"
                 className={({ isActive }) =>
-                  `rounded-full px-3 py-1 ${
-                    isActive ? 'bg-accent text-accent-foreground' : ''
+                  `rounded-full px-3 py-1 ${isActive ? 'bg-accent text-accent-foreground' : ''
                   }`
                 }
               >
@@ -158,12 +156,20 @@ const App = () => {
               <NavLink
                 to="/versione"
                 className={({ isActive }) =>
-                  `rounded-full px-3 py-1 ${
-                    isActive ? 'bg-accent text-accent-foreground' : ''
+                  `rounded-full px-3 py-1 ${isActive ? 'bg-accent text-accent-foreground' : ''
                   }`
                 }
               >
                 Versione
+              </NavLink>
+              <NavLink
+                to="/issues"
+                className={({ isActive }) =>
+                  `rounded-full px-3 py-1 ${isActive ? 'bg-accent text-accent-foreground' : ''
+                  }`
+                }
+              >
+                Issues
               </NavLink>
             </nav>
           </div>
@@ -226,6 +232,7 @@ const App = () => {
           <Route path="/clienti" element={<ClientsPage />} />
           <Route path="/filtri-globali" element={<GlobalFiltersPage />} />
           <Route path="/versione" element={<VersionPage />} />
+          <Route path="/issues" element={<IssuesPage />} />
         </Routes>
       </div>
     </div>

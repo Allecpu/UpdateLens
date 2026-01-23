@@ -148,4 +148,22 @@ npm run server:dev
 
 ---
 
+## Configurazione GitHub Issues
+
+La funzionalità **Issues** permette di leggere e creare segnalazioni direttamente dal portale.
+
+### In Locale (Offline / Dev)
+1. Accedi alla pagina **Issues**.
+2. Clicca su **Configura Token**.
+3. Inserisci un **GitHub Personal Access Token (PAT)**.
+   - I permessi necessari (Fine-grained) sono: `Issues: Read & Write` e `Metadata: Read-only`.
+4. Il token viene salvato nel `localStorage` del browser e non viene mai inviato a server esterni (direttamente a GitHub API).
+
+### In Web (Server Proxy)
+1. Configura la variabile d'ambiente `GITHUB_ISSUES_TOKEN` sul server.
+2. Opzionalmente, imposta `GITHUB_OWNER` e `GITHUB_REPO`.
+3. Gli utenti non vedranno mai il token, le richieste verranno proxate dal backend.
+
+---
+
 Fine README.
