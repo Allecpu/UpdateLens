@@ -54,6 +54,11 @@ export const filterReleaseItems = (
   const query = filters.query.trim().toLowerCase();
   const releaseDateFrom = parseDateAny(filters.releaseDateFrom);
   const releaseDateTo = parseDateAny(filters.releaseDateTo);
+  const bcVersionSet = new Set(
+    (filters.bcVersions ?? [])
+      .map((value) => Number(value))
+      .filter((value) => Number.isFinite(value))
+  );
   // Track which sources have at least one selected product (normalized labels)
   const selectedSources = new Set<ReleaseSource>();
   if (filters.products.length > 0) {
@@ -181,9 +186,15 @@ export const filterReleaseItems = (
       }
     }
 
-    if (isFilterSupported(item.source, 'bcMinVersion') && filters.minBcVersionMin !== null) {
-      if (item.minBcVersion != null && item.minBcVersion < filters.minBcVersionMin) {
-        return false;
+    if (isFilterSupported(item.source, 'bcMinVersion')) {
+      if (bcVersionSet.size > 0) {
+        if (item.minBcVersion == null || !bcVersionSet.has(item.minBcVersion)) {
+          return false;
+        }
+      } else if (filters.minBcVersionMin !== null) {
+        if (item.minBcVersion != null && item.minBcVersion < filters.minBcVersionMin) {
+          return false;
+        }
       }
     }
 
@@ -283,6 +294,7 @@ export const filterReleaseItems = (
       'filters.releaseInDays': filters.releaseInDays,
       'filters.releaseDateFrom': filters.releaseDateFrom,
       'filters.releaseDateTo': filters.releaseDateTo,
+      'filters.bcVersions.length': filters.bcVersions.length,
       'filters.query': filters.query
     });
   }

@@ -11,7 +11,7 @@ import { ALL_RELEASE_SOURCES } from '../../services/FilterDefinitions';
 import { useCustomerStore } from '../store/useCustomerStore';
 import { useCustomerGroupStore } from '../store/useCustomerGroupStore';
 import { useFilterStore, type FilterState } from '../store/useFilterStore';
-import { buildFilterMetadata } from '../../services/FilterMetadata';
+import { buildBcVersionOptions, buildFilterMetadata } from '../../services/FilterMetadata';
 import FilterListSection from '../components/FilterListSection';
 
 const slugify = (value: string): string =>
@@ -165,6 +165,14 @@ const ClientsPage = () => {
     () => metadata.products.map((opt) => opt.value),
     [metadata.products]
   );
+  const bcVersionOptions = useMemo(
+    () => buildBcVersionOptions(snapshotItems),
+    [snapshotItems]
+  );
+  const bcVersionValues = useMemo(
+    () => bcVersionOptions.map((option) => option.value),
+    [bcVersionOptions]
+  );
   const productSourceMap = useMemo(() => {
     const map = new Map<string, ReleaseSource>();
     snapshotItems.forEach((item) => {
@@ -233,6 +241,7 @@ const ClientsPage = () => {
       enabledFor: [],
       geography: [],
       language: [],
+      bcVersions: [],
       periodNewDays: 0,
       periodChangedDays: 0,
       releaseInDays: 0,
@@ -318,6 +327,7 @@ const ClientsPage = () => {
       sources,
       matchAllSources
     );
+    const bcVersions = normalizeSelection(merged.bcVersions, bcVersionValues);
     const language = normalizeSelectionForSources(
       merged.language,
       metadata.language,
@@ -347,6 +357,7 @@ const ClientsPage = () => {
       availabilityTypes,
       enabledFor,
       geography,
+      bcVersions,
       language
     };
   };
@@ -369,6 +380,7 @@ const ClientsPage = () => {
     metadata.enabledFor,
     metadata.geography,
     metadata.language,
+    bcVersionValues,
     productSourceMap,
     productsBySource
   ]);
@@ -402,6 +414,7 @@ const ClientsPage = () => {
     metadata.enabledFor,
     metadata.geography,
     metadata.language,
+    bcVersionValues,
     productSourceMap,
     productsBySource
   ]);

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useDeferredValue, useMemo, useState } from 'react';
 import type { ReleaseSource } from '../../models/ReleaseItem';
 import { ALL_RELEASE_SOURCES } from '../../services/FilterDefinitions';
 import type { FilterOption } from '../../services/FilterMetadata';
@@ -16,6 +16,8 @@ type Props = {
   searchable?: boolean;
   compact?: boolean;
   disabled?: boolean;
+  showBulkActions?: boolean;
+  scrollable?: boolean;
 };
 
 const FilterListSection = ({
@@ -30,36 +32,58 @@ const FilterListSection = ({
   maxVisible = 15,
   searchable = true,
   compact = true,
-  disabled = false
+  disabled = false,
+  showBulkActions = true,
+  scrollable = true
 }: Props) => {
   const [query, setQuery] = useState('');
   const [showAll, setShowAll] = useState(false);
-  const effectiveSources =
-    activeSources && activeSources.length > 0 ? activeSources : ALL_RELEASE_SOURCES;
+  const deferredQuery = useDeferredValue(query);
+  const effectiveSources = useMemo(
+    () => (activeSources && activeSources.length > 0 ? activeSources : ALL_RELEASE_SOURCES),
+    [activeSources]
+  );
+  const effectiveSourcesSet = useMemo(() => new Set(effectiveSources), [effectiveSources]);
+  const selectedSet = useMemo(() => new Set(selected), [selected]);
+  const preparedOptions = useMemo(
+    () =>
+      options.map((option) => ({
+        option,
+        searchLabel: `${option.label ?? option.value} ${option.description ?? ''}`.toLowerCase(),
+        valueLower: option.value.toLowerCase(),
+        sources: option.sources?.length ? option.sources : ALL_RELEASE_SOURCES
+      })),
+    [options]
+  );
 
   const filtered = useMemo(() => {
-    let list = options;
-    if (query.trim()) {
-      const normalized = query.trim().toLowerCase();
-      list = list.filter((option) => {
-        const label = option.label ?? option.value;
-        return (
-          label.toLowerCase().includes(normalized) ||
-          option.value.toLowerCase().includes(normalized)
-        );
-      });
+    let list = preparedOptions;
+    const trimmed = deferredQuery.trim();
+    if (trimmed) {
+      const normalized = trimmed.toLowerCase();
+      list = list.filter(
+        ({ searchLabel, valueLower }) =>
+          searchLabel.includes(normalized) || valueLower.includes(normalized)
+      );
     }
     return list;
-  }, [options, query]);
+  }, [deferredQuery, preparedOptions]);
 
-  const sourceFiltered = filtered.filter((option) => {
-    const optionSources = option.sources?.length ? option.sources : ALL_RELEASE_SOURCES;
-    return matchAllSources
-      ? effectiveSources.every((source) => optionSources.includes(source))
-      : optionSources.some((source) => effectiveSources.includes(source));
-  });
-  const visible = showAll ? sourceFiltered : sourceFiltered.slice(0, maxVisible);
-  const availableValues = sourceFiltered.map((option) => option.value);
+  const sourceFiltered = useMemo(() => {
+    return filtered.filter(({ sources }) => {
+      return matchAllSources
+        ? effectiveSources.every((source) => sources.includes(source))
+        : sources.some((source) => effectiveSourcesSet.has(source));
+    });
+  }, [effectiveSources, effectiveSourcesSet, filtered, matchAllSources]);
+  const visible = useMemo(
+    () => (showAll ? sourceFiltered : sourceFiltered.slice(0, maxVisible)),
+    [maxVisible, showAll, sourceFiltered]
+  );
+  const availableValues = useMemo(
+    () => sourceFiltered.map(({ option }) => option.value),
+    [sourceFiltered]
+  );
 
   const actionClassName = disabled
     ? 'cursor-not-allowed opacity-60'
@@ -93,42 +117,66 @@ const FilterListSection = ({
             disabled={disabled}
           />
         )}
-        <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
-          <button
-            className={actionClassName}
-            onClick={() => onChange(availableValues)}
-            disabled={disabled}
-          >
-            Seleziona tutti
-          </button>
-          <button
-            className={actionClassName}
-            onClick={() => onChange([])}
-            disabled={disabled}
-          >
-            Deseleziona tutti
-          </button>
-        </div>
-        <div className="mt-2 max-h-48 space-y-2 overflow-auto text-xs">
-          {visible.map((option) => (
+        {showBulkActions && (
+          <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+            <button
+              className={actionClassName}
+              onClick={() => onChange(availableValues)}
+              disabled={disabled}
+            >
+              Seleziona tutti
+            </button>
+            <button
+              className={actionClassName}
+              onClick={() => onChange([])}
+              disabled={disabled}
+            >
+              Deseleziona tutti
+            </button>
+          </div>
+        )}
+        <div
+          className={`mt-2 space-y-2 text-xs ${scrollable ? 'max-h-48 overflow-auto' : ''}`}
+        >
+          {visible.map(({ option }) => (
             <label
               key={option.value}
-              className="flex items-center gap-2 text-muted-foreground"
+              className={`flex gap-2 text-muted-foreground ${
+                option.description ? 'items-start' : 'items-center'
+              }`}
             >
               <input
                 type="checkbox"
                 className="ul-checkbox"
-                checked={selected.includes(option.value)}
+                checked={selectedSet.has(option.value)}
                 onChange={() =>
                   onChange(
-                    selected.includes(option.value)
+                    selectedSet.has(option.value)
                       ? selected.filter((item) => item !== option.value)
                       : [...selected, option.value]
                   )
                 }
                 disabled={disabled}
               />
-              {option.label ?? option.value} ({option.count})
+              {option.description ? (
+                <div className="flex-1">
+                  <div className="flex items-center gap-1">
+                    <span className="font-medium text-foreground">
+                      {option.label ?? option.value}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">
+                      ({option.count})
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-muted-foreground">
+                    {option.description}
+                  </div>
+                </div>
+              ) : (
+                <span>
+                  {option.label ?? option.value} ({option.count})
+                </span>
+              )}
             </label>
           ))}
           {sourceFiltered.length === 0 && (

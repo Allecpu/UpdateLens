@@ -1,12 +1,17 @@
 import type { FilterState } from '../models/Filters';
 import type { ReleaseSource } from '../models/ReleaseItem';
-import { type FilterMetadata, normalizeProductLabel } from './FilterMetadata';
+import {
+  type FilterMetadata,
+  buildBcVersionOptions,
+  normalizeProductLabel
+} from './FilterMetadata';
 
 export type NormalizationContext = {
   sourceOptions: string[];
   metadata: FilterMetadata;
   productSourceMap: Map<string, ReleaseSource>;
   productsBySource: Map<ReleaseSource, string[]>;
+  bcVersionOptions: string[];
 };
 
 /**
@@ -109,6 +114,7 @@ export const normalizeFilters = (
     ...merged,
     products: Array.from(expandedProducts),
     sources,
+    bcVersions: normalizeSelection(merged.bcVersions, context.bcVersionOptions),
     statuses: normalizeSelectionForSources(
       merged.statuses,
       metadata.statuses,
@@ -187,6 +193,7 @@ export const createDefaultFilters = (
   enabledFor: [],
   geography: [],
   language: [],
+  bcVersions: [],
   periodNewDays: 0,
   periodChangedDays: 0,
   releaseInDays: 0,
@@ -200,7 +207,7 @@ export const createDefaultFilters = (
 });
 
 export const buildNormalizationContext = (
-  items: { productName: string; source: ReleaseSource }[],
+  items: { productName: string; source: ReleaseSource; minBcVersion?: number | null }[],
   metadata: FilterMetadata,
   sourceOptions: string[]
 ): NormalizationContext => {
@@ -226,7 +233,8 @@ export const buildNormalizationContext = (
     sourceOptions,
     metadata,
     productSourceMap,
-    productsBySource
+    productsBySource,
+    bcVersionOptions: buildBcVersionOptions(items).map((option) => option.value)
   };
 };
 

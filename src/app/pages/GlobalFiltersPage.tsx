@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 
 import { loadAllSnapshots, loadRulesConfig } from '../../services/DataLoader';
-import { buildFilterMetadata } from '../../services/FilterMetadata';
+import { buildBcVersionOptions, buildFilterMetadata } from '../../services/FilterMetadata';
 import { filterReleaseItems } from '../../services/FilterService';
 import {
   ALL_RELEASE_SOURCES,
@@ -127,12 +127,11 @@ const GlobalFiltersPage = () => {
     () => metadata.products.map((opt) => opt.value),
     [metadata.products]
   );
-  const minBcVersions = useMemo(() => {
-    const versions = Array.from(
-      new Set(items.map((item) => item.minBcVersion).filter((value) => typeof value === 'number'))
-    ) as number[];
-    return versions.sort((a, b) => b - a);
-  }, [items]);
+  const bcVersionOptions = useMemo(() => buildBcVersionOptions(items), [items]);
+  const bcVersionValues = useMemo(
+    () => bcVersionOptions.map((option) => option.value),
+    [bcVersionOptions]
+  );
   const cssOwnerOptions = useMemo(() => {
     const counts = new Map<string, number>();
     activeIndex.forEach((entry) => {
@@ -150,19 +149,6 @@ const GlobalFiltersPage = () => {
       }))
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [activeIndex]);
-  const customerOptions = useMemo(
-    () =>
-      activeIndex
-        .slice()
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .map((entry) => ({
-          value: entry.id,
-          label: entry.name,
-          count: 1,
-          sources: ALL_RELEASE_SOURCES
-        })),
-    [activeIndex]
-  );
   const groupOptions = useMemo(
     () =>
       groups
@@ -193,6 +179,7 @@ const GlobalFiltersPage = () => {
       enabledFor: [],
       geography: [],
       language: [],
+      bcVersions: [],
       periodNewDays: 0,
       periodChangedDays: 0,
       releaseInDays: 0,
@@ -287,6 +274,7 @@ const GlobalFiltersPage = () => {
         sources,
         matchAllSources
       ),
+      bcVersions: normalizeSelection(merged.bcVersions, bcVersionValues),
       language: normalizeSelectionForSources(
         merged.language,
         metadata.language,
@@ -307,8 +295,10 @@ const GlobalFiltersPage = () => {
     productOptions,
     sourceOptions,
     statusOptions,
-    metadata
+    metadata,
+    bcVersionValues
   ]);
+  const deferredNormalizedGlobal = useDeferredValue(normalizedGlobal);
 
   const currentFilters = useMemo(() => {
     if (filterScope === 'customer' && activeCustomerId) {
@@ -328,7 +318,8 @@ const GlobalFiltersPage = () => {
     normalizedGlobal,
     defaultFilters,
     sourceOptions,
-    metadata
+    metadata,
+    bcVersionValues
   ]);
 
   const updateFilters = (next: Partial<FilterState>) => {
@@ -395,8 +386,9 @@ const GlobalFiltersPage = () => {
     setTimeout(() => setSaveStatus('saved'), 500);
   };
 
-  const activeSources = resolveActiveSources(
-    (currentFilters.sources ?? []) as ReleaseSource[]
+  const activeSources = useMemo(
+    () => resolveActiveSources((currentFilters.sources ?? []) as ReleaseSource[]),
+    [currentFilters.sources]
   );
   const matchAllSources = false;
   const hasOptionsForSources = (
@@ -439,12 +431,16 @@ const GlobalFiltersPage = () => {
   const isFilterVisible = (key: FilterKey): boolean =>
     getActiveSupportedSources(activeSources, key).length > 0;
   const showProductSplit = activeSources.length > 1;
-  const microsoftProducts = metadata.products.filter((option) =>
-    option.sources.includes('Microsoft')
-  );
-  const eosProducts = metadata.products.filter((option) => option.sources.includes('EOS'));
-  const fabricProducts = metadata.products.filter((option) => option.sources.includes('Fabric'));
-  const m365RoadmapProducts = metadata.products.filter((option) => option.sources.includes('MICROSOFT 365'));
+  const { microsoftProducts, eosProducts, fabricProducts, m365RoadmapProducts } = useMemo(() => {
+    return {
+      microsoftProducts: metadata.products.filter((option) => option.sources.includes('Microsoft')),
+      eosProducts: metadata.products.filter((option) => option.sources.includes('EOS')),
+      fabricProducts: metadata.products.filter((option) => option.sources.includes('Fabric')),
+      m365RoadmapProducts: metadata.products.filter((option) =>
+        option.sources.includes('MICROSOFT 365')
+      )
+    };
+  }, [metadata.products]);
 
   const updateProductsForSource = (source: ReleaseSource, next: string[]) => {
     const toKeep = currentFilters.products.filter((product) => {
@@ -527,23 +523,36 @@ const GlobalFiltersPage = () => {
     });
     return map;
   }, [groups]);
-  const customerPreview = useMemo(() => {
-    const globalFilteredItems = filterReleaseItems(items, normalizedGlobal);
-    const globalProductsCount = globalFilteredItems.length;
+  const globalProductsCount = useMemo(
+    () => filterReleaseItems(items, deferredNormalizedGlobal).length,
+    [items, deferredNormalizedGlobal]
+  );
+  const overrideCounts = useMemo(() => {
     const overrideCustomers = new Set(
       Object.entries(customerFilterMode)
         .filter(([id, mode]) => mode === 'custom' && customerFilters[id])
         .map(([id]) => id)
     );
-    const overrideCounts = new Map<string, number>();
+    const counts = new Map<string, number>();
     overrideCustomers.forEach((id) => {
       const raw = customerFilters[id];
       if (!raw) {
         return;
       }
       const normalized = normalizeFiltersInternal(raw);
-      overrideCounts.set(id, filterReleaseItems(items, normalized).length);
+      counts.set(id, filterReleaseItems(items, normalized).length);
     });
+    return counts;
+  }, [
+    customerFilters,
+    customerFilterMode,
+    items,
+    // dependencies for normalizeFiltersInternal
+    defaultFilters,
+    sourceOptions,
+    metadata
+  ]);
+  const customerPreview = useMemo(() => {
     const entries = activeIndex
       .filter((entry) => activeIncludedCustomerIds.has(entry.id))
       .map((entry) => {
@@ -586,12 +595,8 @@ const GlobalFiltersPage = () => {
     groupNamesByCustomerId,
     activeIncludedCustomerIds,
     activeIndex,
-    items,
-    normalizedGlobal,
-    // dependencies for normalizeFiltersInternal
-    defaultFilters,
-    sourceOptions,
-    metadata
+    overrideCounts,
+    globalProductsCount
   ]);
   const pageSize = 20;
   const totalPages = Math.max(1, Math.ceil(customerPreview.entries.length / pageSize));
@@ -875,15 +880,6 @@ const GlobalFiltersPage = () => {
           <div className="text-xs text-muted-foreground">Scope: CSS</div>
         </div>
         <div className="mt-4">
-          <FilterListSection
-            title="Clienti"
-            options={customerOptions}
-            selected={currentFilters.targetCustomerIds}
-            onChange={(next) => updateFilters({ targetCustomerIds: next })}
-            defaultOpen
-            activeSources={ALL_RELEASE_SOURCES}
-            maxVisible={12}
-          />
           {groupOptions.length > 0 ? (
             <>
               <FilterListSection
@@ -1009,37 +1005,17 @@ const GlobalFiltersPage = () => {
               )}
             </>
           )}
-          {isFilterVisible('bcMinVersion') && minBcVersions.length > 0 && (
-            <div className="mt-4">
-              <div className="text-xs uppercase text-muted-foreground">
-                BC Version
-                {sourceTagFor('bcMinVersion', ['EOS']) && (
-                  <span className="ml-2 inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">
-                    {sourceTagFor('bcMinVersion', ['EOS'])}
-                  </span>
-                )}
-              </div>
-              <select
-                className="ul-input mt-2 text-xs"
-                value={
-                  currentFilters.minBcVersionMin !== null
-                    ? String(currentFilters.minBcVersionMin)
-                    : ''
-                }
-                onChange={(event) =>
-                  updateFilters({
-                    minBcVersionMin: event.target.value ? Number(event.target.value) : null
-                  })
-                }
-              >
-                <option value="">Tutte</option>
-                {minBcVersions.map((value) => (
-                  <option key={value} value={value}>
-                    BC {value}
-                  </option>
-                ))}
-              </select>
-            </div>
+          {isFilterVisible('bcMinVersion') && hasOptionsForSources(bcVersionOptions) && (
+            <FilterListSection
+              title="BC Version"
+              options={bcVersionOptions}
+              selected={currentFilters.bcVersions}
+              onChange={(next) => updateFilters({ bcVersions: next })}
+              activeSources={activeSources}
+              sourceTag={sourceTagFor('bcMinVersion', ['EOS'])}
+              matchAllSources={matchAllSources}
+              maxVisible={12}
+            />
           )}
           {isFilterVisible('months') && hasOptionsForSources(metadata.months) && (
             <FilterListSection
@@ -1097,7 +1073,6 @@ const GlobalFiltersPage = () => {
               options={metadata.waves}
               selected={currentFilters.waves}
               onChange={(next) => updateFilters({ waves: next })}
-              searchable={false}
               activeSources={activeSources}
               sourceTag={sourceTagFor('wave', sourcesFromOptions(metadata.waves))}
               matchAllSources={matchAllSources}
@@ -1179,6 +1154,7 @@ const GlobalFiltersPage = () => {
                         <option value={0}>Tutti</option>
                         <option value={7}>Ultimi 7 giorni</option>
                         <option value={30}>Ultimi 30 giorni</option>
+                        <option value={60}>Ultimi 60 giorni</option>
                       </select>
                     </label>
                   )}
@@ -1195,6 +1171,7 @@ const GlobalFiltersPage = () => {
                         <option value={0}>Tutti</option>
                         <option value={7}>Ultimi 7 giorni</option>
                         <option value={30}>Ultimi 30 giorni</option>
+                        <option value={60}>Ultimi 60 giorni</option>
                       </select>
                     </label>
                   )}

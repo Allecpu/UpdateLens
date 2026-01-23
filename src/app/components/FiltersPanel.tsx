@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import type React from 'react';
 import type { ReleaseSource } from '../../models/ReleaseItem';
 import type { FilterState } from '../store/useFilterStore';
@@ -24,6 +25,7 @@ export type FiltersPanelOptions = {
   customerOptions?: FilterOption[];
   groupOptions?: FilterOption[];
   minBcVersions?: number[];
+  bcVersionOptions?: FilterOption[];
 };
 
 type Props = {
@@ -86,8 +88,21 @@ const FiltersPanel = ({
     cssOwnerOptions = [],
     customerOptions = [],
     groupOptions = [],
-    minBcVersions = []
+    minBcVersions = [],
+    bcVersionOptions = []
   } = options;
+  const resolvedBcOptions = useMemo(() => {
+    if (bcVersionOptions.length > 0) {
+      return bcVersionOptions;
+    }
+    return minBcVersions.map((value) => ({
+      value: String(value),
+      label: `BC ${value}`,
+      description: `Business Central Version ${value}`,
+      count: 1,
+      sources: ['EOS'] as ReleaseSource[]
+    }));
+  }, [bcVersionOptions, minBcVersions]);
 
   const activeSources = resolveActiveSources(
     (filters.sources ?? []) as ReleaseSource[]
@@ -239,37 +254,17 @@ const FiltersPanel = ({
         )}
 
         {/* BC Version */}
-        {isFilterVisible('bcMinVersion') && minBcVersions.length > 0 && (
-          <div>
-            <div className="text-xs uppercase text-muted-foreground">
-              BC Version
-              {sourceTagFor('bcMinVersion', ['EOS']) && (
-                <span className="ml-2 inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">
-                  {sourceTagFor('bcMinVersion', ['EOS'])}
-                </span>
-              )}
-            </div>
-            <select
-              className="ul-input mt-2 text-xs"
-              value={
-                filters.minBcVersionMin !== null && filters.minBcVersionMin !== undefined
-                  ? String(filters.minBcVersionMin)
-                  : ''
-              }
-              onChange={(event) =>
-                onChange({
-                  minBcVersionMin: event.target.value ? Number(event.target.value) : null
-                })
-              }
-            >
-              <option value="">Tutte</option>
-              {minBcVersions.map((value) => (
-                <option key={value} value={value}>
-                  BC {value}
-                </option>
-              ))}
-            </select>
-          </div>
+        {isFilterVisible('bcMinVersion') && hasOptionsForSources(resolvedBcOptions) && (
+          <FilterListSection
+            title="BC Version"
+            options={resolvedBcOptions}
+            selected={filters.bcVersions ?? []}
+            onChange={(next) => onChange({ bcVersions: next })}
+            activeSources={activeSources}
+            sourceTag={sourceTagFor('bcMinVersion', ['EOS'])}
+            matchAllSources={matchAllSources}
+            maxVisible={12}
+          />
         )}
 
         {/* Months */}
@@ -326,7 +321,6 @@ const FiltersPanel = ({
                 options={metadata.waves}
                 selected={filters.waves ?? []}
                 onChange={(next) => onChange({ waves: next })}
-                searchable={false}
                 activeSources={activeSources}
                 sourceTag={sourceTagFor('wave', sourcesFromOptions(metadata.waves))}
                 matchAllSources={matchAllSources}
@@ -743,37 +737,17 @@ const FiltersPanel = ({
               )}
             </>
           )}
-          {isFilterVisible('bcMinVersion') && minBcVersions.length > 0 && (
-            <div className="mt-4">
-              <div className="text-xs uppercase text-muted-foreground">
-                BC Version
-                {sourceTagFor('bcMinVersion', ['EOS']) && (
-                  <span className="ml-2 inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">
-                    {sourceTagFor('bcMinVersion', ['EOS'])}
-                  </span>
-                )}
-              </div>
-              <select
-                className="ul-input mt-2 text-xs"
-                value={
-                  filters.minBcVersionMin !== null
-                    ? String(filters.minBcVersionMin)
-                    : ''
-                }
-                onChange={(event) =>
-                  onChange({
-                    minBcVersionMin: event.target.value ? Number(event.target.value) : null
-                  })
-                }
-              >
-                <option value="">Tutte</option>
-                {minBcVersions.map((value) => (
-                  <option key={value} value={value}>
-                    BC {value}
-                  </option>
-                ))}
-              </select>
-            </div>
+          {isFilterVisible('bcMinVersion') && hasOptionsForSources(resolvedBcOptions) && (
+            <FilterListSection
+              title="BC Version"
+              options={resolvedBcOptions}
+              selected={filters.bcVersions ?? []}
+              onChange={(next) => onChange({ bcVersions: next })}
+              activeSources={activeSources}
+              sourceTag={sourceTagFor('bcMinVersion', ['EOS'])}
+              matchAllSources={matchAllSources}
+              maxVisible={12}
+            />
           )}
           {isFilterVisible('months') && hasOptionsForSources(metadata.months) && (
             <FilterListSection
@@ -832,7 +806,6 @@ const FiltersPanel = ({
               options={metadata.waves}
               selected={filters.waves ?? []}
               onChange={(next) => onChange({ waves: next })}
-              searchable={false}
               activeSources={activeSources}
               sourceTag={sourceTagFor('wave', sourcesFromOptions(metadata.waves))}
               matchAllSources={matchAllSources}

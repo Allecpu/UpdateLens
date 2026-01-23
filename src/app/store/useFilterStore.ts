@@ -9,6 +9,8 @@ type FilterStoreState = {
   cssFilters: FilterState | null;
   customerFilters: Record<string, FilterState>;
   customerFilterMode: Record<string, FilterMode>;
+  // Chat filters: temporary, not persisted, does not affect global filters
+  chatFilters: Partial<FilterState> | null;
   setCssFilters: (filters: FilterState) => void;
   setCustomerFilters: (customerId: string, filters: FilterState) => void;
   setCustomerMode: (customerId: string, mode: FilterMode) => void;
@@ -18,6 +20,9 @@ type FilterStoreState = {
   removeGroupFromFilters: (groupId: string) => void;
   applyGlobalToCustomers: (customerIds: string[], globalFilters: FilterState) => void;
   clearOverridesForCustomers: (customerIds: string[]) => void;
+  // Chat filter actions (temporary, no persistence)
+  setChatFilters: (filters: Partial<FilterState>) => void;
+  clearChatFilters: () => void;
 };
 
 const CSS_KEY = 'updatelens.filters.css.v3';
@@ -64,6 +69,7 @@ export const useFilterStore = create<FilterStoreState>((set, get) => {
   const initial = loadInitial();
   return {
     ...initial,
+    chatFilters: null,
     setCssFilters: (filters) => {
       const { customerFilters, customerFilterMode } = get();
       persist(filters, customerFilters, customerFilterMode);
@@ -140,6 +146,13 @@ export const useFilterStore = create<FilterStoreState>((set, get) => {
 
       persist(cssFilters, nextFilters, nextMode);
       set({ customerFilters: nextFilters, customerFilterMode: nextMode });
+    },
+    // Chat filters: temporary overlay, NOT persisted, does NOT affect global filters
+    setChatFilters: (filters) => {
+      set({ chatFilters: filters });
+    },
+    clearChatFilters: () => {
+      set({ chatFilters: null });
     }
   };
 });

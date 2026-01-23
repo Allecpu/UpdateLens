@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Route, Routes } from 'react-router-dom';
 import ClientsPage from './app/pages/ClientsPage';
 import DashboardPage from './app/pages/DashboardPage';
@@ -12,22 +12,15 @@ import { useFilterStore } from './app/store/useFilterStore';
 
 const isEntryActive = (entry: { isActive?: boolean }): boolean => entry.isActive !== false;
 
-const App = () => {
-  const [isDark, setIsDark] = useState(() => {
-    const stored = localStorage.getItem('updatelens.theme');
-    if (stored === 'dark') {
-      return true;
-    }
-    if (stored === 'light') {
-      return false;
-    }
-    return window.matchMedia('(prefers-color-scheme: dark)').matches;
-  });
+const CustomerPicker = () => {
   const { index, activeCustomerId, setActiveCustomer } = useCustomerStore();
   const activeIndex = useMemo(() => index.filter((entry) => isEntryActive(entry)), [index]);
   const { cssFilters } = useFilterStore();
   const { groups } = useCustomerGroupStore();
   const prevHasCustomerFilters = useRef(false);
+  const [customerQuery, setCustomerQuery] = useState('');
+  const [debouncedCustomerQuery, setDebouncedCustomerQuery] = useState('');
+  const deferredCustomerQuery = useDeferredValue(debouncedCustomerQuery);
 
   const targetCustomerIds = useMemo(() => {
     const selected = new Set<string>(cssFilters?.targetCustomerIds ?? []);
@@ -93,9 +86,51 @@ const App = () => {
       activeIndex
         .filter((entry) => activeIncludedCustomerIds.has(entry.id))
         .slice()
-        .sort((a, b) => a.name.localeCompare(b.name)),
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((entry) => ({
+          ...entry,
+          lowerName: entry.name.toLowerCase()
+        })),
     [activeIndex, activeIncludedCustomerIds]
   );
+
+  const filteredCustomerOptions = useMemo(() => {
+    const normalized = deferredCustomerQuery.trim().toLowerCase();
+    if (!normalized) {
+      return customerOptions;
+    }
+    return customerOptions.filter((entry) =>
+      entry.lowerName.includes(normalized)
+    );
+  }, [customerOptions, deferredCustomerQuery]);
+
+  const customerOptionsForSelect = useMemo(() => {
+    if (!activeCustomerId) {
+      return filteredCustomerOptions;
+    }
+    if (filteredCustomerOptions.some((entry) => entry.id === activeCustomerId)) {
+      return filteredCustomerOptions;
+    }
+    const activeEntry = customerOptions.find((entry) => entry.id === activeCustomerId);
+    return activeEntry ? [activeEntry, ...filteredCustomerOptions] : filteredCustomerOptions;
+  }, [activeCustomerId, customerOptions, filteredCustomerOptions]);
+
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      setDebouncedCustomerQuery(customerQuery);
+    }, 200);
+    return () => window.clearTimeout(handle);
+  }, [customerQuery]);
+
+  useEffect(() => {
+    const normalized = deferredCustomerQuery.trim();
+    if (!normalized) {
+      return;
+    }
+    if (filteredCustomerOptions.length === 1) {
+      setActiveCustomer(filteredCustomerOptions[0].id);
+    }
+  }, [deferredCustomerQuery, filteredCustomerOptions, setActiveCustomer]);
 
   const customerPlaceholder = hasCustomerFilters
     ? `Clienti filtrati (${customerOptions.length})`
@@ -113,6 +148,55 @@ const App = () => {
     }
     prevHasCustomerFilters.current = hasCustomerFilters;
   }, [hasCustomerFilters, setActiveCustomer]);
+
+  return (
+    <div className="flex items-center gap-3">
+      <input
+        className="ul-input max-w-[220px]"
+        value={customerQuery}
+        onChange={(event) => setCustomerQuery(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' && filteredCustomerOptions.length > 0) {
+            setActiveCustomer(filteredCustomerOptions[0].id);
+          }
+        }}
+        placeholder="Cerca cliente..."
+        aria-label="Cerca cliente"
+      />
+      <select
+        className="ul-input max-w-[220px]"
+        value={activeCustomerId ?? ''}
+        onChange={(event) =>
+          setActiveCustomer(event.target.value || null)
+        }
+      >
+        <option value="">{customerPlaceholder}</option>
+        {customerOptionsForSelect.map((entry) => (
+          <option key={entry.id} value={entry.id}>
+            {entry.name}
+          </option>
+        ))}
+        {customerOptionsForSelect.length === 0 && (
+          <option value="" disabled>
+            Nessun risultato
+          </option>
+        )}
+      </select>
+    </div>
+  );
+};
+
+const App = () => {
+  const [isDark, setIsDark] = useState(() => {
+    const stored = localStorage.getItem('updatelens.theme');
+    if (stored === 'dark') {
+      return true;
+    }
+    if (stored === 'light') {
+      return false;
+    }
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', isDark);
@@ -175,20 +259,7 @@ const App = () => {
             </nav>
           </div>
           <div className="flex items-center gap-3">
-            <select
-              className="ul-input max-w-[220px]"
-              value={activeCustomerId ?? ''}
-              onChange={(event) =>
-                setActiveCustomer(event.target.value || null)
-              }
-            >
-              <option value="">{customerPlaceholder}</option>
-              {customerOptions.map((entry) => (
-                <option key={entry.id} value={entry.id}>
-                  {entry.name}
-                </option>
-              ))}
-            </select>
+            <CustomerPicker />
             <button
               className="ul-button ul-button-ghost"
               onClick={() => setIsDark((prev) => !prev)}

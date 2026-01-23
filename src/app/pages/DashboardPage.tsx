@@ -4,8 +4,14 @@ import { filterReleaseItems } from '../../services/FilterService';
 import { buildMarkdown, downloadMarkdown } from '../../services/ExportService';
 import type { ReleaseItem, ReleaseSource, ReleaseStatus } from '../../models/ReleaseItem';
 import { useCustomerStore } from '../store/useCustomerStore';
+import { useCustomerGroupStore } from '../store/useCustomerGroupStore';
 import { useFilterStore, type FilterState } from '../store/useFilterStore';
-import { buildFilterMetadata, normalizeProductLabel } from '../../services/FilterMetadata';
+import {
+  buildBcVersionOptions,
+  buildFilterMetadata,
+  normalizeProductLabel
+} from '../../services/FilterMetadata';
+import { ALL_RELEASE_SOURCES } from '../../services/FilterDefinitions';
 import {
   createDefaultFilters,
   buildNormalizationContext,
@@ -23,17 +29,22 @@ type Chip = {
 
 type DrillSource = ReleaseSource | null;
 
+const isEntryActive = (entry: { isActive?: boolean }): boolean => entry.isActive !== false;
+
 const DashboardPage = () => {
   const [snapshotItems, setSnapshotItems] = useState<ReleaseItem[]>([]);
   const [snapshotErrors, setSnapshotErrors] = useState<string[]>([]);
   const [snapshotsLoaded, setSnapshotsLoaded] = useState(false);
   const rulesConfig = loadRulesConfig();
-  const { activeCustomerId, customers } = useCustomerStore();
+  const { index, activeCustomerId, customers } = useCustomerStore();
+  const { groups } = useCustomerGroupStore();
   const {
     cssFilters,
     customerFilters,
     customerFilterMode,
-    ensureCssFilters
+    ensureCssFilters,
+    chatFilters,
+    clearChatFilters
   } = useFilterStore();
   const [tempFilters, setTempFilters] = useState<Partial<FilterState>>({});
   const activeCustomer = activeCustomerId ? customers[activeCustomerId] : null;
@@ -81,12 +92,51 @@ const DashboardPage = () => {
     () => metadata.products.map((opt) => opt.value),
     [metadata.products]
   );
-  const minBcVersions = useMemo(() => {
-    const versions = Array.from(
-      new Set(items.map((item) => item.minBcVersion).filter((value) => typeof value === 'number'))
-    ) as number[];
-    return versions.sort((a, b) => b - a);
-  }, [items]);
+  const bcVersionOptions = useMemo(() => buildBcVersionOptions(items), [items]);
+  const activeIndex = useMemo(() => index.filter((entry) => isEntryActive(entry)), [index]);
+  const customerOptions = useMemo(
+    () =>
+      activeIndex
+        .slice()
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((entry) => ({
+          value: entry.id,
+          label: entry.name,
+          count: 1,
+          sources: ALL_RELEASE_SOURCES
+        })),
+    [activeIndex]
+  );
+  const groupOptions = useMemo(
+    () =>
+      groups
+        .slice()
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((group) => ({
+          value: group.id,
+          label: group.name,
+          count: group.customerIds.length,
+          sources: ALL_RELEASE_SOURCES
+        })),
+    [groups]
+  );
+  const cssOwnerOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    activeIndex.forEach((entry) => {
+      if (!entry.ownerCss) {
+        return;
+      }
+      counts.set(entry.ownerCss, (counts.get(entry.ownerCss) ?? 0) + 1);
+    });
+    return Array.from(counts.entries())
+      .map(([value, count]) => ({
+        value,
+        label: value,
+        count,
+        sources: ALL_RELEASE_SOURCES
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [activeIndex]);
 
   const normContext = useMemo(
     () => buildNormalizationContext(items, metadata, sourceOptions),
@@ -155,18 +205,20 @@ const DashboardPage = () => {
     normContext
   ]);
 
-  // Reset tempFilters and drill state when activeCustomerId changes
+  // Reset tempFilters, chatFilters and drill state when activeCustomerId changes
   useEffect(() => {
     setTempFilters({});
+    clearChatFilters();
     setDrillSource(null);
     setDrillProduct(null);
-  }, [activeCustomerId]);
+  }, [activeCustomerId, clearChatFilters]);
 
   // =====================================================================
   // Dashboard filters (REGOLA 1, 2, 3, 5):
   // - "Tutti clienti" → exact copy of cssFilters (global filters)
   // - Cliente inherit → exact copy of cssFilters
   // - Cliente custom → exact copy of customerFilters[id]
+  // - chatFilters from chatbot overlaid (temporary, NOT persisted)
   // - tempFilters overlaid for temporary view changes only
   // - Targeting fields always stripped (REGOLA 5)
   // =====================================================================
@@ -174,24 +226,45 @@ const DashboardPage = () => {
     if (!persistentBaseFilters) {
       return null;
     }
-    // Merge with tempFilters (temporary view changes only, no persistence)
-    const merged = Object.keys(tempFilters).length > 0
-      ? { ...persistentBaseFilters, ...tempFilters }
-      : persistentBaseFilters;
-    // Strip targeting fields - Dashboard ignores customer targeting (REGOLA 5)
+    // Priority: persistentBaseFilters < tempFilters < chatFilters
+    let merged = persistentBaseFilters;
+    if (Object.keys(tempFilters).length > 0) {
+      merged = { ...merged, ...tempFilters };
+    }
+    if (chatFilters && Object.keys(chatFilters).length > 0) {
+      merged = { ...merged, ...chatFilters };
+    }
     return stripTargetingFields(merged);
-  }, [persistentBaseFilters, tempFilters]);
-
+  }, [persistentBaseFilters, tempFilters, chatFilters]);
 
   // updateFilters: local-only, does NOT persist to store
-  // NEVER calls setCssFilters/setCustomerFilters/setCustomerMode/applyGlobalToCustomers
+  // Also clears chatFilters when user manually changes filters
   const updateFilters = (nextFilters: Partial<FilterState>) => {
+    if (chatFilters) {
+      clearChatFilters();
+    }
     setTempFilters((prev) => ({ ...prev, ...nextFilters }));
   };
 
-  // Reset temporary filters to baseline
-  const resetTempFilters = () => {
-    setTempFilters({});
+
+  const filterScope = activeCustomerId ? 'customer' : 'global';
+  const hasOwnerSelection = (dashboardFilters?.targetCssOwners.length ?? 0) > 0;
+  const hasGroupSelection = (dashboardFilters?.targetGroupIds.length ?? 0) > 0;
+  const isGroupDisabled = hasOwnerSelection || filterScope === 'customer';
+  const isOwnerDisabled = hasGroupSelection || filterScope === 'customer';
+
+  const onChangeGroupIds = (next: string[]) => {
+    updateFilters({
+      targetGroupIds: next,
+      targetCssOwners: next.length > 0 ? [] : (dashboardFilters?.targetCssOwners ?? [])
+    });
+  };
+
+  const onChangeCssOwnerIds = (next: string[]) => {
+    updateFilters({
+      targetCssOwners: next,
+      targetGroupIds: next.length > 0 ? [] : (dashboardFilters?.targetGroupIds ?? [])
+    });
   };
 
   // =====================================================================
@@ -212,6 +285,7 @@ const DashboardPage = () => {
       categories: dashboardFilters.categories,
       tags: dashboardFilters.tags,
       waves: dashboardFilters.waves,
+      bcVersions: dashboardFilters.bcVersions,
       months: dashboardFilters.months,
       availabilityTypes: dashboardFilters.availabilityTypes,
       enabledFor: dashboardFilters.enabledFor,
@@ -431,7 +505,9 @@ const DashboardPage = () => {
         onRemove: () => updateFilters({ releaseInDays: 0 })
       });
     }
-    if (dashboardFilters.minBcVersionMin !== null) {
+    if (dashboardFilters.bcVersions.length > 0) {
+      pushValues('BC', 'bcVersions', dashboardFilters.bcVersions);
+    } else if (dashboardFilters.minBcVersionMin !== null) {
       entries.push({
         label: `BC Min Version >= ${dashboardFilters.minBcVersionMin}`,
         onRemove: () => updateFilters({ minBcVersionMin: null })
@@ -508,16 +584,6 @@ const DashboardPage = () => {
             : 'Scope: CSS'}
         </div>
 
-        {/* Reset filtri Dashboard button */}
-        {Object.keys(tempFilters).length > 0 && (
-          <button
-            className="mt-3 w-full rounded-md bg-secondary px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80"
-            onClick={resetTempFilters}
-          >
-            Reset filtri Dashboard
-          </button>
-        )}
-
         <div className="mt-4">
           {dashboardFilters && (
             <FiltersPanel
@@ -525,13 +591,19 @@ const DashboardPage = () => {
               onChange={updateFilters}
               metadata={metadata}
               options={{
-                minBcVersions
+                bcVersionOptions,
+                cssOwnerOptions,
+                customerOptions,
+                groupOptions
               }}
               hideSections={{
-                ownerCss: true,
-                includedCustomers: true,
-                targetCustomers: true
+                includedCustomers: true
               }}
+              onChangeCssOwnerIds={onChangeCssOwnerIds}
+              onChangeGroupIds={onChangeGroupIds}
+              isOwnerDisabled={isOwnerDisabled}
+              isGroupDisabled={isGroupDisabled}
+              filterScope={filterScope}
               productSourceMap={productSourceMap}
               variant="sidebar"
             />

@@ -27,6 +27,7 @@ const DEFAULT_FILTERS: FilterState = {
   enabledFor: [],
   geography: [],
   language: [],
+  bcVersions: [],
   periodNewDays: 0,
   periodChangedDays: 0,
   releaseInDays: 0,
@@ -43,7 +44,7 @@ const ChatPanel = () => {
   const navigate = useNavigate();
   const { isOpen, messages, toggleChat, closeChat, addMessage } =
     useChatStore();
-  const { cssFilters, setCssFilters } = useFilterStore();
+  const { cssFilters, setChatFilters, clearChatFilters } = useFilterStore();
 
   const [items, setItems] = useState<ReleaseItem[]>([]);
   const [metadata, setMetadata] = useState<FilterMetadata | null>(null);
@@ -122,23 +123,21 @@ const ChatPanel = () => {
 
   const handleApplyFilters = useCallback(
     (filterPatch: Partial<FilterState>) => {
-      const baseFilters = cssFilters ?? DEFAULT_FILTERS;
-
       // Check if this is a reset
       const isReset = Object.keys(filterPatch).length === 0;
 
-      const newFilters: FilterState = isReset
-        ? DEFAULT_FILTERS
-        : {
-            ...baseFilters,
-            ...filterPatch
-          };
+      if (isReset) {
+        // Clear chat filters - dashboard will show base filters
+        clearChatFilters();
+      } else {
+        // Set chat filters as temporary overlay (does NOT modify global filters)
+        setChatFilters(filterPatch);
+      }
 
-      setCssFilters(newFilters);
       closeChat();
       navigate('/');
     },
-    [cssFilters, setCssFilters, closeChat, navigate]
+    [setChatFilters, clearChatFilters, closeChat, navigate]
   );
 
   return (

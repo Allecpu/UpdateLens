@@ -4,6 +4,7 @@ import { extractCountriesFromHtml } from '../utils/geography';
 export type FilterOption = {
   value: string;
   label?: string;
+  description?: string;
   count: number;
   sources: ReleaseSource[];
 };
@@ -201,4 +202,39 @@ export const buildFilterMetadata = (items: ReleaseItem[]): FilterMetadata => {
     }),
     language: countValues(items, (item) => [item.language ?? ''])
   };
+};
+
+const BC_VERSION_LABELS: Record<number, string> = {
+  14: 'BC14 - 2019 Wave 1',
+  15: 'BC15 - 2019 Wave 2',
+  16: 'BC16 - 2020 Wave 1',
+  17: 'BC17 - 2020 Wave 2',
+  18: 'BC18 - 2021 Wave 1',
+  19: 'BC19 - 2021 Wave 2',
+  20: 'BC20 - 2022 Wave 1',
+  21: 'BC21 - 2022 Wave 2',
+  22: 'BC22 - 2023 Wave 1',
+  23: 'BC23 - 2023 Wave 2',
+  24: 'BC24 - 2024 Wave 1',
+  25: 'BC25 - 2024 Wave 2',
+  26: 'BC26 - 2025 Wave 1',
+  27: 'BC27 - 2025 Wave 2'
+};
+
+export const buildBcVersionOptions = (items: { minBcVersion?: number | null }[]): FilterOption[] => {
+  const counts = new Map<number, number>();
+  items.forEach((item) => {
+    if (typeof item.minBcVersion !== 'number') {
+      return;
+    }
+    counts.set(item.minBcVersion, (counts.get(item.minBcVersion) ?? 0) + 1);
+  });
+  return Array.from(counts.entries())
+    .map(([value, count]) => ({
+      value: String(value),
+      label: BC_VERSION_LABELS[value] ?? `BC ${value}`,
+      count,
+      sources: ['EOS'] as ReleaseSource[]
+    }))
+    .sort((a, b) => Number(b.value) - Number(a.value));
 };

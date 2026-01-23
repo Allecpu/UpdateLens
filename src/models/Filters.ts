@@ -13,6 +13,7 @@ export type FilterState = {
   enabledFor: string[];
   geography: string[];
   language: string[];
+  bcVersions: string[];
   periodNewDays: number;
   periodChangedDays: number;
   releaseInDays: number;
