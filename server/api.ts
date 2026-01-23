@@ -478,6 +478,28 @@ export const createApi = () => {
     }
   });
 
+  app.get('/api/github/issues/:number/comments', async (req, res) => {
+    try {
+      if (!GITHUB_TOKEN) {
+        return res.status(500).json({ error: 'GITHUB_TOKEN non configurato sul server.' });
+      }
+      const { number } = req.params;
+      const response = await fetch(
+        `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/issues/${number}/comments`,
+        {
+          headers: {
+            'Authorization': `Bearer ${GITHUB_TOKEN}`,
+            'Accept': 'application/vnd.github.v3+json'
+          }
+        }
+      );
+      const data = await response.json();
+      res.status(response.status).json(data);
+    } catch (error) {
+      res.status(500).json({ error: 'Errore durante il caricamento dei commenti.' });
+    }
+  });
+
   app.post('/api/github/upload', express.json({ limit: '10mb' }), async (req, res) => {
     try {
       if (!GITHUB_TOKEN) {

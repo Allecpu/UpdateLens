@@ -25,6 +25,16 @@ const inlineAssets = async (): Promise<void> => {
 
   let html = await readFile(htmlPath, 'utf-8');
 
+  // Remove external font requests to keep the release fully offline-friendly.
+  html = html.replace(
+    /<link[^>]+https:\/\/fonts\.googleapis\.com[^>]*>\s*/g,
+    ''
+  );
+  html = html.replace(
+    /<link[^>]+https:\/\/fonts\.gstatic\.com[^>]*>\s*/g,
+    ''
+  );
+
   html = html.replace(
     /<link[^>]+rel=["']modulepreload["'][^>]*>\s*/g,
     ''

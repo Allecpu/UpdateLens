@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useGitHubStore } from '../store/useGitHubStore';
-import { GitHubIssuesClient, type GitHubIssue, type GitHubLabel } from '../../services/GitHubService';
+import { GitHubIssuesClient, type GitHubIssue, type GitHubLabel, type GitHubComment } from '../../services/GitHubService';
 import { getAttachments, saveAttachments, removeAttachment as removeStoredAttachment, clearAttachments } from '../../utils/attachmentStorage';
 
 const isFileProtocol = typeof window !== 'undefined' && window.location.protocol === 'file:';
@@ -116,6 +116,15 @@ const IssuesPage = () => {
     const [search, setSearch] = useState('');
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isTokenModalOpen, setIsTokenModalOpen] = useState(false);
+
+    // Comments state
+    const [expandedIssues, setExpandedIssues] = useState<Set<number>>(new Set());
+    const [commentsCache, setCommentsCache] = useState<Map<number, GitHubComment[]>>(new Map());
+    const [loadingComments, setLoadingComments] = useState<Set<number>>(new Set());
+    const [commentsErrors, setCommentsErrors] = useState<Map<number, string>>(new Map());
+
+    // Issue body expansion state (for open issues)
+    const [expandedBodies, setExpandedBodies] = useState<Set<number>>(new Set());
 
     // Token Config State
     const [tempToken, setTempToken] = useState('');
@@ -413,10 +422,64 @@ const IssuesPage = () => {
         }
     };
 
+    const handleToggleComments = async (issueNumber: number) => {
+        const isExpanded = expandedIssues.has(issueNumber);
+
+        // Toggle expansion state
+        setExpandedIssues(prev => {
+            const next = new Set(prev);
+            if (isExpanded) {
+                next.delete(issueNumber);
+            } else {
+                next.add(issueNumber);
+            }
+            return next;
+        });
+
+        // If expanding and not cached, fetch comments
+        if (!isExpanded && !commentsCache.has(issueNumber)) {
+            setLoadingComments(prev => new Set(prev).add(issueNumber));
+            setCommentsErrors(prev => {
+                const next = new Map(prev);
+                next.delete(issueNumber);
+                return next;
+            });
+
+            try {
+                const comments = await client.listComments(issueNumber);
+                setCommentsCache(prev => new Map(prev).set(issueNumber, comments));
+            } catch (err) {
+                const errorMessage = err instanceof Error ? err.message : 'Errore nel caricamento dei commenti';
+                setCommentsErrors(prev => new Map(prev).set(issueNumber, errorMessage));
+            } finally {
+                setLoadingComments(prev => {
+                    const next = new Set(prev);
+                    next.delete(issueNumber);
+                    return next;
+                });
+            }
+        }
+    };
+
+    const handleToggleBody = (issueNumber: number) => {
+        setExpandedBodies(prev => {
+            const next = new Set(prev);
+            if (next.has(issueNumber)) {
+                next.delete(issueNumber);
+            } else {
+                next.add(issueNumber);
+            }
+            return next;
+        });
+    };
+
     const filteredIssues = useMemo(() => {
         return issues.filter(issue =>
-            issue.title.toLowerCase().includes(search.toLowerCase()) ||
-            issue.number.toString().includes(search)
+            // Exclude pull requests (they have a pull_request field)
+            !issue.pull_request &&
+            // Filter by search
+            (issue.title.toLowerCase().includes(search.toLowerCase()) ||
+            issue.number.toString().includes(search))
         );
     }, [issues, search]);
 
@@ -511,6 +574,9 @@ const IssuesPage = () => {
                             >
                                 Tutte
                             </button>
+                            <span className="ml-3 px-3 py-1 text-sm font-medium text-muted-foreground bg-accent/50 rounded-full border border-border">
+                                Totale: {filteredIssues.length}
+                            </span>
                         </div>
                         <div className="relative">
                             <input
@@ -577,6 +643,108 @@ const IssuesPage = () => {
                                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
                                         </a>
                                     </div>
+
+                                    {/* Issue body section - only for open issues */}
+                                    {issue.state === 'open' && issue.body && (
+                                        <div className="mt-4 border-t border-border pt-4">
+                                            <button
+                                                onClick={() => handleToggleBody(issue.number)}
+                                                className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                                            >
+                                                <svg className={`w-4 h-4 transition-transform ${expandedBodies.has(issue.number) ? 'rotate-90' : ''}`}
+                                                     fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path>
+                                                </svg>
+                                                <span>
+                                                    {expandedBodies.has(issue.number) ? 'Nascondi descrizione' : 'Mostra descrizione'}
+                                                </span>
+                                            </button>
+
+                                            {expandedBodies.has(issue.number) && (
+                                                <div className="mt-3">
+                                                    <div className="bg-accent/30 rounded-lg p-4 border border-border">
+                                                        <div
+                                                            className="text-sm text-foreground/90 leading-relaxed prose prose-sm max-w-none"
+                                                            dangerouslySetInnerHTML={{
+                                                                __html: markdownToHtml(issue.body, owner, repo)
+                                                            }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Comments section - only for closed issues */}
+                                    {issue.state === 'closed' && (
+                                        <div className="mt-4 border-t border-border pt-4">
+                                            <button
+                                                onClick={() => handleToggleComments(issue.number)}
+                                                className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                                            >
+                                                <svg className={`w-4 h-4 transition-transform ${expandedIssues.has(issue.number) ? 'rotate-90' : ''}`}
+                                                     fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path>
+                                                </svg>
+                                                <span>
+                                                    {expandedIssues.has(issue.number) ? 'Nascondi commenti' :
+                                                     commentsCache.has(issue.number) && commentsCache.get(issue.number)!.length > 0
+                                                         ? `Mostra ${commentsCache.get(issue.number)!.length} commenti`
+                                                         : 'Mostra commenti'}
+                                                </span>
+                                            </button>
+
+                                            {expandedIssues.has(issue.number) && (
+                                                <div className="mt-3 space-y-3">
+                                                    {loadingComments.has(issue.number) && (
+                                                        <div className="flex justify-center py-4">
+                                                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                                                        </div>
+                                                    )}
+
+                                                    {commentsErrors.has(issue.number) && (
+                                                        <div className="ul-surface bg-rose-500/5 border-rose-500/20 px-3 py-2 text-xs text-rose-500">
+                                                            {commentsErrors.get(issue.number)}
+                                                        </div>
+                                                    )}
+
+                                                    {!loadingComments.has(issue.number) && !commentsErrors.has(issue.number) &&
+                                                     (!commentsCache.has(issue.number) || commentsCache.get(issue.number)!.length === 0) && (
+                                                        <div className="text-xs text-muted-foreground italic px-3">
+                                                            Nessun commento
+                                                        </div>
+                                                    )}
+
+                                                    {!loadingComments.has(issue.number) && !commentsErrors.has(issue.number) &&
+                                                     commentsCache.has(issue.number) && commentsCache.get(issue.number)!.length > 0 && (
+                                                        <div className="space-y-2 max-h-96 overflow-y-auto">
+                                                            {commentsCache.get(issue.number)!.map(comment => (
+                                                                <div key={comment.id} className="bg-accent/30 rounded-lg p-3 border border-border">
+                                                                    <div className="flex items-center gap-2 mb-2">
+                                                                        <img
+                                                                            src={comment.user.avatar_url}
+                                                                            className="w-5 h-5 rounded-full"
+                                                                            alt={comment.user.login}
+                                                                        />
+                                                                        <span className="text-xs font-medium">{comment.user.login}</span>
+                                                                        <span className="text-[10px] text-muted-foreground">
+                                                                            {new Date(comment.created_at).toLocaleDateString()}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div
+                                                                        className="text-xs text-foreground/80 leading-relaxed"
+                                                                        dangerouslySetInnerHTML={{
+                                                                            __html: markdownToHtml(comment.body, owner, repo)
+                                                                        }}
+                                                                    />
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             ))
                         ) : (

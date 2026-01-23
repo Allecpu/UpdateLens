@@ -16,6 +16,24 @@ export interface GitHubIssue {
     }[];
     created_at: string;
     updated_at: string;
+    pull_request?: {
+        url: string;
+        html_url: string;
+        diff_url: string;
+        patch_url: string;
+    };
+}
+
+export interface GitHubComment {
+    id: number;
+    body: string;
+    user: {
+        login: string;
+        avatar_url: string;
+    };
+    created_at: string;
+    updated_at: string;
+    html_url: string;
 }
 
 export interface GitHubLabel {
@@ -110,6 +128,17 @@ export class GitHubIssuesClient {
 
     async listLabels(): Promise<GitHubLabel[]> {
         const url = this.isWeb ? '/api/github/labels' : `${this.apiBase}/labels`;
+        const response = await fetch(url, { headers: this.headers });
+        if (!response.ok) {
+            throw new Error(`GitHub API error: ${response.statusText}`);
+        }
+        return response.json();
+    }
+
+    async listComments(issueNumber: number): Promise<GitHubComment[]> {
+        const base = this.isWeb ? '/api/github' : `${this.baseUrl}/repos/${this.owner}/${this.repo}`;
+        const url = `${base}/issues/${issueNumber}/comments`;
+
         const response = await fetch(url, { headers: this.headers });
         if (!response.ok) {
             throw new Error(`GitHub API error: ${response.statusText}`);
