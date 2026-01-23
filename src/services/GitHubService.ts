@@ -28,6 +28,7 @@ export interface CreateIssuePayload {
     title: string;
     body: string;
     labels?: string[];
+    state?: 'open' | 'closed';
 }
 
 export interface GitHubIssuesClientOptions {
@@ -93,10 +94,8 @@ export class GitHubIssuesClient {
     }
 
     async updateIssue(issueNumber: number, payload: Partial<CreateIssuePayload> & { state?: 'open' | 'closed' }): Promise<GitHubIssue> {
-        if (!this.isWeb) {
-            throw new Error('Update issue is only supported in Web mode');
-        }
-        const url = `/api/github/issues/${issueNumber}`;
+        const base = this.isWeb ? '/api/github' : `${this.baseUrl}/repos/${this.owner}/${this.repo}`;
+        const url = `${base}/issues/${issueNumber}`;
 
         const response = await fetch(url, {
             method: 'PATCH',
@@ -136,6 +135,41 @@ export class GitHubIssuesClient {
             return { ok: false, message: `Errore GitHub: ${response.statusText}` };
         } catch (err) {
             return { ok: false, message: 'Impossibile contattare GitHub API' };
+        }
+    }
+    async uploadFile(path: string, contentBase64: string, message: string): Promise<{ download_url: string }> {
+        // Ensure we use the correct base URL for contents
+        const base = this.isWeb ? '/api/github' : `https://api.github.com/repos/${this.owner}/${this.repo}`;
+        const url = `${base}/contents/${path}`;
+
+        const response = await fetch(url, {
+            method: 'PUT',
+            headers: this.headers,
+            body: JSON.stringify({
+                message,
+                content: contentBase64,
+            }),
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({ message: response.statusText }));
+            throw new Error(err.message || `GitHub API error: ${response.statusText}`);
+        }
+        const data = await response.json();
+        return { download_url: data.content.download_url };
+    }
+
+    async addComment(issueNumber: number, body: string): Promise<void> {
+        const base = this.isWeb ? '/api/github' : `https://api.github.com/repos/${this.owner}/${this.repo}`;
+        const url = `${base}/issues/${issueNumber}/comments`;
+
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: this.headers,
+            body: JSON.stringify({ body }),
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({ message: response.statusText }));
+            throw new Error(err.message || `GitHub API error: ${response.statusText}`);
         }
     }
 }

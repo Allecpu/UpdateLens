@@ -16,7 +16,8 @@
       "Bash(npm run refresh:fabric:*)",
       "Bash(ls:*)",
       "Bash(node -e:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(timeout /t 5 /nobreak)"
     ]
   }
 }

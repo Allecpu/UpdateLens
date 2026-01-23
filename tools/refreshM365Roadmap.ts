@@ -47,7 +47,7 @@ type ReleaseItem = {
   firstAvailableDate?: string;
   lastUpdatedDate?: string;
   sourceUrl: string;
-  learnUrl?: string | null;
+  learnUrl?: string;
   url: string;
 };
 
@@ -126,8 +126,8 @@ const parseM365Date = (dateStr: string): string => {
 /**
  * Parse ISO 8601 date string to YYYY-MM-DD format
  */
-const parseDateFull = (isoDate: string): string | null => {
-  if (!isoDate || !/^\d{4}-\d{2}-\d{2}T/.test(isoDate)) return null;
+const parseDateFull = (isoDate: string): string | undefined => {
+  if (!isoDate || !/^\d{4}-\d{2}-\d{2}T/.test(isoDate)) return undefined;
   return isoDate.slice(0, 10);
 };
 
@@ -292,12 +292,12 @@ const buildReleaseItem = (
     tags: extractAllTags(raw),
     firstAvailableDate: parseDateFull(raw.created),
     lastUpdatedDate: parseDateFull(raw.modified),
-    sourceUrl: `https://www.microsoft.com/microsoft-365/roadmap?featureid=${featureId}`,
+    sourceUrl: `https://www.microsoft.com/microsoft-365/roadmap?featureid=${featureId}&searchterms=${featureId}`,
     learnUrl:
       raw.moreInfoLink && isValidHttpUrl(raw.moreInfoLink)
         ? raw.moreInfoLink
-        : null,
-    url: `https://www.microsoft.com/microsoft-365/roadmap?featureid=${featureId}`
+        : undefined,
+    url: `https://www.microsoft.com/microsoft-365/roadmap?featureid=${featureId}&searchterms=${featureId}`
   };
 };
 

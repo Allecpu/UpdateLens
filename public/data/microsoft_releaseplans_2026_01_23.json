@@ -5340,7 +5340,7 @@
         "GA"
       ],
       "enabledFor": "Utenti da parte di amministratori, autori o analisti",
-      "geography": "<p>Visita il report <a href=\"https://aka.ms/FeatureGeographicAvailabilityReport\" data-linktype=\"external\">Esplora funzionalità geografiche</a> per le aree di Microsoft Azure dove questa funzionalità è pianificata o disponibile.</p>",
+      "geography": "<p>Visitare il report <a href=\"https://aka.ms/FeatureGeographicAvailabilityReport\" data-linktype=\"external\">Esplora geografia funzionalità</a> per aree di Microsoft Azure in cui questa funzionalità è pianificata o disponibile.</p>",
       "geographyCountries": [],
       "title": "Abilitare il supporto VDI in Desktop virtuale Azure per il canale voce",
       "summary": "Distribuendo il canale vocale in Customer Service tramite desktop remoti, le aziende ottengono notevoli risparmi sui costi IT fornendo desktop agente standardizzati e sicuri. Questo approccio consente anche di gestire in modo efficiente gli ambienti per i lavoratori remoti, poiché si esegue l'onboarding degli agenti remoti semplicemente fornendo una configurazione di Desktop virtuale Azure e l'accesso per iniziare.",
@@ -5803,7 +5803,7 @@
         "GA"
       ],
       "enabledFor": "Utenti, automaticamente",
-      "geography": "<p>Visita il report <a href=\"https://aka.ms/FeatureGeographicAvailabilityReport\" data-linktype=\"external\">Esplora funzionalità geografiche</a> per le aree di Microsoft Azure dove questa funzionalità è pianificata o disponibile.</p>",
+      "geography": "<p>Visitare il report <a href=\"https://aka.ms/FeatureGeographicAvailabilityReport\" data-linktype=\"external\">Esplora geografia funzionalità</a> per aree di Microsoft Azure in cui questa funzionalità è pianificata o disponibile.</p>",
       "geographyCountries": [],
       "title": "Nascondere le trascrizioni per le chiamate vocali",
       "summary": "Nascondendo le trascrizioni delle chiamate vocali anche quando la funzione di trascrizione è attiva, riduci le distrazioni e il disordine per i tuoi agenti.",
@@ -7840,7 +7840,7 @@
         "GA"
       ],
       "enabledFor": "Amministratori, autori, responsabili del marketing o analisti, automaticamente",
-      "geography": "<p>Visitare il report <a href=\"https://aka.ms/FeatureGeographicAvailabilityReport\" data-linktype=\"external\">Esplora geografia funzionalità</a> per aree di Microsoft Azure in cui questa funzionalità è pianificata o disponibile.</p>",
+      "geography": "<p>Visita il report <a href=\"https://aka.ms/FeatureGeographicAvailabilityReport\" data-linktype=\"external\">Esplora funzionalità geografiche</a> per le aree di Microsoft Azure dove questa funzionalità è pianificata o disponibile.</p>",
       "geographyCountries": [],
       "title": "Selezionare le colonne della tabella da includere nella sincronizzazione offline per dispositivi mobili",
       "summary": "Gli autori possono selezionare le colonne delle tabelle che l'app scarica sui dispositivi mobili per l'uso offline. Quando selezioni un numero inferiore di colonne, l'app scarica i dati più velocemente sul dispositivo per l'utilizzo senza connettività.",
@@ -9316,34 +9316,6 @@
       "url": "https://releaseplans.microsoft.com/?app=Finance&planID=fb31944a-e1c1-ee11-9079-000d3a4fe8f7"
     },
     {
-      "id": "ms-48311d38-b6fd-ee11-a1ff-00224827e012",
-      "productId": "50a470c0-d3b7-e911-a992-000d3a4f3343",
-      "releasePlanId": "48311d38-b6fd-ee11-a1ff-00224827e012",
-      "sourcePlanId": "28178f7d-20f8-f011-8406-000d3a1be30e",
-      "sourceAppName": "Finance",
-      "source": "Microsoft",
-      "product": "Dynamics 365 Finance",
-      "category": "Prestazioni aziendali",
-      "wave": "2025 release wave 2",
-      "availabilityTypes": [
-        "Public Preview",
-        "GA"
-      ],
-      "enabledFor": "Utenti, automaticamente",
-      "geography": "<p>Visita il report <a href=\"https://aka.ms/FeatureGeographicAvailabilityReport\" data-linktype=\"external\">Esplora aree geografiche funzionalità</a> per le aree di Microsoft Azure in cui questa funzionalità è pianificata o disponibile.</p>",
-      "geographyCountries": [],
-      "title": "Offri agli utenti assistenza e guida generativa nell&#39;ambito dell&#39;analisi delle prestazioni aziendali",
-      "summary": "Con l'aiuto di Copilot, gli utenti ottengono assistenza senza uscire dall'analisi delle prestazioni aziendali. Gli utenti pongono domande a Copilot sull'applicazione e ricevono risposte senza dover trovare manualmente una risposta. Questa assistenza consente agli utenti di risparmiare tempo e potenzialmente aiuta anche la divisione di supporto IT della loro azienda.",
-      "status": "Launched",
-      "availabilityDate": "2025-10",
-      "availabilityDateFull": "2025-10-01",
-      "firstAvailableDate": "2024-08-30",
-      "lastUpdatedDate": "2026-01-08",
-      "sourceUrl": "https://releaseplans.microsoft.com/?app=Finance&planID=28178f7d-20f8-f011-8406-000d3a1be30e",
-      "learnUrl": "https://learn.microsoft.com/dynamics365/finance/business-performance-analytics/copilot-in-business-performance-analytics",
-      "url": "https://releaseplans.microsoft.com/?app=Finance&planID=28178f7d-20f8-f011-8406-000d3a1be30e"
-    },
-    {
       "id": "ms-e7db46e7-8298-ee11-be37-00224827e576",
       "productId": "50a470c0-d3b7-e911-a992-000d3a4f3343",
       "releasePlanId": "e7db46e7-8298-ee11-be37-00224827e576",
@@ -9661,7 +9633,7 @@
         "Public Preview",
         "GA"
       ],
-      "enabledFor": "Utenti da amministratori, autori o analisti",
+      "enabledFor": "Utenti da parte di amministratori, autori o analisti",
       "geography": "<p>Visita il report <a href=\"https://aka.ms/FeatureGeographicAvailabilityReport\" data-linktype=\"external\">Esplora funzionalità geografiche</a> per le aree di Microsoft Azure dove questa funzionalità è pianificata o disponibile.</p>",
       "geographyCountries": [],
       "title": "Analizzare i dati aziendali in Excel",
@@ -10178,7 +10150,7 @@
         "GA"
       ],
       "enabledFor": "Amministratori, autori, responsabili del marketing o analisti, automaticamente",
-      "geography": "<p>Visita il report <a href=\"https://aka.ms/FeatureGeographicAvailabilityReport\" data-linktype=\"external\">Esplora aree geografiche funzionalità</a> per le aree di Microsoft Azure in cui questa funzionalità è pianificata o disponibile.</p>",
+      "geography": "<p>Visita il report <a href=\"https://aka.ms/FeatureGeographicAvailabilityReport\" data-linktype=\"external\">Esplora funzionalità geografiche</a> per le aree di Microsoft Azure dove questa funzionalità è pianificata o disponibile.</p>",
       "geographyCountries": [],
       "title": "Risparmiare tempo con l&#39;applicazione per la cassa automatica",
       "summary": "Dynamics 365 Finance offre funzionalità avanzate di riconciliazione bancaria che aiutano le aziende a gestire il processo di riconciliazione bancaria in modo più efficiente. Grazie a una maggiore automazione e a funzionalità avanzate, le aziende riducono la necessità di lavoro manuale e fanno risparmiare tempo agli addetti alla gestione della liquidità. Semplificando il processo di riconciliazione bancaria, Dynamics 365 Finance aiuta le aziende a migliorare la gestione finanziaria e a garantire una reportistica accurata.",
@@ -12277,6 +12249,34 @@
       "url": "https://releaseplans.microsoft.com/?app=Finance&planID=fac54a50-9a08-ef11-9f8a-000d3a9c4aad"
     },
     {
+      "id": "ms-527ca4a7-9e1f-ef11-9f89-000d3a11e031",
+      "productId": "e30c6971-52c8-e911-a968-000d3a4f3883",
+      "releasePlanId": "527ca4a7-9e1f-ef11-9f89-000d3a11e031",
+      "sourcePlanId": "20d53bf2-3bf8-f011-8406-7ced8dde41ce",
+      "sourceAppName": "Finance",
+      "source": "Microsoft",
+      "product": "Finance and Operations cross-app capabilities",
+      "category": "Aumentare la produttività con Copilot",
+      "wave": "2025 release wave 2",
+      "availabilityTypes": [
+        "Public Preview",
+        "GA"
+      ],
+      "enabledFor": "Amministratori, autori, responsabili del marketing o analisti, automaticamente",
+      "geography": "<p>Visita il report <a href=\"https://aka.ms/FeatureGeographicAvailabilityReport\" data-linktype=\"external\">Esplora funzionalità geografiche</a> per le aree di Microsoft Azure dove questa funzionalità è pianificata o disponibile.</p>",
+      "geographyCountries": [],
+      "title": "Estendere Copilot nelle app per la finanza e le operazioni con azioni client",
+      "summary": "I creatori di app per la finanza e le operazioni possono estendere e personalizzare le esperienze Copilot per gli utenti delle loro applicazioni aggiungendo funzionalità tramite plug-in. Questa funzionalità include l'esperienza di chat in linguaggio naturale di Copilot per le app per la finanza e le operazioni. Grazie a questa funzionalità, gli autori possono aggiungere funzionalità all'esperienza di chat sidecar nelle app per la finanza e le operazioni basate sulla logica di business del codice client. Gli utenti di Copilot immettono prompt come domande o comandi e ricevono una risposta richiamando direttamente la logica di business nelle app per la finanza e le operazioni. Questa funzionalità espande notevolmente le funzionalità e le opzioni di personalizzazione per Copilot, migliorando l'esperienza In-App di Copilot.",
+      "status": "Launched",
+      "availabilityDate": "2026-01",
+      "availabilityDateFull": "2026-01-01",
+      "firstAvailableDate": "2024-04-26",
+      "lastUpdatedDate": "2026-01-08",
+      "sourceUrl": "https://releaseplans.microsoft.com/?app=Finance&planID=20d53bf2-3bf8-f011-8406-7ced8dde41ce",
+      "learnUrl": "https://learn.microsoft.com/dynamics365/fin-ops-core/dev-itpro/copilot/extend-copilot",
+      "url": "https://releaseplans.microsoft.com/?app=Finance&planID=20d53bf2-3bf8-f011-8406-7ced8dde41ce"
+    },
+    {
       "id": "ms-9cb4082f-5521-f011-9989-7c1e5282477e",
       "productId": "e30c6971-52c8-e911-a968-000d3a4f3883",
       "releasePlanId": "9cb4082f-5521-f011-9989-7c1e5282477e",
@@ -12399,8 +12399,8 @@
         "Public Preview",
         "GA"
       ],
-      "enabledFor": "Utenti da parte di amministratori, autori o analisti",
-      "geography": "<p>Visita il rapporto <a href=\"https://aka.ms/FeatureGeographicAvailabilityReport\" data-linktype=\"external\">Esplora geografia funzionalità</a> delle aree di Microsoft Azure in cui questa funzionalità è pianificata o disponibile.</p>",
+      "enabledFor": "Utenti da amministratori, autori o analisti",
+      "geography": "<p>Visita il report <a href=\"https://aka.ms/FeatureGeographicAvailabilityReport\" data-linktype=\"external\">Esplora funzionalità geografiche</a> per le aree di Microsoft Azure dove questa funzionalità è pianificata o disponibile.</p>",
       "geographyCountries": [],
       "title": "Abilitare una pianificazione della domanda efficiente e accurata con Copilot",
       "summary": "Copilot fornisce ai pianificatori della domanda indicazioni sul prodotto e approfondimenti sulle previsioni. Con il linguaggio naturale, i pianificatori della domanda possono esplorare tendenze, anomalie e fattori di influenza. Questa funzionalità consente ai pianificatori della domanda in Dynamics 365 Supply Chain Management di prendere decisioni informate, migliorare l'accuratezza delle previsioni e ottimizzare le operazioni della supply chain.",
@@ -16571,8 +16571,8 @@
       "enabledFor": "Utenti, automaticamente",
       "geography": "<p>Visita il report <a href=\"https://aka.ms/FeatureGeographicAvailabilityReport\" data-linktype=\"external\">Esplora funzionalità geografiche</a> per le aree di Microsoft Azure dove questa funzionalità è pianificata o disponibile.</p>",
       "geographyCountries": [],
-      "title": "Scopri approfondimenti sulle dichiarazioni di vendita al dettaglio utilizzando i riepiloghi di Copilot.",
-      "summary": "I negozi fisici inviano regolarmente transazioni di contanti e trasporto alla sede centrale di Dynamics 365 Commerce per l'elaborazione, che aggiorna l'inventario e i record finanziari. Tuttavia, gli errori di elaborazione frequenti possono causare tempi significativi e risorse necessarie per la risoluzione dei problemi da parte del team operativo. L'identificazione ritardata di questi problemi complica la risoluzione, soprattutto se composta da vincoli sensibili al tempo, ad esempio la chiusura dell'anno finanziario o la sospensione di articoli. La funzionalità Sintesi e approfondimenti da Copilot sulle transazioni mira a fornire approfondimenti attuabili sulle transazioni non riuscite, consentendo di dare priorità e risolvere i problemi in modo efficace.",
+      "title": "Scoprire approfondimenti sulle vendite al dettaglio utilizzando i riepiloghi di Copilot",
+      "summary": "I negozi fisici inviano regolarmente transazioni di contanti e trasporto alla sede centrale di Dynamics 365 Commerce per l'elaborazione, che aggiorna l'inventario e i record finanziari. Tuttavia, gli errori di elaborazione frequenti possono causare tempi significativi e risorse necessarie per la risoluzione dei problemi da parte del team operativo. L'identificazione ritardata di questi problemi complica la risoluzione, soprattutto se composta da vincoli sensibili al tempo, ad esempio la chiusura dell'anno finanziario o la sospensione di articoli. La funzionalità di informazioni dettagliate e riepilogo della pubblicazione del rendiconto di Copilot mira a fornire informazioni dettagliate utili sulle transazioni non riuscite, consentendo di stabilire le priorità e risolvere i problemi in modo efficace.",
       "status": "Launched",
       "availabilityDate": "2025-12",
       "availabilityDateFull": "2025-12-01",
@@ -29463,7 +29463,7 @@
         "GA"
       ],
       "enabledFor": "Amministratori, autori, responsabili del marketing o analisti, automaticamente",
-      "geography": "<p>Visita il report <a href=\"https://aka.ms/FeatureGeographicAvailabilityReport\" data-linktype=\"external\">Esplora funzionalità geografiche</a> per le aree di Microsoft Azure dove questa funzionalità è pianificata o disponibile.</p>",
+      "geography": "<p>Visitare il report <a href=\"https://aka.ms/FeatureGeographicAvailabilityReport\" data-linktype=\"external\">Esplora geografia funzionalità</a> per aree di Microsoft Azure in cui questa funzionalità è pianificata o disponibile.</p>",
       "geographyCountries": [],
       "title": "Dividere un gruppo di destinatari in gruppi per offrire esperienze cliente uniche",
       "summary": "Quando desideri che i clienti vivano esperienze diverse in un unico percorso, devi dividerli in gruppi. Sebbene oggi sia possibile dividere i gruppi di destinatari utilizzando rami o segmenti di attributi, a volte il numero di clienti in ciascun ramo è più importante di quello che tali clienti hanno in comune. Ad esempio, è consigliabile inviare un sondaggio a un sottoinsieme casuale dei tuoi clienti per ottenere feedback, che richiederebbe molto tempo da configurare oggi. Il nuovo riquadro di suddivisione del percorso consente di dividere il gruppo di destinatari in rami in modo da poter fornire a un sottoinsieme del gruppo di destinatari con esperienze uniche, che si tratti di un sondaggio, di un nuovo tipo di esperienza da testare o di un'offerta promozionale riservata ai primi arrivati. Puoi dividere il tuo gruppo di destinatari in percentuale (nei casi in cui hai bisogno di casualità) o per numeri (nei casi in cui desideri offrire esperienze specifiche a un determinato numero di persone).",
@@ -31880,7 +31880,7 @@
         "GA"
       ],
       "enabledFor": "Utenti da parte di amministratori, autori o analisti",
-      "geography": "<p>Visitare il report <a href=\"https://aka.ms/FeatureGeographicAvailabilityReport\" data-linktype=\"external\">Esplora geografia funzionalità</a> per aree di Microsoft Azure in cui questa funzionalità è pianificata o disponibile.</p>",
+      "geography": "<p>Visita il report <a href=\"https://aka.ms/FeatureGeographicAvailabilityReport\" data-linktype=\"external\">Esplora funzionalità geografiche</a> per le aree di Microsoft Azure dove questa funzionalità è pianificata o disponibile.</p>",
       "geographyCountries": [],
       "title": "Utilizzare la distribuzione nell&#39;ambiente per Power Automate Desktop",
       "summary": "Il routing dell'ambiente ti offre uno spazio personale e sicuro per costruire con Microsoft Dataverse senza preoccuparti che altri possano accedere alle tue app o ai tuoi dati.",

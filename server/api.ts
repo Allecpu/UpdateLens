@@ -102,10 +102,51 @@ export const createApi = () => {
   const db = createDb();
   const app = express();
 
-  app.use(express.json());
+  app.use(express.json({ limit: '10mb' }));
 
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok' });
+  });
+
+  // GitHub Proxy for Web Mode
+  app.all('/api/github/*', async (req, res) => {
+    const token = process.env.GITHUB_ISSUES_TOKEN;
+    const owner = process.env.GITHUB_OWNER || 'Allecpu';
+    const repo = process.env.GITHUB_REPO || 'UpdateLens';
+
+    if (!token && req.path !== '/api/github/health') {
+      return res.status(503).json({
+        error: 'GitHub token non configurato sul server. Usa la modalità locale o configura GITHUB_ISSUES_TOKEN.'
+      });
+    }
+
+    if (req.path === '/api/github/health') {
+      return res.json({ ok: !!token, mode: 'web' });
+    }
+
+    const githubPath = (req.params as string[])[0];
+    const url = `https://api.github.com/repos/${owner}/${repo}/${githubPath}`;
+
+    try {
+      const headers: Record<string, string> = {
+        'Accept': 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(url, {
+        method: req.method,
+        headers,
+        body: ['POST', 'PUT', 'PATCH'].includes(req.method) ? JSON.stringify(req.body) : undefined,
+      });
+
+      const data = await response.json().catch(() => ({}));
+      res.status(response.status).json(data);
+    } catch (error) {
+      res.status(500).json({ error: 'Errore durante il proxy GitHub: ' + (error instanceof Error ? error.message : String(error)) });
+    }
   });
 
   app.get('/api/releaseplans', (req, res) => {

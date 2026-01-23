@@ -139,7 +139,7 @@ const resolveSourceUrl = (item: ReleaseItem): string | null => {
     // Extract feature ID from id (format: m365roadmap-{id}-{productSlug})
     const match = item.id.match(/^m365roadmap-(\d+)-/);
     const featureId = match ? match[1] : item.id.replace('m365roadmap-', '');
-    return `https://www.microsoft.com/microsoft-365/roadmap?featureid=${featureId}`;
+    return `https://www.microsoft.com/microsoft-365/roadmap?featureid=${featureId}&searchterms=${featureId}`;
   }
   return resolveGenericSourceUrl(item);
 };
