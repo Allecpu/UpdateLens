@@ -1,4 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { loadAllSnapshots } from '../../services/DataLoader';
+import {
+  computeCountsBySourceAndProduct,
+  type CountsInfo
+} from '../../services/CountsService';
 import {
   appEnvironment,
   appVersion,
@@ -47,6 +52,8 @@ type UpdateAllInfo = {
 };
 
 const REFRESH_STORAGE_KEY = 'updatelens.refresh.status';
+const COUNTS_STORAGE_KEY = 'updatelens.refresh.counts';
+const MAX_PRODUCTS_VISIBLE = 4;
 
 const loadRefreshInfo = (): RefreshInfo => {
   if (typeof window === 'undefined') {
@@ -84,6 +91,28 @@ const persistRefreshInfo = (info: RefreshInfo) => {
   window.localStorage.setItem(REFRESH_STORAGE_KEY, JSON.stringify(info));
 };
 
+const loadCountsInfo = (): CountsInfo | null => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  try {
+    const raw = window.localStorage.getItem(COUNTS_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+    return JSON.parse(raw) as CountsInfo;
+  } catch {
+    return null;
+  }
+};
+
+const persistCountsInfo = (info: CountsInfo) => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  window.localStorage.setItem(COUNTS_STORAGE_KEY, JSON.stringify(info));
+};
+
 const parseFilename = (contentDisposition: string | null): string | null => {
   if (!contentDisposition) {
     return null;
@@ -99,6 +128,7 @@ const VersionPage = () => {
   const buildLabel = buildTime || 'N/D';
   const commitLabel = gitCommit || 'N/D';
   const [refreshInfo, setRefreshInfo] = useState<RefreshInfo>(() => loadRefreshInfo());
+  const [countsInfo, setCountsInfo] = useState<CountsInfo | null>(() => loadCountsInfo());
   const [toast, setToast] = useState<ToastInfo | null>(null);
   const [releaseState, setReleaseState] = useState<ReleaseState>('idle');
   const [updateAllInfo, setUpdateAllInfo] = useState<UpdateAllInfo>({
@@ -106,6 +136,18 @@ const VersionPage = () => {
     results: null,
     completedAt: null
   });
+  const [expandedSources, setExpandedSources] = useState<Record<string, boolean>>({});
+
+  const refreshCounts = async () => {
+    try {
+      const snapshotResult = await loadAllSnapshots();
+      const counts = computeCountsBySourceAndProduct(snapshotResult.items);
+      setCountsInfo(counts);
+      persistCountsInfo(counts);
+    } catch (error) {
+      console.warn('[UpdateLens] Conteggi non aggiornati', error);
+    }
+  };
 
   const updateRefreshInfo = (next: RefreshInfo) => {
     setRefreshInfo(next);
@@ -116,6 +158,10 @@ const VersionPage = () => {
     setToast(next);
     window.setTimeout(() => setToast(null), 3500);
   };
+
+  useEffect(() => {
+    refreshCounts();
+  }, []);
 
   const handleRefresh = async () => {
     if (refreshInfo.status === 'running') {
@@ -175,6 +221,7 @@ const VersionPage = () => {
         eosCount,
         message: 'Aggiornamento completato'
       });
+      await refreshCounts();
       triggerToast({
         type: 'success',
         message: 'Aggiornamento completato, download avviato.'
@@ -267,6 +314,7 @@ const VersionPage = () => {
         results: data.results,
         completedAt: data.completedAt
       });
+      await refreshCounts();
 
       const successCount = data.summary.successful;
       const totalCount = data.summary.total;
@@ -405,10 +453,63 @@ const VersionPage = () => {
           </div>
           <div className="rounded-lg border border-border/60 p-4 text-sm">
             <div className="text-xs uppercase text-muted-foreground">Conteggi</div>
-            <div className="mt-2 text-sm text-muted-foreground">
-              MS: {refreshInfo.microsoftCount ?? 'N/D'} | EOS:{' '}
-              {refreshInfo.eosCount ?? 'N/D'}
-            </div>
+            {countsInfo ? (
+              <div className="mt-3 space-y-3">
+                {countsInfo.sources.map((source) => {
+                  const products = source.products ?? [];
+                  const isExpanded = expandedSources[source.source] ?? false;
+                  const shouldCollapse = products.length > MAX_PRODUCTS_VISIBLE;
+                  const visibleProducts = shouldCollapse && !isExpanded
+                    ? products.slice(0, MAX_PRODUCTS_VISIBLE)
+                    : products;
+
+                  return (
+                    <div key={source.source}>
+                      <div className="flex items-center justify-between gap-2 text-sm">
+                        <span className="font-medium text-foreground">{source.label}</span>
+                        <span className="text-foreground">{source.total}</span>
+                      </div>
+                      {products.length > 0 ? (
+                        <div className="ml-3 mt-2 space-y-1 text-xs text-muted-foreground">
+                          {visibleProducts.map((product) => (
+                            <div
+                              key={`${source.source}-${product.label}`}
+                              className="flex items-center justify-between gap-2"
+                            >
+                              <span className="min-w-0 flex-1 truncate">
+                                {product.label}
+                              </span>
+                              <span className="text-foreground/80">{product.count}</span>
+                            </div>
+                          ))}
+                          {shouldCollapse && (
+                            <button
+                              className="mt-1 text-xs text-foreground underline-offset-2 hover:underline"
+                              onClick={() =>
+                                setExpandedSources((prev) => ({
+                                  ...prev,
+                                  [source.source]: !isExpanded
+                                }))
+                              }
+                            >
+                              {isExpanded
+                                ? 'Mostra meno'
+                                : `Mostra altro (${products.length - MAX_PRODUCTS_VISIBLE})`}
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="ml-3 mt-2 text-xs text-muted-foreground">
+                          Prodotti: N/D
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="mt-2 text-sm text-muted-foreground">N/D</div>
+            )}
           </div>
         </div>
       </section>

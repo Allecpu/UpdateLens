@@ -747,21 +747,6 @@ const GlobalFiltersPage = () => {
         </div>
       )}
 
-      <section className="grid gap-4 md:grid-cols-4">
-        {DASHBOARD_KPI_DEFINITIONS.map((definition) => (
-          <div key={definition.key} className="ul-surface p-5">
-            <div className="text-xs uppercase text-muted-foreground">
-              {definition.label}
-            </div>
-            <div
-              className={`mt-3 text-3xl font-semibold ${DASHBOARD_KPI_VALUE_CLASSES[definition.key]}`}
-            >
-              {dashboardKpis[definition.key]}
-            </div>
-          </div>
-        ))}
-      </section>
-
       <section className="ul-surface p-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
@@ -939,6 +924,21 @@ const GlobalFiltersPage = () => {
             </div>
           )}
         </div>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-4">
+        {DASHBOARD_KPI_DEFINITIONS.map((definition) => (
+          <div key={definition.key} className="ul-surface p-5">
+            <div className="text-xs uppercase text-muted-foreground">
+              {definition.label}
+            </div>
+            <div
+              className={`mt-3 text-3xl font-semibold ${DASHBOARD_KPI_VALUE_CLASSES[definition.key]}`}
+            >
+              {dashboardKpis[definition.key]}
+            </div>
+          </div>
+        ))}
       </section>
 
       <section className="ul-surface p-6">
