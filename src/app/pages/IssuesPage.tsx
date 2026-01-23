@@ -436,26 +436,24 @@ const IssuesPage = () => {
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
-                    {!isWeb && (
-                        <div className="flex items-center gap-2 mr-4">
-                            {token ? (
-                                <div className="flex items-center gap-2">
-                                    <span className="text-xs text-emerald-500 font-medium flex items-center gap-1">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                                        Token configurato
-                                    </span>
-                                    <button onClick={handleRemoveToken} className="text-xs text-muted-foreground hover:text-rose-500 transition-colors">Rimuovi</button>
-                                </div>
-                            ) : (
-                                <button
-                                    onClick={() => setIsTokenModalOpen(true)}
-                                    className="ul-button ul-button-ghost py-1.5 px-3 text-xs border-amber-500/30 text-amber-500"
-                                >
-                                    Configura Token
-                                </button>
-                            )}
-                        </div>
-                    )}
+                    <div className="flex items-center gap-2 mr-4">
+                        {token ? (
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs text-emerald-500 font-medium flex items-center gap-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                    Token configurato
+                                </span>
+                                <button onClick={handleRemoveToken} className="text-xs text-muted-foreground hover:text-rose-500 transition-colors">Rimuovi</button>
+                            </div>
+                        ) : (
+                            <button
+                                onClick={() => setIsTokenModalOpen(true)}
+                                className="ul-button ul-button-ghost py-1.5 px-3 text-xs border-amber-500/30 text-amber-500"
+                            >
+                                Configura Token
+                            </button>
+                        )}
+                    </div>
                     <button
                         disabled={isTokenMissing}
                         onClick={() => setIsCreateModalOpen(true)}
@@ -602,7 +600,7 @@ const IssuesPage = () => {
                         </header>
                         <div className="p-6 space-y-4">
                             <p className="text-sm text-muted-foreground">
-                                Inserisci un <strong>Personal Access Token (fine-grained)</strong>. Il token rimarrà salvato solo nel tuo browser.
+                                Inserisci un <strong>Personal Access Token (fine-grained)</strong>. Il token rimarrà salvato solo nel tuo browser e può essere usato anche in modalità web per l'upload immagini.
                             </p>
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">GitHub PAT</label>

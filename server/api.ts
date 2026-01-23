@@ -110,9 +110,17 @@ export const createApi = () => {
 
   // GitHub Proxy for Web Mode
   app.all('/api/github/*', async (req, res) => {
-    const token = process.env.GITHUB_ISSUES_TOKEN;
+    const envToken = process.env.GITHUB_ISSUES_TOKEN;
     const owner = process.env.GITHUB_OWNER || 'Allecpu';
     const repo = process.env.GITHUB_REPO || 'UpdateLens';
+    const inboundAuth = typeof req.headers.authorization === 'string' ? req.headers.authorization.trim() : '';
+    const normalizeAuth = (value?: string) => {
+      if (!value) return '';
+      return value.startsWith('Bearer ') ? value : `Bearer ${value}`;
+    };
+    const primaryAuth = inboundAuth ? normalizeAuth(inboundAuth) : normalizeAuth(envToken);
+    const fallbackAuth = inboundAuth && envToken ? normalizeAuth(envToken) : '';
+    const token = primaryAuth;
 
     if (!token && req.path !== '/api/github/health') {
       return res.status(503).json({
@@ -121,26 +129,38 @@ export const createApi = () => {
     }
 
     if (req.path === '/api/github/health') {
-      return res.json({ ok: !!token, mode: 'web' });
+      return res.json({ ok: !!envToken, mode: 'web' });
     }
 
     const githubPath = (req.params as string[])[0];
     const url = `https://api.github.com/repos/${owner}/${repo}/${githubPath}`;
 
     try {
-      const headers: Record<string, string> = {
-        'Accept': 'application/vnd.github.v3+json',
-        'Content-Type': 'application/json',
+      const body = ['POST', 'PUT', 'PATCH'].includes(req.method) ? JSON.stringify(req.body) : undefined;
+      const makeHeaders = (auth?: string) => {
+        const headers: Record<string, string> = {
+          'Accept': 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json',
+        };
+        if (auth) {
+          headers['Authorization'] = auth;
+        }
+        return headers;
       };
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
 
-      const response = await fetch(url, {
+      let response = await fetch(url, {
         method: req.method,
-        headers,
-        body: ['POST', 'PUT', 'PATCH'].includes(req.method) ? JSON.stringify(req.body) : undefined,
+        headers: makeHeaders(token),
+        body,
       });
+
+      if ((response.status === 401 || response.status === 403) && fallbackAuth) {
+        response = await fetch(url, {
+          method: req.method,
+          headers: makeHeaders(fallbackAuth),
+          body,
+        });
+      }
 
       const data = await response.json().catch(() => ({}));
       res.status(response.status).json(data);
