@@ -5,6 +5,7 @@ import DashboardPage from './app/pages/DashboardPage';
 import GlobalFiltersPage from './app/pages/GlobalFiltersPage';
 import VersionPage from './app/pages/VersionPage';
 import IssuesPage from './app/pages/IssuesPage';
+import ChatPanel from './app/components/chat/ChatPanel';
 import { useCustomerGroupStore } from './app/store/useCustomerGroupStore';
 import { useCustomerStore } from './app/store/useCustomerStore';
 import { useFilterStore } from './app/store/useFilterStore';
@@ -235,6 +236,7 @@ const App = () => {
           <Route path="/issues" element={<IssuesPage />} />
         </Routes>
       </div>
+      <ChatPanel />
     </div>
   );
 };

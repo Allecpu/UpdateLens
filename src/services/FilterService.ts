@@ -54,14 +54,16 @@ export const filterReleaseItems = (
   const query = filters.query.trim().toLowerCase();
   const releaseDateFrom = parseDateAny(filters.releaseDateFrom);
   const releaseDateTo = parseDateAny(filters.releaseDateTo);
-  // Build product source map using NORMALIZED product names as keys
-  const productSourceMap = new Map<string, ReleaseSource>();
-  items.forEach((item) => {
-    const normalizedName = normalizeProductLabel(item.productName);
-    if (!productSourceMap.has(normalizedName)) {
-      productSourceMap.set(normalizedName, item.source);
-    }
-  });
+  // Track which sources have at least one selected product (normalized labels)
+  const selectedSources = new Set<ReleaseSource>();
+  if (filters.products.length > 0) {
+    items.forEach((item) => {
+      const normalizedName = normalizeProductLabel(item.productName);
+      if (filters.products.includes(normalizedName)) {
+        selectedSources.add(item.source);
+      }
+    });
+  }
 
   // DEBUG: Track which filters are eliminating items
   const debugCounts = {
@@ -94,19 +96,17 @@ export const filterReleaseItems = (
 
   // 3. Products filter (uses normalized product names for comparison)
   remaining = remaining.filter(item => {
-    if (isFilterSupported(item.source, 'productOrApp') && filters.products.length) {
-      // Normalize item's product name for comparison
-      const normalizedItemProduct = normalizeProductLabel(item.productName);
-      // Check if there's any selected product for this source
-      const hasProductForSource = filters.products.some(
-        (product) => productSourceMap.get(product) === item.source
-      );
-      if (hasProductForSource) {
-        // Compare normalized names (filters.products contains normalized values)
-        return filters.products.includes(normalizedItemProduct);
-      }
+    if (!isFilterSupported(item.source, 'productOrApp')) {
+      return true;
     }
-    return true;
+    if (filters.products.length === 0) {
+      return false;
+    }
+    if (!selectedSources.has(item.source)) {
+      return false;
+    }
+    const normalizedItemProduct = normalizeProductLabel(item.productName);
+    return filters.products.includes(normalizedItemProduct);
   });
   debugCounts.afterProducts = remaining.length;
 

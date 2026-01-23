@@ -477,11 +477,13 @@ const IssuesPage = () => {
         return issues.filter(issue =>
             // Exclude pull requests (they have a pull_request field)
             !issue.pull_request &&
+            // Filter by state
+            (filterState === 'all' || issue.state === filterState) &&
             // Filter by search
             (issue.title.toLowerCase().includes(search.toLowerCase()) ||
             issue.number.toString().includes(search))
         );
-    }, [issues, search]);
+    }, [issues, filterState, search]);
 
     const envType = isWeb ? 'WEB (SERVER)' : isFileProtocol ? 'LOCAL (OFFLINE)' : 'LOCAL (BROWSER)';
     const isTokenMissing = !isWeb && !token;

@@ -97,26 +97,18 @@ const GlobalFiltersPage = () => {
 
   const items = snapshotItems;
   const metadata = useMemo(() => buildFilterMetadata(items), [items]);
-  const productSourceMap = useMemo(() => {
-    const map = new Map<string, ReleaseSource>();
-    items.forEach((item) => {
-      if (!map.has(item.productName)) {
-        map.set(item.productName, item.source);
+  const productSourcesByValue = useMemo(() => {
+    const map = new Map<string, Set<ReleaseSource>>();
+    metadata.products.forEach((option) => {
+      if (!map.has(option.value)) {
+        map.set(option.value, new Set(option.sources));
+      } else {
+        const existing = map.get(option.value);
+        option.sources.forEach((source) => existing?.add(source));
       }
     });
     return map;
-  }, [items]);
-  const productsBySource = useMemo(() => {
-    const map = new Map<ReleaseSource, string[]>();
-    items.forEach((item) => {
-      const list = map.get(item.source) ?? [];
-      if (!list.includes(item.productName)) {
-        list.push(item.productName);
-        map.set(item.source, list);
-      }
-    });
-    return map;
-  }, [items]);
+  }, [metadata.products]);
   const sourceOptions = useMemo(
     () =>
       metadata.sources.length
@@ -248,20 +240,9 @@ const GlobalFiltersPage = () => {
       sources,
       matchAllSources
     );
-    const expandedProducts = new Set(productSelection);
-    sources.forEach((source) => {
-      const hasProduct = productSelection.some(
-        (product) => productSourceMap.get(product) === source
-      );
-      if (!hasProduct) {
-        (productsBySource.get(source) ?? []).forEach((product) =>
-          expandedProducts.add(product)
-        );
-      }
-    });
     return {
       ...merged,
-      products: Array.from(expandedProducts),
+      products: productSelection,
       sources,
       statuses: normalizeSelectionForSources(
         merged.statuses,
@@ -326,9 +307,7 @@ const GlobalFiltersPage = () => {
     productOptions,
     sourceOptions,
     statusOptions,
-    metadata,
-    productSourceMap,
-    productsBySource
+    metadata
   ]);
 
   const currentFilters = useMemo(() => {
@@ -349,9 +328,7 @@ const GlobalFiltersPage = () => {
     normalizedGlobal,
     defaultFilters,
     sourceOptions,
-    metadata,
-    productSourceMap,
-    productsBySource
+    metadata
   ]);
 
   const updateFilters = (next: Partial<FilterState>) => {
@@ -470,9 +447,10 @@ const GlobalFiltersPage = () => {
   const m365RoadmapProducts = metadata.products.filter((option) => option.sources.includes('MICROSOFT 365'));
 
   const updateProductsForSource = (source: ReleaseSource, next: string[]) => {
-    const toKeep = currentFilters.products.filter(
-      (product) => productSourceMap.get(product) !== source
-    );
+    const toKeep = currentFilters.products.filter((product) => {
+      const sources = productSourcesByValue.get(product);
+      return sources ? !sources.has(source) : true;
+    });
     const merged = Array.from(new Set([...toKeep, ...next]));
     updateFilters({ products: merged });
   };
@@ -613,9 +591,7 @@ const GlobalFiltersPage = () => {
     // dependencies for normalizeFiltersInternal
     defaultFilters,
     sourceOptions,
-    metadata,
-    productSourceMap,
-    productsBySource
+    metadata
   ]);
   const pageSize = 20;
   const totalPages = Math.max(1, Math.ceil(customerPreview.entries.length / pageSize));

@@ -133,7 +133,9 @@ export const createApi = () => {
     }
 
     const githubPath = (req.params as string[])[0];
-    const url = `https://api.github.com/repos/${owner}/${repo}/${githubPath}`;
+    const queryIndex = req.originalUrl.indexOf('?');
+    const query = queryIndex >= 0 ? req.originalUrl.slice(queryIndex) : '';
+    const url = `https://api.github.com/repos/${owner}/${repo}/${githubPath}${query}`;
 
     try {
       const body = ['POST', 'PUT', 'PATCH'].includes(req.method) ? JSON.stringify(req.body) : undefined;
