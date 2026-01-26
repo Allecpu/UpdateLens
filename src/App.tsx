@@ -9,6 +9,7 @@ import ChatPanel from './app/components/chat/ChatPanel';
 import { useCustomerGroupStore } from './app/store/useCustomerGroupStore';
 import { useCustomerStore } from './app/store/useCustomerStore';
 import { useFilterStore } from './app/store/useFilterStore';
+import { useBootstrapFilters } from './hooks/useBootstrapFilters';
 
 const isEntryActive = (entry: { isActive?: boolean }): boolean => entry.isActive !== false;
 
@@ -187,6 +188,9 @@ const CustomerPicker = () => {
 };
 
 const App = () => {
+  // Bootstrap global filters if needed
+  useBootstrapFilters();
+
   const [isDark, setIsDark] = useState(() => {
     const stored = localStorage.getItem('updatelens.theme');
     if (stored === 'dark') {

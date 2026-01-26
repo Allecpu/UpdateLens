@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { loadAllSnapshots } from '../../services/DataLoader';
 import {
   computeCountsBySourceAndProduct,
@@ -13,6 +13,8 @@ import {
   lastUpdateNotes,
   lastUpdateTitle
 } from '../../version';
+import { useFilterStore } from '../store/useFilterStore';
+import { FilterExportSchema, type FilterExport } from '../../validators/FilterSchema';
 
 type RefreshOutcome = 'idle' | 'running' | 'success' | 'error';
 
@@ -345,13 +347,12 @@ const VersionPage = () => {
     <div className="space-y-6">
       {toast && (
         <div
-          className={`ul-surface border-l-4 px-4 py-3 text-sm ${
-            toast.type === 'success'
+          className={`ul-surface border-l-4 px-4 py-3 text-sm ${toast.type === 'success'
               ? 'border-emerald-500 text-emerald-500'
               : toast.type === 'error'
                 ? 'border-rose-500 text-rose-500'
                 : 'border-amber-400 text-amber-400'
-          }`}
+            }`}
         >
           {toast.message}
         </div>
@@ -555,26 +556,24 @@ const VersionPage = () => {
               {updateAllInfo.results.map((result) => (
                 <div
                   key={result.source}
-                  className={`rounded-lg border p-4 ${
-                    result.status === 'ok'
+                  className={`rounded-lg border p-4 ${result.status === 'ok'
                       ? 'border-emerald-500/30 bg-emerald-500/5'
                       : result.status === 'failed'
                         ? 'border-rose-500/30 bg-rose-500/5'
                         : 'border-amber-400/30 bg-amber-400/5'
-                  }`}
+                    }`}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <span className="font-semibold capitalize">{result.source}</span>
                         <span
-                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                            result.status === 'ok'
+                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${result.status === 'ok'
                               ? 'bg-emerald-500/20 text-emerald-500'
                               : result.status === 'failed'
                                 ? 'bg-rose-500/20 text-rose-500'
                                 : 'bg-amber-400/20 text-amber-400'
-                          }`}
+                            }`}
                         >
                           {result.status === 'ok' ? 'Successo' : result.status === 'failed' ? 'Errore' : 'Non disponibile'}
                         </span>
@@ -632,7 +631,122 @@ const VersionPage = () => {
           </div>
         )}
       </section>
+
+      <FilterManagementSection />
     </div>
+  );
+};
+
+// Internal component for Filter Management to keep VersionPage clean
+const FilterManagementSection = () => {
+  const { cssFilters, setCssFilters } = useFilterStore();
+  const [importState, setImportState] = useState<'idle' | 'success' | 'error'>('idle');
+  const [message, setMessage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleExport = () => {
+    if (!cssFilters) {
+      setMessage('Nessun filtro globale attivo da esportare.');
+      setImportState('error');
+      return;
+    }
+
+    const exportData: FilterExport = {
+      meta: {
+        appVersion: appVersion,
+        exportedAt: new Date().toISOString(),
+        schemaVersion: 1
+      },
+      data: cssFilters
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `globalFilters.${appVersion}.json`;
+    link.click();
+    window.URL.revokeObjectURL(url);
+
+    setMessage('Filtri esportati con successo.');
+    setImportState('success');
+    setTimeout(() => {
+      setImportState('idle');
+      setMessage(null);
+    }, 3000);
+  };
+
+  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const json = JSON.parse(e.target?.result as string);
+        const result = FilterExportSchema.safeParse(json);
+
+        if (!result.success) {
+          throw new Error('Formato file non valido. Verifica che sia un file di filtri UpdateLens.');
+        }
+
+        setCssFilters(result.data.data);
+        setImportState('success');
+        setMessage(`Filtri importati (v${result.data.meta.appVersion}) aggiornati al ${new Date(result.data.meta.exportedAt).toLocaleDateString()}.`);
+      } catch (error) {
+        setImportState('error');
+        setMessage(error instanceof Error ? error.message : 'Errore durante l\'importazione.');
+      }
+
+      // Reset input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  return (
+    <section className="ul-surface p-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-semibold">Filtri Globali</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Esporta la configurazione attuale o importa un file di filtri salvato.
+          </p>
+        </div>
+        <div className="flex gap-3">
+          <input
+            type="file"
+            accept=".json"
+            className="hidden"
+            ref={fileInputRef}
+            onChange={handleImport}
+          />
+          <button
+            className="ul-button ul-button-secondary"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            Importa filtri
+          </button>
+          <button
+            className="ul-button ul-button-secondary"
+            onClick={handleExport}
+          >
+            Esporta filtri
+          </button>
+        </div>
+      </div>
+
+      {message && (
+        <div className={`mt-4 rounded-md p-3 text-sm ${importState === 'success'
+            ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
+            : 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
+          }`}>
+          {message}
+        </div>
+      )}
+    </section>
   );
 };
 
