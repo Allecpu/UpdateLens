@@ -30,7 +30,21 @@ export type ReleaseZipResult = {
 };
 
 export const buildReleaseZip = async (): Promise<ReleaseZipResult> => {
-  await execAsync('npm run build:release', { cwd: repoRoot });
+  try {
+    // Increase maxBuffer to 10MB to prevent crashes on large build outputs
+    await execAsync('npm run build:release', { cwd: repoRoot, maxBuffer: 10 * 1024 * 1024 });
+  } catch (error: any) {
+    const stderr = error.stderr ? `\nSTDERR:\n${error.stderr}` : '';
+    const stdout = error.stdout ? `\nSTDOUT:\n${error.stdout}` : '';
+    throw new Error(`Build failed: ${error.message}${stderr}${stdout}`);
+  }
+
+  try {
+    await stat(releaseDir);
+  } catch {
+    throw new Error(`Release directory not found at: ${releaseDir}`);
+  }
+
   const zip = new JSZip();
   await addFolderToZip(zip, releaseDir, releaseDir);
 

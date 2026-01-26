@@ -56,7 +56,7 @@ const getTopN = (counts: Map<string, number>, n: number): Array<[string, number]
 const groupByMonth = (items: ReleaseItem[]): Map<string, number> => {
   const counts = new Map<string, number>();
   items.forEach(item => {
-    const date = item.releaseDate || item.modifiedDate;
+    const date = item.releaseDate || item.lastUpdatedDate;
     if (date) {
       const monthKey = date.slice(0, 7); // YYYY-MM
       counts.set(monthKey, (counts.get(monthKey) ?? 0) + 1);
@@ -134,19 +134,19 @@ export const generateResponse = (
       const [target1, target2] = intent.compareTargets || ['', ''];
       const items1 = filteredItems.filter(
         i => i.source.toLowerCase().includes(target1.toLowerCase()) ||
-             (i.productName || '').toLowerCase().includes(target1.toLowerCase())
+          (i.productName || '').toLowerCase().includes(target1.toLowerCase())
       );
       const items2 = filteredItems.filter(
         i => i.source.toLowerCase().includes(target2.toLowerCase()) ||
-             (i.productName || '').toLowerCase().includes(target2.toLowerCase())
+          (i.productName || '').toLowerCase().includes(target2.toLowerCase())
       );
 
       const diff = items1.length - items2.length;
       const comparison = diff > 0
         ? `${target1} ha ${diff} elementi in più`
         : diff < 0
-        ? `${target2} ha ${Math.abs(diff)} elementi in più`
-        : 'Hanno lo stesso numero di elementi';
+          ? `${target2} ha ${Math.abs(diff)} elementi in più`
+          : 'Hanno lo stesso numero di elementi';
 
       return {
         message: `Confronto tra ${target1} e ${target2}:\n\n` +
@@ -163,7 +163,7 @@ export const generateResponse = (
       const target = intent.trendTarget || '';
       const targetItems = filteredItems.filter(
         i => i.source.toLowerCase().includes(target.toLowerCase()) ||
-             (i.productName || '').toLowerCase().includes(target.toLowerCase())
+          (i.productName || '').toLowerCase().includes(target.toLowerCase())
       );
 
       const monthCounts = groupByMonth(targetItems);

@@ -46,11 +46,18 @@ const resolveGitCommit = (): string => {
 };
 
 const runRefreshScripts = async (sources: RefreshSource[]): Promise<void> => {
-  if (sources.includes('microsoft')) {
-    await execAsync('npm run refresh:microsoft', { cwd: repoRoot });
-  }
-  if (sources.includes('eos')) {
-    await execAsync('npm run refresh:eos', { cwd: repoRoot });
+  const options = { cwd: repoRoot, maxBuffer: 10 * 1024 * 1024 };
+  try {
+    if (sources.includes('microsoft')) {
+      await execAsync('npm run refresh:microsoft', options);
+    }
+    if (sources.includes('eos')) {
+      await execAsync('npm run refresh:eos', options);
+    }
+  } catch (error: any) {
+    const stderr = error.stderr ? `\nSTDERR:\n${error.stderr}` : '';
+    const stdout = error.stdout ? `\nSTDOUT:\n${error.stdout}` : '';
+    throw new Error(`Refresh failed: ${error.message}${stderr}${stdout}`);
   }
 };
 

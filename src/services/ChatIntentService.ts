@@ -237,7 +237,7 @@ const fuzzyMatchProduct = (
   // Partial match
   const partialMatch = metadata.products.find(
     p => p.value.toLowerCase().includes(normalized) ||
-         normalized.includes(p.value.toLowerCase())
+      normalized.includes(p.value.toLowerCase())
   );
   if (partialMatch) return { match: partialMatch.value };
 
@@ -296,7 +296,7 @@ const fuzzyMatchCategory = (
 
   const partialMatch = metadata.categories.find(
     c => c.value.toLowerCase().includes(normalized) ||
-         normalized.includes(c.value.toLowerCase())
+      normalized.includes(c.value.toLowerCase())
   );
   if (partialMatch) return partialMatch.value;
 
@@ -637,7 +637,7 @@ const extractContextReference = (text: string): { isContextRef: boolean; target:
 /**
  * Check for analytics queries
  */
-const parseAnalyticsQuery = (text: string, metadata: FilterMetadata): ParsedIntent | null => {
+const parseAnalyticsQuery = (text: string): ParsedIntent | null => {
   const normalized = text.toLowerCase().trim();
 
   // Comparison queries
@@ -777,7 +777,7 @@ export const parseIntent = (
   }
 
   // Check for analytics queries
-  const analyticsIntent = parseAnalyticsQuery(normalized, metadata);
+  const analyticsIntent = parseAnalyticsQuery(normalized);
   if (analyticsIntent) {
     lastIntent = analyticsIntent;
     return analyticsIntent;
