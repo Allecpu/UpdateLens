@@ -125,9 +125,15 @@ const FiltersPanel = ({
   };
 
   const formatSourceBadge = (sources: ReleaseSource[]): string | undefined => {
-    const ordered = (['Microsoft', 'EOS'] as ReleaseSource[]).filter((source) =>
+    const ordered = (['Microsoft', 'EOS', 'Fabric', 'MICROSOFT 365'] as ReleaseSource[]).filter((source) =>
       sources.includes(source)
     );
+    if (ordered.length === 4) {
+      return 'Tutte le fonti';
+    }
+    if (ordered.length === 3) {
+      return `${RELEASE_SOURCE_LABELS[ordered[0]]} + ${RELEASE_SOURCE_LABELS[ordered[1]]} + ${RELEASE_SOURCE_LABELS[ordered[2]]}`;
+    }
     if (ordered.length === 2) {
       return `${RELEASE_SOURCE_LABELS[ordered[0]]} + ${RELEASE_SOURCE_LABELS[ordered[1]]}`;
     }
@@ -161,6 +167,10 @@ const FiltersPanel = ({
     option.sources.includes('Microsoft')
   );
   const eosProducts = metadata.products.filter((option) => option.sources.includes('EOS'));
+  const fabricProducts = metadata.products.filter((option) => option.sources.includes('Fabric'));
+  const m365RoadmapProducts = metadata.products.filter((option) =>
+    option.sources.includes('MICROSOFT 365')
+  );
 
   const updateProductsForSource = (source: ReleaseSource, next: string[]) => {
     const toKeep = (filters.products ?? []).filter(
@@ -223,10 +233,32 @@ const FiltersPanel = ({
                     activeSources={['EOS']}
                   />
                 )}
+                {fabricProducts.length > 0 && (
+                  <FilterListSection
+                    title="Workload (Fabric)"
+                    options={fabricProducts}
+                    selected={filters.products ?? []}
+                    onChange={(next) => updateProductsForSource('Fabric', next)}
+                    activeSources={['Fabric']}
+                  />
+                )}
+                {m365RoadmapProducts.length > 0 && (
+                  <FilterListSection
+                    title="Prodotti (MICROSOFT 365)"
+                    options={m365RoadmapProducts}
+                    selected={filters.products ?? []}
+                    onChange={(next) => updateProductsForSource('MICROSOFT 365', next)}
+                    activeSources={['MICROSOFT 365']}
+                  />
+                )}
               </>
             ) : (
               <FilterListSection
-                title={activeSources[0] === 'EOS' ? 'App' : 'Prodotti'}
+                title={
+                  activeSources[0] === 'EOS' ? 'App' :
+                  activeSources[0] === 'Fabric' ? 'Workload' :
+                  'Prodotti'
+                }
                 options={metadata.products}
                 selected={filters.products ?? []}
                 onChange={(next) => onChange({ products: next })}
@@ -722,10 +754,34 @@ const FiltersPanel = ({
                       activeSources={['EOS']}
                     />
                   )}
+                  {fabricProducts.length > 0 && (
+                    <FilterListSection
+                      title="Workload (Fabric)"
+                      options={fabricProducts}
+                      selected={filters.products ?? []}
+                      onChange={(next) => updateProductsForSource('Fabric', next)}
+                      defaultOpen
+                      activeSources={['Fabric']}
+                    />
+                  )}
+                  {m365RoadmapProducts.length > 0 && (
+                    <FilterListSection
+                      title="Prodotti (MICROSOFT 365)"
+                      options={m365RoadmapProducts}
+                      selected={filters.products ?? []}
+                      onChange={(next) => updateProductsForSource('MICROSOFT 365', next)}
+                      defaultOpen
+                      activeSources={['MICROSOFT 365']}
+                    />
+                  )}
                 </>
               ) : (
                 <FilterListSection
-                  title={activeSources[0] === 'EOS' ? 'App' : 'Prodotti'}
+                  title={
+                    activeSources[0] === 'EOS' ? 'App' :
+                    activeSources[0] === 'Fabric' ? 'Workload' :
+                    'Prodotti'
+                  }
                   options={metadata.products}
                   selected={filters.products ?? []}
                   onChange={(next) => onChange({ products: next })}
