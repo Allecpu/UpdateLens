@@ -25,3 +25,13 @@ export type FilterState = {
   horizonMonths: number;
   historyMonths: number;
 };
+
+export type FilterPreset = {
+  id: string;
+  name: string;
+  description?: string;
+  filters: FilterState;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+};

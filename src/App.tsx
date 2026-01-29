@@ -204,6 +204,8 @@ const App = () => {
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', isDark);
+    // Set color-scheme for native form controls (select, input, etc.)
+    document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
     localStorage.setItem('updatelens.theme', isDark ? 'dark' : 'light');
   }, [isDark]);
 

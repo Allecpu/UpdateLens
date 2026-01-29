@@ -71,9 +71,11 @@ export const useFilterStore = create<FilterStoreState>((set, get) => {
     ...initial,
     chatFilters: null,
     setCssFilters: (filters) => {
+      console.log('[FilterStore] setCssFilters called with:', filters);
       const { customerFilters, customerFilterMode } = get();
       persist(filters, customerFilters, customerFilterMode);
       set({ cssFilters: filters });
+      console.log('[FilterStore] cssFilters updated in store');
     },
     setCustomerFilters: (customerId, filters) => {
       const next = { ...get().customerFilters, [customerId]: filters };

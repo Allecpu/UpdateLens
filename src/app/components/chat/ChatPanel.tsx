@@ -42,8 +42,19 @@ const DEFAULT_FILTERS: FilterState = {
 
 const ChatPanel = () => {
   const navigate = useNavigate();
-  const { isOpen, messages, queryHistory, toggleChat, closeChat, addMessage, addToHistory } =
-    useChatStore();
+  const {
+    isOpen,
+    messages,
+    queryHistory,
+    activeTab,
+    toggleChat,
+    closeChat,
+    addMessage,
+    addToHistory,
+    deleteFromHistory,
+    clearHistory,
+    setActiveTab
+  } = useChatStore();
   const { cssFilters, setChatFilters, clearChatFilters } = useFilterStore();
 
   const [items, setItems] = useState<ReleaseItem[]>([]);
@@ -148,9 +159,13 @@ const ChatPanel = () => {
           <ChatWindow
             messages={messages}
             queryHistory={queryHistory}
+            activeTab={activeTab}
             onClose={closeChat}
             onSend={handleSend}
             onApplyFilters={handleApplyFilters}
+            onSetActiveTab={setActiveTab}
+            onDeleteFromHistory={deleteFromHistory}
+            onClearHistory={clearHistory}
           />
         </div>
       )}

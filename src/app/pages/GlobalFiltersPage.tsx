@@ -1,6 +1,10 @@
-import { useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
 
 import { loadAllSnapshots, loadRulesConfig } from '../../services/DataLoader';
+import {
+  usePersistedSectionStates,
+  STORAGE_KEYS
+} from '../../hooks/usePersistedSectionStates';
 import { buildBcVersionOptions, buildFilterMetadata } from '../../services/FilterMetadata';
 import { filterReleaseItems } from '../../services/FilterService';
 import {
@@ -17,14 +21,21 @@ import {
 import { useFilterStore, type FilterState } from '../store/useFilterStore';
 import { useCustomerStore } from '../store/useCustomerStore';
 import { useCustomerGroupStore } from '../store/useCustomerGroupStore';
+import { usePresetStore } from '../store/usePresetStore';
+import { useBootstrapPresets } from '../../hooks/useBootstrapPresets';
 import FilterListSection from '../components/FilterListSection';
 import FilterSourceToggle from '../components/FilterSourceToggle';
+import PresetSelector from '../components/filters/PresetSelector';
 import type { ReleaseItem, ReleaseSource } from '../../models/ReleaseItem';
 import type { FilterKey } from '../../services/FilterDefinitions';
 
 const normalizeSelection = (values: string[], options: string[]): string[] => {
   if (values.length === 0) {
     return [];
+  }
+  // If options is empty (metadata not loaded yet), preserve the original values
+  if (options.length === 0) {
+    return values;
   }
   const valid = values.filter((value) => options.includes(value));
   return valid.length > 0 ? valid : options;
@@ -81,6 +92,17 @@ const GlobalFiltersPage = () => {
   const { index, activeCustomerId, customers, updateCustomer } = useCustomerStore();
   const activeIndex = useMemo(() => index.filter((entry) => isEntryActive(entry)), [index]);
   const { groups } = useCustomerGroupStore();
+
+  // Preset management
+  const { ready: presetsReady } = useBootstrapPresets();
+  const {
+    presets,
+    activePresetId,
+    getDefaultPreset,
+    applyPresetToFilters,
+    setActivePreset
+  } = usePresetStore();
+
   const [saveStatus, setSaveStatus] = useState<'saved' | 'pending'>('saved');
   const [filterScope, setFilterScope] = useState<'global' | 'customer'>('global');
   const [pageIndex, setPageIndex] = useState(0);
@@ -107,6 +129,28 @@ const GlobalFiltersPage = () => {
       active = false;
     };
   }, []);
+
+  // Load Default preset on mount (after snapshots are loaded)
+  useEffect(() => {
+    if (!snapshotsLoaded) return;
+    if (presets.length === 0) return;
+
+    const defaultPreset = getDefaultPreset();
+    const activeId = activePresetId;
+
+    if (!activeId && defaultPreset) {
+      // No active preset, load default
+      applyPresetToFilters(defaultPreset.id);
+      setActivePreset(defaultPreset.id);
+    } else if (activeId) {
+      // Resume active preset
+      applyPresetToFilters(activeId);
+    } else if (presets.length > 0) {
+      // Fallback: load first preset
+      applyPresetToFilters(presets[0].id);
+      setActivePreset(presets[0].id);
+    }
+  }, [snapshotsLoaded, presets.length]); // Run when snapshots loaded and presets available
 
   const items = snapshotItems;
   const metadata = useMemo(() => buildFilterMetadata(items), [items]);
@@ -407,6 +451,14 @@ const GlobalFiltersPage = () => {
     setTimeout(() => setSaveStatus('saved'), 500);
   };
 
+  const handlePresetChange = (presetId: string) => {
+    // CRITICAL: Always apply to cssFilters, NEVER to customerFilters
+    // Even if in customer scope, preset modifies global filters only
+    applyPresetToFilters(presetId);
+    setActivePreset(presetId);
+    setSaveStatus('saved');
+  };
+
   const activeSources = useMemo(
     () => resolveActiveSources((currentFilters.sources ?? []) as ReleaseSource[]),
     [currentFilters.sources]
@@ -636,6 +688,235 @@ const GlobalFiltersPage = () => {
   const isGroupDisabled = hasOwnerSelection || (filterScope === 'customer');
   const isOwnerDisabled = hasGroupSelection || (filterScope === 'customer');
 
+  // Section open state management for expand/collapse all
+  type SectionKey =
+    | 'products'
+    | 'microsoftProducts'
+    | 'eosProducts'
+    | 'fabricProducts'
+    | 'm365Products'
+    | 'status'
+    | 'bcVersion'
+    | 'months'
+    | 'tags'
+    | 'categories'
+    | 'waves'
+    | 'availabilityType'
+    | 'enabledFor'
+    | 'geography'
+    | 'language'
+    | 'periods';
+
+  // Main sections (Presets, Owner CSS, Target clienti, Fonte dati, KPIs)
+  type MainSectionKey = 'presets' | 'ownerCss' | 'targetCustomers' | 'dataSources' | 'dashboardKpis';
+
+  const defaultMainSectionStates: Record<MainSectionKey, boolean> = {
+    presets: true,
+    ownerCss: true,
+    targetCustomers: true,
+    dataSources: true,
+    dashboardKpis: true
+  };
+
+  const defaultBaseOpenStates: Record<SectionKey, boolean> = {
+    products: true,
+    microsoftProducts: true,
+    eosProducts: true,
+    fabricProducts: true,
+    m365Products: true,
+    status: true,
+    bcVersion: false,
+    months: false,
+    tags: false,
+    categories: false,
+    waves: false,
+    availabilityType: false,
+    enabledFor: false,
+    geography: false,
+    language: false,
+    periods: true
+  };
+
+  const defaultAdvancedOpenStates: Record<SectionKey, boolean> = {
+    products: false,
+    microsoftProducts: false,
+    eosProducts: false,
+    fabricProducts: false,
+    m365Products: false,
+    status: false,
+    bcVersion: false,
+    months: false,
+    tags: false,
+    categories: false,
+    waves: false,
+    availabilityType: false,
+    enabledFor: false,
+    geography: false,
+    language: false,
+    periods: true
+  };
+
+  // Use persisted states for GlobalFiltersPage (independent from Dashboard)
+  const [mainSectionStates, setMainSectionStates] = usePersistedSectionStates<Record<MainSectionKey, boolean>>(
+    STORAGE_KEYS.GLOBAL_FILTERS_MAIN,
+    defaultMainSectionStates
+  );
+  const [baseSectionStates, setBaseSectionStates] = usePersistedSectionStates<Record<SectionKey, boolean>>(
+    STORAGE_KEYS.GLOBAL_FILTERS_BASE,
+    defaultBaseOpenStates
+  );
+  const [advancedSectionStates, setAdvancedSectionStates] = usePersistedSectionStates<Record<SectionKey, boolean>>(
+    STORAGE_KEYS.GLOBAL_FILTERS_ADVANCED,
+    defaultAdvancedOpenStates
+  );
+
+  const toggleMainSection = useCallback((key: MainSectionKey, isOpen: boolean) => {
+    setMainSectionStates((prev) => ({ ...prev, [key]: isOpen }));
+  }, []);
+
+  const toggleBaseSection = useCallback((key: SectionKey, isOpen: boolean) => {
+    setBaseSectionStates((prev) => ({ ...prev, [key]: isOpen }));
+  }, []);
+
+  const toggleAdvancedSection = useCallback((key: SectionKey, isOpen: boolean) => {
+    setAdvancedSectionStates((prev) => ({ ...prev, [key]: isOpen }));
+  }, []);
+
+  const expandAllBase = useCallback(() => {
+    setBaseSectionStates((prev) => {
+      const next = { ...prev };
+      for (const key of Object.keys(next) as SectionKey[]) {
+        next[key] = true;
+      }
+      return next;
+    });
+  }, []);
+
+  const collapseAllBase = useCallback(() => {
+    setBaseSectionStates((prev) => {
+      const next = { ...prev };
+      for (const key of Object.keys(next) as SectionKey[]) {
+        next[key] = false;
+      }
+      return next;
+    });
+  }, []);
+
+  const expandAllAdvanced = useCallback(() => {
+    setAdvancedSectionStates((prev) => {
+      const next = { ...prev };
+      for (const key of Object.keys(next) as SectionKey[]) {
+        next[key] = true;
+      }
+      return next;
+    });
+  }, []);
+
+  const collapseAllAdvanced = useCallback(() => {
+    setAdvancedSectionStates((prev) => {
+      const next = { ...prev };
+      for (const key of Object.keys(next) as SectionKey[]) {
+        next[key] = false;
+      }
+      return next;
+    });
+  }, []);
+
+  // Global expand/collapse all sections (main + base + advanced)
+  const expandAllSections = useCallback(() => {
+    setMainSectionStates((prev) => {
+      const next = { ...prev };
+      for (const key of Object.keys(next) as MainSectionKey[]) {
+        next[key] = true;
+      }
+      return next;
+    });
+    setBaseSectionStates((prev) => {
+      const next = { ...prev };
+      for (const key of Object.keys(next) as SectionKey[]) {
+        next[key] = true;
+      }
+      return next;
+    });
+    setAdvancedSectionStates((prev) => {
+      const next = { ...prev };
+      for (const key of Object.keys(next) as SectionKey[]) {
+        next[key] = true;
+      }
+      return next;
+    });
+  }, []);
+
+  const collapseAllSections = useCallback(() => {
+    setMainSectionStates((prev) => {
+      const next = { ...prev };
+      for (const key of Object.keys(next) as MainSectionKey[]) {
+        next[key] = false;
+      }
+      return next;
+    });
+    setBaseSectionStates((prev) => {
+      const next = { ...prev };
+      for (const key of Object.keys(next) as SectionKey[]) {
+        next[key] = false;
+      }
+      return next;
+    });
+    setAdvancedSectionStates((prev) => {
+      const next = { ...prev };
+      for (const key of Object.keys(next) as SectionKey[]) {
+        next[key] = false;
+      }
+      return next;
+    });
+  }, []);
+
+  // Check if any section is collapsed (for "Espandi tutto" visibility)
+  const hasCollapsedMain = Object.values(mainSectionStates).some((v) => !v);
+  const hasExpandedMain = Object.values(mainSectionStates).some((v) => v);
+  const hasCollapsedBase = Object.values(baseSectionStates).some((v) => !v);
+  const hasExpandedBase = Object.values(baseSectionStates).some((v) => v);
+  const hasCollapsedAdvanced = Object.values(advancedSectionStates).some((v) => !v);
+  const hasExpandedAdvanced = Object.values(advancedSectionStates).some((v) => v);
+
+  // Global check across all sections
+  const hasAnyCollapsed = hasCollapsedMain || hasCollapsedBase || hasCollapsedAdvanced;
+  const hasAnyExpanded = hasExpandedMain || hasExpandedBase || hasExpandedAdvanced;
+
+  // Expand/Collapse All button component
+  const ExpandCollapseButtons = ({
+    onExpandAll,
+    onCollapseAll,
+    hasCollapsed,
+    hasExpanded
+  }: {
+    onExpandAll: () => void;
+    onCollapseAll: () => void;
+    hasCollapsed: boolean;
+    hasExpanded: boolean;
+  }) => (
+    <div className="flex gap-2 text-[11px]">
+      {hasCollapsed && (
+        <button
+          type="button"
+          className="text-primary underline"
+          onClick={onExpandAll}
+        >
+          Espandi tutto
+        </button>
+      )}
+      {hasExpanded && (
+        <button
+          type="button"
+          className="text-primary underline"
+          onClick={onCollapseAll}
+        >
+          Comprimi tutto
+        </button>
+      )}
+    </div>
+  );
+
   const ownerBadgeLabel = isOwnerDisabled
     ? (filterScope === 'customer' ? 'Owner CSS: Disabilitato (Scope cliente)' : 'Owner CSS: disabilitato per conflitto')
     : currentFilters.targetCssOwners.length === 0
@@ -664,7 +945,31 @@ const GlobalFiltersPage = () => {
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-semibold">Filtri</h1>
+          <div className="flex items-center gap-4">
+            <h1 className="text-3xl font-semibold">Filtri</h1>
+            <div className="flex gap-2 text-xs">
+              {hasAnyCollapsed && (
+                <button
+                  type="button"
+                  className="rounded-md bg-secondary px-3 py-1.5 text-muted-foreground hover:bg-secondary/80 hover:text-foreground transition-colors"
+                  onClick={expandAllSections}
+                  title="Espandi tutte le sezioni"
+                >
+                  Espandi tutto
+                </button>
+              )}
+              {hasAnyExpanded && (
+                <button
+                  type="button"
+                  className="rounded-md bg-secondary px-3 py-1.5 text-muted-foreground hover:bg-secondary/80 hover:text-foreground transition-colors"
+                  onClick={collapseAllSections}
+                  title="Comprimi tutte le sezioni"
+                >
+                  Comprimi tutto
+                </button>
+              )}
+            </div>
+          </div>
           <p className="mt-2 text-sm text-muted-foreground">
             Questi filtri sono il default del sistema e vengono ereditati dai clienti.
           </p>
@@ -747,16 +1052,50 @@ const GlobalFiltersPage = () => {
         </div>
       )}
 
-      <section className="ul-surface p-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-semibold">Owner CSS</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Seleziona uno o piu Owner CSS per restringere l'impatto sui clienti.
-            </p>
+      {presets.length > 0 && (
+        <PresetSelector
+          currentFilters={normalizedGlobal}
+          onPresetChange={handlePresetChange}
+          disabled={!snapshotsLoaded}
+          loading={!presetsReady}
+          open={mainSectionStates.presets}
+          onToggle={(isOpen) => toggleMainSection('presets', isOpen)}
+        />
+      )}
+
+      <details
+        className="ul-surface"
+        open={mainSectionStates.ownerCss}
+        onToggle={(e) => toggleMainSection('ownerCss', (e.target as HTMLDetailsElement).open)}
+      >
+        <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-4 p-6 select-none">
+          <div className="flex items-center gap-3">
+            <svg
+              className={`h-4 w-4 text-muted-foreground transition-transform ${mainSectionStates.ownerCss ? 'rotate-90' : ''}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+            <div>
+              <h2 className="text-lg font-semibold">Owner CSS</h2>
+              {!mainSectionStates.ownerCss && (
+                <p className="text-xs text-muted-foreground">
+                  {currentFilters.targetCssOwners.length === 0
+                    ? 'Tutti gli owner'
+                    : `${currentFilters.targetCssOwners.length} selezionati`}
+                </p>
+              )}
+            </div>
           </div>
           <div className="text-xs text-muted-foreground">Scope: CSS</div>
-        </div>
+        </summary>
+        <div className="px-6 pb-6">
+          <p className="text-sm text-muted-foreground">
+            Seleziona uno o piu Owner CSS per restringere l'impatto sui clienti.
+          </p>
         <div className="mt-4">
           <FilterListSection
             title="Owner CSS"
@@ -880,18 +1219,42 @@ const GlobalFiltersPage = () => {
             </div>
           </details>
         </div>
-      </section>
+        </div>
+      </details>
 
-      <section className="ul-surface p-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-semibold">Target clienti</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Seleziona clienti o gruppi per limitare il set di destinazione.
-            </p>
+      <details
+        className="ul-surface"
+        open={mainSectionStates.targetCustomers}
+        onToggle={(e) => toggleMainSection('targetCustomers', (e.target as HTMLDetailsElement).open)}
+      >
+        <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-4 p-6 select-none">
+          <div className="flex items-center gap-3">
+            <svg
+              className={`h-4 w-4 text-muted-foreground transition-transform ${mainSectionStates.targetCustomers ? 'rotate-90' : ''}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+            <div>
+              <h2 className="text-lg font-semibold">Target clienti</h2>
+              {!mainSectionStates.targetCustomers && (
+                <p className="text-xs text-muted-foreground">
+                  {currentFilters.targetGroupIds.length === 0
+                    ? 'Tutti i gruppi'
+                    : `${currentFilters.targetGroupIds.length} gruppi selezionati`}
+                </p>
+              )}
+            </div>
           </div>
           <div className="text-xs text-muted-foreground">Scope: CSS</div>
-        </div>
+        </summary>
+        <div className="px-6 pb-6">
+          <p className="text-sm text-muted-foreground">
+            Seleziona clienti o gruppi per limitare il set di destinazione.
+          </p>
         <div className="mt-4">
           {groupOptions.length > 0 ? (
             <>
@@ -924,26 +1287,70 @@ const GlobalFiltersPage = () => {
             </div>
           )}
         </div>
-      </section>
+        </div>
+      </details>
 
-      <section className="grid gap-4 md:grid-cols-4">
-        {DASHBOARD_KPI_DEFINITIONS.map((definition) => (
-          <div key={definition.key} className="ul-surface p-5">
-            <div className="text-xs uppercase text-muted-foreground">
-              {definition.label}
+      <details
+        className="ul-surface"
+        open={mainSectionStates.dashboardKpis}
+        onToggle={(e) => toggleMainSection('dashboardKpis', (e.target as HTMLDetailsElement).open)}
+      >
+        <summary className="flex cursor-pointer items-center gap-3 p-5 select-none">
+          <svg
+            className={`h-4 w-4 text-muted-foreground transition-transform ${mainSectionStates.dashboardKpis ? 'rotate-90' : ''}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+          <h2 className="text-lg font-semibold">KPI Dashboard</h2>
+          {!mainSectionStates.dashboardKpis && (
+            <span className="text-xs text-muted-foreground">
+              Totale: {dashboardKpis.total}
+            </span>
+          )}
+        </summary>
+        <div className="grid gap-4 px-5 pb-5 md:grid-cols-4">
+          {DASHBOARD_KPI_DEFINITIONS.map((definition) => (
+            <div key={definition.key} className="ul-surface p-5">
+              <div className="text-xs uppercase text-muted-foreground">
+                {definition.label}
+              </div>
+              <div
+                className={`mt-3 text-3xl font-semibold ${DASHBOARD_KPI_VALUE_CLASSES[definition.key]}`}
+              >
+                {dashboardKpis[definition.key]}
+              </div>
             </div>
-            <div
-              className={`mt-3 text-3xl font-semibold ${DASHBOARD_KPI_VALUE_CLASSES[definition.key]}`}
-            >
-              {dashboardKpis[definition.key]}
-            </div>
-          </div>
-        ))}
-      </section>
+          ))}
+        </div>
+      </details>
 
-      <section className="ul-surface p-6">
-        <h2 className="text-lg font-semibold">Fonte dati</h2>
-        <div className="mt-3 space-y-3">
+      <details
+        className="ul-surface"
+        open={mainSectionStates.dataSources}
+        onToggle={(e) => toggleMainSection('dataSources', (e.target as HTMLDetailsElement).open)}
+      >
+        <summary className="flex cursor-pointer items-center gap-3 p-6 select-none">
+          <svg
+            className={`h-4 w-4 text-muted-foreground transition-transform ${mainSectionStates.dataSources ? 'rotate-90' : ''}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+          <h2 className="text-lg font-semibold">Fonte dati</h2>
+          {!mainSectionStates.dataSources && (
+            <span className="text-xs text-muted-foreground">
+              Attive: {activeSources.map((source) => RELEASE_SOURCE_LABELS[source]).join(', ')}
+            </span>
+          )}
+        </summary>
+        <div className="space-y-3 px-6 pb-6">
           <FilterSourceToggle
             selected={currentFilters.sources as ReleaseSource[]}
             onChange={(next) => updateFilters({ sources: next })}
@@ -952,22 +1359,31 @@ const GlobalFiltersPage = () => {
             Attive: {activeSources.map((source) => RELEASE_SOURCE_LABELS[source]).join(', ')}
           </div>
         </div>
-      </section>
+      </details>
 
       <section className="grid gap-4 lg:grid-cols-[1fr_1fr]">
         <div className="ul-surface p-6">
-          <h2 className="text-lg font-semibold">Base</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Base</h2>
+            <ExpandCollapseButtons
+              onExpandAll={expandAllBase}
+              onCollapseAll={collapseAllBase}
+              hasCollapsed={hasCollapsedBase}
+              hasExpanded={hasExpandedBase}
+            />
+          </div>
           {isFilterVisible('status') && hasOptionsForSources(metadata.statuses) && (
             <FilterListSection
               title="Stato"
               options={metadata.statuses}
               selected={currentFilters.statuses}
               onChange={(next) => updateFilters({ statuses: next })}
-              defaultOpen
               searchable={false}
               activeSources={activeSources}
               sourceTag={sourceTagFor('status', sourcesFromOptions(metadata.statuses))}
               matchAllSources={matchAllSources}
+              open={baseSectionStates.status}
+              onToggle={(isOpen) => toggleBaseSection('status', isOpen)}
             />
           )}
           {isFilterVisible('productOrApp') && hasOptionsForSources(metadata.products) && (
@@ -980,8 +1396,9 @@ const GlobalFiltersPage = () => {
                       options={microsoftProducts}
                       selected={currentFilters.products}
                       onChange={(next) => updateProductsForSource('Microsoft', next)}
-                      defaultOpen
                       activeSources={['Microsoft']}
+                      open={baseSectionStates.microsoftProducts}
+                      onToggle={(isOpen) => toggleBaseSection('microsoftProducts', isOpen)}
                     />
                   )}
                   {eosProducts.length > 0 && (
@@ -990,8 +1407,9 @@ const GlobalFiltersPage = () => {
                       options={eosProducts}
                       selected={currentFilters.products}
                       onChange={(next) => updateProductsForSource('EOS', next)}
-                      defaultOpen
                       activeSources={['EOS']}
+                      open={baseSectionStates.eosProducts}
+                      onToggle={(isOpen) => toggleBaseSection('eosProducts', isOpen)}
                     />
                   )}
                   {fabricProducts.length > 0 && (
@@ -1000,8 +1418,9 @@ const GlobalFiltersPage = () => {
                       options={fabricProducts}
                       selected={currentFilters.products}
                       onChange={(next) => updateProductsForSource('Fabric', next)}
-                      defaultOpen
                       activeSources={['Fabric']}
+                      open={baseSectionStates.fabricProducts}
+                      onToggle={(isOpen) => toggleBaseSection('fabricProducts', isOpen)}
                     />
                   )}
                   {m365RoadmapProducts.length > 0 && (
@@ -1010,8 +1429,9 @@ const GlobalFiltersPage = () => {
                       options={m365RoadmapProducts}
                       selected={currentFilters.products}
                       onChange={(next) => updateProductsForSource('MICROSOFT 365', next)}
-                      defaultOpen
                       activeSources={['MICROSOFT 365']}
+                      open={baseSectionStates.m365Products}
+                      onToggle={(isOpen) => toggleBaseSection('m365Products', isOpen)}
                     />
                   )}
                 </>
@@ -1025,10 +1445,11 @@ const GlobalFiltersPage = () => {
                   options={metadata.products}
                   selected={currentFilters.products}
                   onChange={(next) => updateFilters({ products: next })}
-                  defaultOpen
                   activeSources={activeSources}
                   sourceTag={sourceTagFor('productOrApp', sourcesFromOptions(metadata.products))}
                   matchAllSources={matchAllSources}
+                  open={baseSectionStates.products}
+                  onToggle={(isOpen) => toggleBaseSection('products', isOpen)}
                 />
               )}
             </>
@@ -1043,6 +1464,8 @@ const GlobalFiltersPage = () => {
               sourceTag={sourceTagFor('bcMinVersion', ['EOS'])}
               matchAllSources={matchAllSources}
               maxVisible={12}
+              open={baseSectionStates.bcVersion}
+              onToggle={(isOpen) => toggleBaseSection('bcVersion', isOpen)}
             />
           )}
           {isFilterVisible('months') && hasOptionsForSources(metadata.months) && (
@@ -1056,6 +1479,8 @@ const GlobalFiltersPage = () => {
               activeSources={activeSources}
               sourceTag={sourceTagFor('months', sourcesFromOptions(metadata.months))}
               matchAllSources={matchAllSources}
+              open={baseSectionStates.months}
+              onToggle={(isOpen) => toggleBaseSection('months', isOpen)}
             />
           )}
           {isFilterVisible('query') && (
@@ -1072,7 +1497,15 @@ const GlobalFiltersPage = () => {
         </div>
 
         <div className="ul-surface p-6">
-          <h2 className="text-lg font-semibold">Avanzati</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Avanzati</h2>
+            <ExpandCollapseButtons
+              onExpandAll={expandAllAdvanced}
+              onCollapseAll={collapseAllAdvanced}
+              hasCollapsed={hasCollapsedAdvanced}
+              hasExpanded={hasExpandedAdvanced}
+            />
+          </div>
           {isFilterVisible('categories') && hasOptionsForSources(metadata.categories) && (
             <FilterListSection
               title="Categorie"
@@ -1082,6 +1515,8 @@ const GlobalFiltersPage = () => {
               activeSources={activeSources}
               sourceTag={sourceTagFor('categories', sourcesFromOptions(metadata.categories))}
               matchAllSources={matchAllSources}
+              open={advancedSectionStates.categories}
+              onToggle={(isOpen) => toggleAdvancedSection('categories', isOpen)}
             />
           )}
           {isFilterVisible('tags') && hasOptionsForSources(metadata.tags) && (
@@ -1093,6 +1528,8 @@ const GlobalFiltersPage = () => {
               activeSources={activeSources}
               sourceTag={sourceTagFor('tags', sourcesFromOptions(metadata.tags))}
               matchAllSources={matchAllSources}
+              open={advancedSectionStates.tags}
+              onToggle={(isOpen) => toggleAdvancedSection('tags', isOpen)}
             />
           )}
           {isFilterVisible('wave') && hasOptionsForSources(metadata.waves) && (
@@ -1104,6 +1541,8 @@ const GlobalFiltersPage = () => {
               activeSources={activeSources}
               sourceTag={sourceTagFor('wave', sourcesFromOptions(metadata.waves))}
               matchAllSources={matchAllSources}
+              open={advancedSectionStates.waves}
+              onToggle={(isOpen) => toggleAdvancedSection('waves', isOpen)}
             />
           )}
           {isFilterVisible('availabilityType') &&
@@ -1119,6 +1558,8 @@ const GlobalFiltersPage = () => {
                   sourcesFromOptions(metadata.availabilityTypes)
                 )}
                 matchAllSources={matchAllSources}
+                open={advancedSectionStates.availabilityType}
+                onToggle={(isOpen) => toggleAdvancedSection('availabilityType', isOpen)}
               />
             )}
           {isFilterVisible('enabledFor') && hasOptionsForSources(metadata.enabledFor) && (
@@ -1130,6 +1571,8 @@ const GlobalFiltersPage = () => {
               activeSources={activeSources}
               sourceTag={sourceTagFor('enabledFor', sourcesFromOptions(metadata.enabledFor))}
               matchAllSources={matchAllSources}
+              open={advancedSectionStates.enabledFor}
+              onToggle={(isOpen) => toggleAdvancedSection('enabledFor', isOpen)}
             />
           )}
           {isFilterVisible('geography') && hasOptionsForSources(metadata.geography) && (
@@ -1141,6 +1584,8 @@ const GlobalFiltersPage = () => {
               activeSources={activeSources}
               sourceTag={sourceTagFor('geography', sourcesFromOptions(metadata.geography))}
               matchAllSources={matchAllSources}
+              open={advancedSectionStates.geography}
+              onToggle={(isOpen) => toggleAdvancedSection('geography', isOpen)}
             />
           )}
           {isFilterVisible('language') && hasOptionsForSources(metadata.language) && (
@@ -1152,6 +1597,8 @@ const GlobalFiltersPage = () => {
               activeSources={activeSources}
               sourceTag={sourceTagFor('language', sourcesFromOptions(metadata.language))}
               matchAllSources={matchAllSources}
+              open={advancedSectionStates.language}
+              onToggle={(isOpen) => toggleAdvancedSection('language', isOpen)}
             />
           )}
 
@@ -1159,7 +1606,11 @@ const GlobalFiltersPage = () => {
             isFilterVisible('periodChangedDays') ||
             isFilterVisible('releaseInDays') ||
             isFilterVisible('releaseDateRange')) && (
-              <details className="mt-4" open>
+              <details
+                className="mt-4"
+                open={advancedSectionStates.periods}
+                onToggle={(e) => toggleAdvancedSection('periods', (e.target as HTMLDetailsElement).open)}
+              >
                 <summary className="cursor-pointer text-xs uppercase text-muted-foreground">
                   Periodi
                   {sourceTagFor('periodNewDays') && (

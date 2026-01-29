@@ -1,7 +1,9 @@
 import { useEffect, useRef, useMemo } from 'react';
-import type { ChatMessage as ChatMessageData } from '../../store/useChatStore';
+import type { ChatMessage as ChatMessageData, ChatTab } from '../../store/useChatStore';
 import ChatMessage from './ChatMessage';
-import ChatInput from './ChatInput';
+import ChatInput, { type ChatInputHandle } from './ChatInput';
+import ChatHistoryPanel from './ChatHistoryPanel';
+import ChatHelpPanel from './ChatHelpPanel';
 
 type QuickReply = {
   label: string;
@@ -26,23 +28,47 @@ const truncate = (text: string, maxLen: number): string => {
 type ChatWindowProps = {
   messages: ChatMessageData[];
   queryHistory: string[];
+  activeTab: ChatTab;
   onClose: () => void;
   onSend: (text: string) => void;
   onApplyFilters: (filterPatch: Partial<Record<string, unknown>>) => void;
+  onSetActiveTab: (tab: ChatTab) => void;
+  onDeleteFromHistory: (query: string) => void;
+  onClearHistory: () => void;
+};
+
+const TAB_LABELS: Record<ChatTab, { icon: string; label: string }> = {
+  chat: { icon: '💬', label: 'Chat' },
+  history: { icon: '📜', label: 'Cronologia' },
+  help: { icon: '❓', label: 'Help' }
 };
 
 const ChatWindow = ({
   messages,
   queryHistory,
+  activeTab,
   onClose,
   onSend,
-  onApplyFilters
+  onApplyFilters,
+  onSetActiveTab,
+  onDeleteFromHistory,
+  onClearHistory
 }: ChatWindowProps) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<ChatInputHandle>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  const handleSelectQuery = (query: string) => {
+    inputRef.current?.setValue(query);
+    onSetActiveTab('chat');
+    // Focus the input after a small delay to ensure the tab has switched
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 50);
+  };
 
   const handleApplyFilters = (message: ChatMessageData) => {
     if (message.filterPatch) {
@@ -105,41 +131,77 @@ const ChatWindow = ({
         </button>
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 space-y-3 overflow-y-auto p-4">
-        {messages.map((message) => (
-          <ChatMessage
-            key={message.id}
-            message={message}
-            onApplyFilters={() => handleApplyFilters(message)}
-          />
+      {/* Tab Navigation */}
+      <div className="flex border-b border-border">
+        {(['chat', 'history', 'help'] as const).map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => onSetActiveTab(tab)}
+            className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
+              activeTab === tab
+                ? 'border-b-2 border-primary text-primary'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {TAB_LABELS[tab].icon} {TAB_LABELS[tab].label}
+          </button>
         ))}
-        <div ref={messagesEndRef} />
       </div>
 
-      {/* Quick Replies */}
-      {messages.length <= 1 && (
-        <div className="flex flex-wrap gap-2 border-t border-border px-3 py-2">
-          {queryHistory.length > 0 && (
-            <span className="w-full text-[10px] text-muted-foreground mb-1">
-              Recenti:
-            </span>
+      {/* Tab Content */}
+      {activeTab === 'chat' && (
+        <>
+          {/* Messages */}
+          <div className="flex-1 space-y-3 overflow-y-auto p-4">
+            {messages.map((message) => (
+              <ChatMessage
+                key={message.id}
+                message={message}
+                onApplyFilters={() => handleApplyFilters(message)}
+              />
+            ))}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Quick Replies */}
+          {messages.length <= 1 && (
+            <div className="flex flex-wrap gap-2 border-t border-border px-3 py-2">
+              {queryHistory.length > 0 && (
+                <span className="w-full text-[10px] text-muted-foreground mb-1">
+                  Recenti:
+                </span>
+              )}
+              {quickReplies.map((reply, index) => (
+                <button
+                  key={`${reply.text}-${index}`}
+                  type="button"
+                  onClick={() => onSend(reply.text)}
+                  className="rounded-full border border-border bg-muted/50 px-3 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+                >
+                  {reply.label}
+                </button>
+              ))}
+            </div>
           )}
-          {quickReplies.map((reply, index) => (
-            <button
-              key={`${reply.text}-${index}`}
-              type="button"
-              onClick={() => onSend(reply.text)}
-              className="rounded-full border border-border bg-muted/50 px-3 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted"
-            >
-              {reply.label}
-            </button>
-          ))}
-        </div>
+
+          {/* Input */}
+          <ChatInput ref={inputRef} onSend={onSend} />
+        </>
       )}
 
-      {/* Input */}
-      <ChatInput onSend={onSend} />
+      {activeTab === 'history' && (
+        <ChatHistoryPanel
+          history={queryHistory}
+          onSelectQuery={handleSelectQuery}
+          onDeleteQuery={onDeleteFromHistory}
+          onClearAll={onClearHistory}
+        />
+      )}
+
+      {activeTab === 'help' && (
+        <ChatHelpPanel onSelectExample={handleSelectQuery} />
+      )}
     </div>
   );
 };

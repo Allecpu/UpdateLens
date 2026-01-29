@@ -63,6 +63,7 @@
 }
 
 .dark {
+  color-scheme: dark;
   --background: oklch(0.2223 0.0060 271.1393);
   --foreground: oklch(0.9551 0 0);
   --card: oklch(0.2568 0.0076 274.6528);
@@ -307,4 +308,54 @@ input[type='checkbox'].ul-checkbox:checked::after {
 input[type='checkbox'].ul-checkbox:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px color-mix(in oklch, var(--primary) 35%, transparent);
+}
+
+/* Dark mode styling for native select elements */
+select {
+  background-color: var(--card);
+  color: var(--foreground);
+}
+
+select option {
+  background-color: var(--card);
+  color: var(--foreground);
+}
+
+.dark select,
+.dark select option {
+  background-color: var(--card);
+  color: var(--foreground);
+}
+
+/* Collapsible section styling */
+details.ul-surface > summary {
+  list-style: none;
+}
+
+details.ul-surface > summary::-webkit-details-marker {
+  display: none;
+}
+
+details.ul-surface > summary::marker {
+  display: none;
+}
+
+details.ul-surface > summary:hover {
+  background-color: color-mix(in oklch, var(--muted) 50%, transparent);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+details.ul-surface:not([open]) > summary:hover {
+  border-radius: var(--radius-lg);
+}
+
+details.ul-surface > summary:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--primary) 40%, transparent);
+  border-radius: var(--radius-lg);
+}
+
+/* Smooth chevron rotation */
+details.ul-surface svg {
+  transition: transform 200ms ease;
 }

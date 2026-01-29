@@ -18,6 +18,10 @@ type Props = {
   disabled?: boolean;
   showBulkActions?: boolean;
   scrollable?: boolean;
+  /** Controlled open state (overrides defaultOpen when provided) */
+  open?: boolean;
+  /** Callback when section is toggled (enables controlled mode) */
+  onToggle?: (isOpen: boolean) => void;
 };
 
 const FilterListSection = ({
@@ -34,8 +38,13 @@ const FilterListSection = ({
   compact = true,
   disabled = false,
   showBulkActions = true,
-  scrollable = true
+  scrollable = true,
+  open,
+  onToggle
 }: Props) => {
+  // Controlled mode: use open prop; Uncontrolled mode: use defaultOpen
+  const isControlled = open !== undefined;
+  const effectiveOpen = isControlled ? open : defaultOpen;
   const [query, setQuery] = useState('');
   const [showAll, setShowAll] = useState(false);
   const deferredQuery = useDeferredValue(query);
@@ -89,10 +98,17 @@ const FilterListSection = ({
     ? 'cursor-not-allowed opacity-60'
     : 'underline';
 
+  const handleToggle = (event: React.SyntheticEvent<HTMLDetailsElement>) => {
+    if (onToggle) {
+      onToggle(event.currentTarget.open);
+    }
+  };
+
   return (
     <details
       className={`mt-4 ${disabled ? 'opacity-60' : ''}`}
-      open={defaultOpen}
+      open={effectiveOpen}
+      onToggle={handleToggle}
       aria-disabled={disabled}
     >
       <summary

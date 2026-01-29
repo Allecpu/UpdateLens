@@ -61,13 +61,30 @@ export const filterReleaseItems = (
   );
   // Track which sources have at least one selected product (normalized labels)
   const selectedSources = new Set<ReleaseSource>();
+  let matchedProductCount = 0;
   if (filters.products.length > 0) {
     items.forEach((item) => {
       const normalizedName = normalizeProductLabel(item.productName);
       if (filters.products.includes(normalizedName)) {
         selectedSources.add(item.source);
+        matchedProductCount++;
       }
     });
+
+    // Debug: If no products matched, log samples to find the mismatch
+    if (matchedProductCount === 0 && items.length > 0) {
+      const sampleFilterProducts = filters.products.slice(0, 5);
+      const sampleItemProducts = items.slice(0, 5).map(item => ({
+        raw: item.productName,
+        normalized: normalizeProductLabel(item.productName)
+      }));
+      console.warn('[FilterService] PRODUCT_MISMATCH - No filter products matched any items:', {
+        filterProductsCount: filters.products.length,
+        sampleFilterProducts,
+        itemsCount: items.length,
+        sampleItemProducts
+      });
+    }
   }
 
   // DEBUG: Track which filters are eliminating items
@@ -100,20 +117,44 @@ export const filterReleaseItems = (
   debugCounts.afterStatuses = remaining.length;
 
   // 3. Products filter (uses normalized product names for comparison)
+  // Debug: Track why items are being filtered out
+  const productFilterDebug = {
+    passedNotSupported: 0,
+    failedEmptyProducts: 0,
+    failedSourceNotSelected: 0,
+    failedProductNotInList: 0,
+    passed: 0
+  };
+
   remaining = remaining.filter(item => {
     if (!isFilterSupported(item.source, 'productOrApp')) {
+      productFilterDebug.passedNotSupported++;
       return true;
     }
     if (filters.products.length === 0) {
+      productFilterDebug.failedEmptyProducts++;
       return false;
     }
     if (!selectedSources.has(item.source)) {
+      productFilterDebug.failedSourceNotSelected++;
       return false;
     }
     const normalizedItemProduct = normalizeProductLabel(item.productName);
-    return filters.products.includes(normalizedItemProduct);
+    if (filters.products.includes(normalizedItemProduct)) {
+      productFilterDebug.passed++;
+      return true;
+    }
+    productFilterDebug.failedProductNotInList++;
+    return false;
   });
   debugCounts.afterProducts = remaining.length;
+
+  // Log product filter breakdown when results are 0
+  if (remaining.length === 0 && items.length > 0) {
+    console.warn('[FilterService] PRODUCT_FILTER_BREAKDOWN:', productFilterDebug);
+    console.warn('[FilterService] selectedSources:', Array.from(selectedSources));
+    console.warn('[FilterService] matchedProductCount:', matchedProductCount);
+  }
 
   // 4. Horizon filter
   remaining = remaining.filter(item => {

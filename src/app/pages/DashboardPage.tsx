@@ -6,6 +6,7 @@ import type { ReleaseItem, ReleaseSource, ReleaseStatus } from '../../models/Rel
 import { useCustomerStore } from '../store/useCustomerStore';
 import { useCustomerGroupStore } from '../store/useCustomerGroupStore';
 import { useFilterStore, type FilterState } from '../store/useFilterStore';
+import { usePresetStore } from '../store/usePresetStore';
 import { computeDashboardKpis } from '../../services/KpiService';
 import {
   buildBcVersionOptions,
@@ -47,9 +48,36 @@ const DashboardPage = () => {
     chatFilters,
     clearChatFilters
   } = useFilterStore();
+
+  // Preset management (session-only in Dashboard)
+  const { presets, getPreset, applyPresetToFilters, activePresetId, getDefaultPreset } = usePresetStore();
+  const [sessionPresetId, setSessionPresetId] = useState<string | null>(null);
+
   const [tempFilters, setTempFilters] = useState<Partial<FilterState>>({});
   const activeCustomer = activeCustomerId ? customers[activeCustomerId] : null;
   const debugLoggedRef = useRef(false);
+
+  // Sync session preset with active preset from store on mount
+  useEffect(() => {
+    // Only when no customer is selected (global scope)
+    if (activeCustomerId) {
+      return;
+    }
+
+    // If there's an active preset in the store (from GlobalFiltersPage), use it
+    if (activePresetId) {
+      console.log('[Dashboard] Syncing with active preset from store:', activePresetId);
+      setSessionPresetId(activePresetId);
+      return;
+    }
+
+    // Otherwise, use the Default preset if available
+    const defaultPreset = getDefaultPreset();
+    if (defaultPreset) {
+      console.log('[Dashboard] No active preset, using Default preset:', defaultPreset.id);
+      setSessionPresetId(defaultPreset.id);
+    }
+  }, []); // Run once on mount
 
   // =====================================================================
   // DRILL-DOWN STATE (UI only, no persistence)
@@ -188,7 +216,7 @@ const DashboardPage = () => {
     if (!filtersReady) {
       return null;
     }
-    return selectEffectiveFilters(
+    const result = selectEffectiveFilters(
       activeCustomerId,
       cssFilters,
       customerFilters,
@@ -196,6 +224,12 @@ const DashboardPage = () => {
       defaultFilters,
       normContext
     );
+    console.log('[Dashboard] persistentBaseFilters recomputed:', {
+      products: result?.products.length,
+      sources: result?.sources.length,
+      statuses: result?.statuses.length
+    });
+    return result;
   }, [
     filtersReady,
     activeCustomerId,
@@ -212,7 +246,18 @@ const DashboardPage = () => {
     clearChatFilters();
     setDrillSource(null);
     setDrillProduct(null);
-  }, [activeCustomerId, clearChatFilters]);
+
+    // When switching back to global scope, resync with active preset
+    if (!activeCustomerId) {
+      const currentActivePreset = activePresetId || getDefaultPreset()?.id;
+      if (currentActivePreset) {
+        setSessionPresetId(currentActivePreset);
+      }
+    } else {
+      // Clear session preset when customer is selected (preset selector will be hidden anyway)
+      setSessionPresetId(null);
+    }
+  }, [activeCustomerId, clearChatFilters, activePresetId, getDefaultPreset]);
 
   // =====================================================================
   // Dashboard filters (REGOLA 1, 2, 3, 5):
@@ -247,6 +292,14 @@ const DashboardPage = () => {
     setTempFilters((prev) => ({ ...prev, ...nextFilters }));
   };
 
+  // Preset selection handler (Dashboard only, session-only)
+  const handlePresetSelect = (presetId: string) => {
+    console.log('[Dashboard] handlePresetSelect called with presetId:', presetId);
+    setSessionPresetId(presetId);
+    applyPresetToFilters(presetId);
+    setTempFilters({}); // Clear temp filters to show pure preset effect
+    console.log('[Dashboard] handlePresetSelect completed');
+  };
 
   const filterScope = activeCustomerId ? 'customer' : 'global';
   const hasOwnerSelection = (dashboardFilters?.targetCssOwners.length ?? 0) > 0;
@@ -304,10 +357,11 @@ const DashboardPage = () => {
       historyMonths: dashboardFilters.historyMonths
     });
   }, [dashboardFilters, items]);
-  const dashboardKpis = useMemo(
-    () => computeDashboardKpis(filteredItems),
-    [filteredItems]
-  );
+  const dashboardKpis = useMemo(() => {
+    const kpis = computeDashboardKpis(filteredItems);
+    console.log('[Dashboard] dashboardKpis recomputed:', kpis);
+    return kpis;
+  }, [filteredItems]);
 
   // =====================================================================
   // MANDATORY DEBUG LOG - one-shot per customer change (per specification)
@@ -357,6 +411,17 @@ const DashboardPage = () => {
   useEffect(() => {
     debugLoggedRef.current = false;
   }, [activeCustomerId]);
+
+  // Track cssFilters changes for preset debugging
+  useEffect(() => {
+    if (cssFilters) {
+      console.log('[Dashboard] cssFilters changed:', {
+        products: cssFilters.products.length,
+        sources: cssFilters.sources.length,
+        statuses: cssFilters.statuses.length
+      });
+    }
+  }, [cssFilters]);
 
   const sortedItems = useMemo(() => {
     const order = dashboardFilters?.sortOrder ?? 'newest';
@@ -588,6 +653,29 @@ const DashboardPage = () => {
             ? `Scope: Cliente: ${activeCustomer?.name ?? 'Cliente'}`
             : 'Scope: CSS'}
         </div>
+
+        {!activeCustomerId && presets.length > 0 && (
+          <div className="mt-4">
+            <div className="mb-2 text-xs uppercase text-muted-foreground">Preset</div>
+            <select
+              value={sessionPresetId || ''}
+              onChange={(e) => e.target.value && handlePresetSelect(e.target.value)}
+              className="w-full rounded-md border-border bg-sidebar text-sidebar-foreground px-2 py-1.5 text-xs focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            >
+              <option value="">Seleziona preset...</option>
+              {presets.map((preset) => (
+                <option key={preset.id} value={preset.id}>
+                  {preset.name} {preset.isDefault ? '⭐' : ''}
+                </option>
+              ))}
+            </select>
+            {sessionPresetId && (
+              <div className="mt-1 text-[10px] text-muted-foreground">
+                Preset attivo: {getPreset(sessionPresetId)?.name}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="mt-4">
           {dashboardFilters && (

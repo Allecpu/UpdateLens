@@ -1,9 +1,13 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import type React from 'react';
 import type { ReleaseSource } from '../../models/ReleaseItem';
 import type { FilterState } from '../store/useFilterStore';
 import type { FilterMetadata, FilterOption } from '../../services/FilterMetadata';
 import type { FilterKey } from '../../services/FilterDefinitions';
+import {
+  usePersistedSectionStates,
+  STORAGE_KEYS
+} from '../../hooks/usePersistedSectionStates';
 import {
   ALL_RELEASE_SOURCES,
   RELEASE_SOURCE_LABELS,
@@ -182,6 +186,167 @@ const FiltersPanel = ({
 
   const isSidebar = variant === 'sidebar';
 
+  // Section open state management for expand/collapse all
+  type SectionKey =
+    | 'products'
+    | 'microsoftProducts'
+    | 'eosProducts'
+    | 'fabricProducts'
+    | 'm365Products'
+    | 'status'
+    | 'bcVersion'
+    | 'months'
+    | 'tags'
+    | 'categories'
+    | 'waves'
+    | 'availabilityType'
+    | 'enabledFor'
+    | 'geography'
+    | 'language'
+    | 'periods'
+    | 'avanzati';
+
+  // Default open states based on variant
+  const defaultSidebarBaseStates: Record<SectionKey, boolean> = {
+    products: false,
+    microsoftProducts: false,
+    eosProducts: false,
+    fabricProducts: false,
+    m365Products: false,
+    status: true,
+    bcVersion: false,
+    months: false,
+    tags: false,
+    categories: false,
+    waves: false,
+    availabilityType: false,
+    enabledFor: false,
+    geography: false,
+    language: false,
+    periods: false,
+    avanzati: false
+  };
+
+  const defaultSidebarAdvancedStates: Record<SectionKey, boolean> = {
+    products: false,
+    microsoftProducts: false,
+    eosProducts: false,
+    fabricProducts: false,
+    m365Products: false,
+    status: false,
+    bcVersion: false,
+    months: false,
+    tags: false,
+    categories: false,
+    waves: false,
+    availabilityType: false,
+    enabledFor: false,
+    geography: false,
+    language: false,
+    periods: false,
+    avanzati: false
+  };
+
+  // Use persisted states for Dashboard (sidebar variant)
+  // Note: FiltersPanel with variant="full" is not currently used standalone,
+  // but we provide separate storage keys for future flexibility
+  const [baseSectionStates, setBaseSectionStates] = usePersistedSectionStates<Record<SectionKey, boolean>>(
+    isSidebar ? STORAGE_KEYS.DASHBOARD_BASE : STORAGE_KEYS.GLOBAL_FILTERS_BASE,
+    defaultSidebarBaseStates
+  );
+  const [advancedSectionStates, setAdvancedSectionStates] = usePersistedSectionStates<Record<SectionKey, boolean>>(
+    isSidebar ? STORAGE_KEYS.DASHBOARD_ADVANCED : STORAGE_KEYS.GLOBAL_FILTERS_ADVANCED,
+    defaultSidebarAdvancedStates
+  );
+
+  const toggleBaseSection = useCallback((key: SectionKey, isOpen: boolean) => {
+    setBaseSectionStates((prev) => ({ ...prev, [key]: isOpen }));
+  }, []);
+
+  const toggleAdvancedSection = useCallback((key: SectionKey, isOpen: boolean) => {
+    setAdvancedSectionStates((prev) => ({ ...prev, [key]: isOpen }));
+  }, []);
+
+  const expandAllBase = useCallback(() => {
+    setBaseSectionStates((prev) => {
+      const next = { ...prev };
+      for (const key of Object.keys(next) as SectionKey[]) {
+        next[key] = true;
+      }
+      return next;
+    });
+  }, []);
+
+  const collapseAllBase = useCallback(() => {
+    setBaseSectionStates((prev) => {
+      const next = { ...prev };
+      for (const key of Object.keys(next) as SectionKey[]) {
+        next[key] = false;
+      }
+      return next;
+    });
+  }, []);
+
+  const expandAllAdvanced = useCallback(() => {
+    setAdvancedSectionStates((prev) => {
+      const next = { ...prev };
+      for (const key of Object.keys(next) as SectionKey[]) {
+        next[key] = true;
+      }
+      return next;
+    });
+  }, []);
+
+  const collapseAllAdvanced = useCallback(() => {
+    setAdvancedSectionStates((prev) => {
+      const next = { ...prev };
+      for (const key of Object.keys(next) as SectionKey[]) {
+        next[key] = false;
+      }
+      return next;
+    });
+  }, []);
+
+  // Check if any section is collapsed (for "Espandi tutto" visibility)
+  const hasCollapsedBase = Object.values(baseSectionStates).some((v) => !v);
+  const hasExpandedBase = Object.values(baseSectionStates).some((v) => v);
+  const hasCollapsedAdvanced = Object.values(advancedSectionStates).some((v) => !v);
+  const hasExpandedAdvanced = Object.values(advancedSectionStates).some((v) => v);
+
+  // Expand/Collapse All button component
+  const ExpandCollapseButtons = ({
+    onExpandAll,
+    onCollapseAll,
+    hasCollapsed,
+    hasExpanded
+  }: {
+    onExpandAll: () => void;
+    onCollapseAll: () => void;
+    hasCollapsed: boolean;
+    hasExpanded: boolean;
+  }) => (
+    <div className="flex gap-2 text-[11px]">
+      {hasCollapsed && (
+        <button
+          type="button"
+          className="text-primary underline"
+          onClick={onExpandAll}
+        >
+          Espandi tutto
+        </button>
+      )}
+      {hasExpanded && (
+        <button
+          type="button"
+          className="text-primary underline"
+          onClick={onCollapseAll}
+        >
+          Comprimi tutto
+        </button>
+      )}
+    </div>
+  );
+
   // Sidebar layout (compact)
   if (isSidebar) {
     return (
@@ -193,6 +358,17 @@ const FiltersPanel = ({
         />
         <div className="text-xs text-muted-foreground">
           Attive: {activeSources.map((source) => RELEASE_SOURCE_LABELS[source]).join(', ')}
+        </div>
+
+        {/* Base Section Header with Expand/Collapse */}
+        <div className="flex items-center justify-between border-b border-border pb-2">
+          <span className="text-xs font-semibold uppercase text-muted-foreground">Base</span>
+          <ExpandCollapseButtons
+            onExpandAll={expandAllBase}
+            onCollapseAll={collapseAllBase}
+            hasCollapsed={hasCollapsedBase}
+            hasExpanded={hasExpandedBase}
+          />
         </div>
 
         {/* Search */}
@@ -222,6 +398,8 @@ const FiltersPanel = ({
                     selected={filters.products ?? []}
                     onChange={(next) => updateProductsForSource('Microsoft', next)}
                     activeSources={['Microsoft']}
+                    open={baseSectionStates.microsoftProducts}
+                    onToggle={(isOpen) => toggleBaseSection('microsoftProducts', isOpen)}
                   />
                 )}
                 {eosProducts.length > 0 && (
@@ -231,6 +409,8 @@ const FiltersPanel = ({
                     selected={filters.products ?? []}
                     onChange={(next) => updateProductsForSource('EOS', next)}
                     activeSources={['EOS']}
+                    open={baseSectionStates.eosProducts}
+                    onToggle={(isOpen) => toggleBaseSection('eosProducts', isOpen)}
                   />
                 )}
                 {fabricProducts.length > 0 && (
@@ -240,6 +420,8 @@ const FiltersPanel = ({
                     selected={filters.products ?? []}
                     onChange={(next) => updateProductsForSource('Fabric', next)}
                     activeSources={['Fabric']}
+                    open={baseSectionStates.fabricProducts}
+                    onToggle={(isOpen) => toggleBaseSection('fabricProducts', isOpen)}
                   />
                 )}
                 {m365RoadmapProducts.length > 0 && (
@@ -249,6 +431,8 @@ const FiltersPanel = ({
                     selected={filters.products ?? []}
                     onChange={(next) => updateProductsForSource('MICROSOFT 365', next)}
                     activeSources={['MICROSOFT 365']}
+                    open={baseSectionStates.m365Products}
+                    onToggle={(isOpen) => toggleBaseSection('m365Products', isOpen)}
                   />
                 )}
               </>
@@ -265,6 +449,8 @@ const FiltersPanel = ({
                 activeSources={activeSources}
                 sourceTag={sourceTagFor('productOrApp', sourcesFromOptions(metadata.products))}
                 matchAllSources={matchAllSources}
+                open={baseSectionStates.products}
+                onToggle={(isOpen) => toggleBaseSection('products', isOpen)}
               />
             )}
           </>
@@ -277,11 +463,12 @@ const FiltersPanel = ({
             options={metadata.statuses}
             selected={filters.statuses ?? []}
             onChange={(next) => onChange({ statuses: next })}
-            defaultOpen
             searchable={false}
             activeSources={activeSources}
             sourceTag={sourceTagFor('status', sourcesFromOptions(metadata.statuses))}
             matchAllSources={matchAllSources}
+            open={baseSectionStates.status}
+            onToggle={(isOpen) => toggleBaseSection('status', isOpen)}
           />
         )}
 
@@ -296,6 +483,8 @@ const FiltersPanel = ({
             sourceTag={sourceTagFor('bcMinVersion', ['EOS'])}
             matchAllSources={matchAllSources}
             maxVisible={12}
+            open={baseSectionStates.bcVersion}
+            onToggle={(isOpen) => toggleBaseSection('bcVersion', isOpen)}
           />
         )}
 
@@ -311,6 +500,8 @@ const FiltersPanel = ({
             activeSources={activeSources}
             sourceTag={sourceTagFor('months', sourcesFromOptions(metadata.months))}
             matchAllSources={matchAllSources}
+            open={baseSectionStates.months}
+            onToggle={(isOpen) => toggleBaseSection('months', isOpen)}
           />
         )}
 
@@ -324,15 +515,30 @@ const FiltersPanel = ({
             activeSources={activeSources}
             sourceTag={sourceTagFor('tags', sourcesFromOptions(metadata.tags))}
             matchAllSources={matchAllSources}
+            open={baseSectionStates.tags}
+            onToggle={(isOpen) => toggleBaseSection('tags', isOpen)}
           />
         )}
 
         {/* Avanzati Section (collapsible) */}
-        <details>
+        <details
+          open={advancedSectionStates.avanzati}
+          onToggle={(e) => toggleAdvancedSection('avanzati', (e.target as HTMLDetailsElement).open)}
+        >
           <summary className="cursor-pointer text-xs font-semibold uppercase text-muted-foreground">
             Avanzati
           </summary>
           <div className="mt-2 space-y-3">
+            {/* Expand/Collapse All for Advanced sections */}
+            <div className="flex justify-end">
+              <ExpandCollapseButtons
+                onExpandAll={expandAllAdvanced}
+                onCollapseAll={collapseAllAdvanced}
+                hasCollapsed={hasCollapsedAdvanced}
+                hasExpanded={hasExpandedAdvanced}
+              />
+            </div>
+
             {/* Categories */}
             {isFilterVisible('categories') && hasOptionsForSources(metadata.categories) && (
               <FilterListSection
@@ -343,6 +549,8 @@ const FiltersPanel = ({
                 activeSources={activeSources}
                 sourceTag={sourceTagFor('categories', sourcesFromOptions(metadata.categories))}
                 matchAllSources={matchAllSources}
+                open={advancedSectionStates.categories}
+                onToggle={(isOpen) => toggleAdvancedSection('categories', isOpen)}
               />
             )}
 
@@ -356,6 +564,8 @@ const FiltersPanel = ({
                 activeSources={activeSources}
                 sourceTag={sourceTagFor('wave', sourcesFromOptions(metadata.waves))}
                 matchAllSources={matchAllSources}
+                open={advancedSectionStates.waves}
+                onToggle={(isOpen) => toggleAdvancedSection('waves', isOpen)}
               />
             )}
 
@@ -373,6 +583,8 @@ const FiltersPanel = ({
                     sourcesFromOptions(metadata.availabilityTypes)
                   )}
                   matchAllSources={matchAllSources}
+                  open={advancedSectionStates.availabilityType}
+                  onToggle={(isOpen) => toggleAdvancedSection('availabilityType', isOpen)}
                 />
               )}
 
@@ -386,6 +598,8 @@ const FiltersPanel = ({
                 activeSources={activeSources}
                 sourceTag={sourceTagFor('enabledFor', sourcesFromOptions(metadata.enabledFor))}
                 matchAllSources={matchAllSources}
+                open={advancedSectionStates.enabledFor}
+                onToggle={(isOpen) => toggleAdvancedSection('enabledFor', isOpen)}
               />
             )}
 
@@ -399,6 +613,8 @@ const FiltersPanel = ({
                 activeSources={activeSources}
                 sourceTag={sourceTagFor('geography', sourcesFromOptions(metadata.geography))}
                 matchAllSources={matchAllSources}
+                open={advancedSectionStates.geography}
+                onToggle={(isOpen) => toggleAdvancedSection('geography', isOpen)}
               />
             )}
 
@@ -412,6 +628,8 @@ const FiltersPanel = ({
                 activeSources={activeSources}
                 sourceTag={sourceTagFor('language', sourcesFromOptions(metadata.language))}
                 matchAllSources={matchAllSources}
+                open={advancedSectionStates.language}
+                onToggle={(isOpen) => toggleAdvancedSection('language', isOpen)}
               />
             )}
           </div>
@@ -422,7 +640,10 @@ const FiltersPanel = ({
           isFilterVisible('periodChangedDays') ||
           isFilterVisible('releaseInDays') ||
           isFilterVisible('releaseDateRange')) && (
-          <details>
+          <details
+            open={advancedSectionStates.periods}
+            onToggle={(e) => toggleAdvancedSection('periods', (e.target as HTMLDetailsElement).open)}
+          >
             <summary className="cursor-pointer text-xs uppercase text-muted-foreground">
               Periodi
               {sourceTagFor('periodNewDays') && (
@@ -716,18 +937,27 @@ const FiltersPanel = ({
       <section className="grid gap-4 lg:grid-cols-[1fr_1fr]">
         {/* Base Column */}
         <div className="ul-surface p-6">
-          <h2 className="text-lg font-semibold">Base</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Base</h2>
+            <ExpandCollapseButtons
+              onExpandAll={expandAllBase}
+              onCollapseAll={collapseAllBase}
+              hasCollapsed={hasCollapsedBase}
+              hasExpanded={hasExpandedBase}
+            />
+          </div>
           {isFilterVisible('status') && hasOptionsForSources(metadata.statuses) && (
             <FilterListSection
               title="Stato"
               options={metadata.statuses}
               selected={filters.statuses ?? []}
               onChange={(next) => onChange({ statuses: next })}
-              defaultOpen
               searchable={false}
               activeSources={activeSources}
               sourceTag={sourceTagFor('status', sourcesFromOptions(metadata.statuses))}
               matchAllSources={matchAllSources}
+              open={baseSectionStates.status}
+              onToggle={(isOpen) => toggleBaseSection('status', isOpen)}
             />
           )}
           {isFilterVisible('productOrApp') && hasOptionsForSources(metadata.products) && (
@@ -740,8 +970,9 @@ const FiltersPanel = ({
                       options={microsoftProducts}
                       selected={filters.products ?? []}
                       onChange={(next) => updateProductsForSource('Microsoft', next)}
-                      defaultOpen
                       activeSources={['Microsoft']}
+                      open={baseSectionStates.microsoftProducts}
+                      onToggle={(isOpen) => toggleBaseSection('microsoftProducts', isOpen)}
                     />
                   )}
                   {eosProducts.length > 0 && (
@@ -750,8 +981,9 @@ const FiltersPanel = ({
                       options={eosProducts}
                       selected={filters.products ?? []}
                       onChange={(next) => updateProductsForSource('EOS', next)}
-                      defaultOpen
                       activeSources={['EOS']}
+                      open={baseSectionStates.eosProducts}
+                      onToggle={(isOpen) => toggleBaseSection('eosProducts', isOpen)}
                     />
                   )}
                   {fabricProducts.length > 0 && (
@@ -760,8 +992,9 @@ const FiltersPanel = ({
                       options={fabricProducts}
                       selected={filters.products ?? []}
                       onChange={(next) => updateProductsForSource('Fabric', next)}
-                      defaultOpen
                       activeSources={['Fabric']}
+                      open={baseSectionStates.fabricProducts}
+                      onToggle={(isOpen) => toggleBaseSection('fabricProducts', isOpen)}
                     />
                   )}
                   {m365RoadmapProducts.length > 0 && (
@@ -770,8 +1003,9 @@ const FiltersPanel = ({
                       options={m365RoadmapProducts}
                       selected={filters.products ?? []}
                       onChange={(next) => updateProductsForSource('MICROSOFT 365', next)}
-                      defaultOpen
                       activeSources={['MICROSOFT 365']}
+                      open={baseSectionStates.m365Products}
+                      onToggle={(isOpen) => toggleBaseSection('m365Products', isOpen)}
                     />
                   )}
                 </>
@@ -785,10 +1019,11 @@ const FiltersPanel = ({
                   options={metadata.products}
                   selected={filters.products ?? []}
                   onChange={(next) => onChange({ products: next })}
-                  defaultOpen
                   activeSources={activeSources}
                   sourceTag={sourceTagFor('productOrApp', sourcesFromOptions(metadata.products))}
                   matchAllSources={matchAllSources}
+                  open={baseSectionStates.products}
+                  onToggle={(isOpen) => toggleBaseSection('products', isOpen)}
                 />
               )}
             </>
@@ -803,6 +1038,8 @@ const FiltersPanel = ({
               sourceTag={sourceTagFor('bcMinVersion', ['EOS'])}
               matchAllSources={matchAllSources}
               maxVisible={12}
+              open={baseSectionStates.bcVersion}
+              onToggle={(isOpen) => toggleBaseSection('bcVersion', isOpen)}
             />
           )}
           {isFilterVisible('months') && hasOptionsForSources(metadata.months) && (
@@ -816,6 +1053,8 @@ const FiltersPanel = ({
               activeSources={activeSources}
               sourceTag={sourceTagFor('months', sourcesFromOptions(metadata.months))}
               matchAllSources={matchAllSources}
+              open={baseSectionStates.months}
+              onToggle={(isOpen) => toggleBaseSection('months', isOpen)}
             />
           )}
           {isFilterVisible('query') && (
@@ -833,7 +1072,15 @@ const FiltersPanel = ({
 
         {/* Advanced Column */}
         <div className="ul-surface p-6">
-          <h2 className="text-lg font-semibold">Avanzati</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Avanzati</h2>
+            <ExpandCollapseButtons
+              onExpandAll={expandAllAdvanced}
+              onCollapseAll={collapseAllAdvanced}
+              hasCollapsed={hasCollapsedAdvanced}
+              hasExpanded={hasExpandedAdvanced}
+            />
+          </div>
           {isFilterVisible('categories') && hasOptionsForSources(metadata.categories) && (
             <FilterListSection
               title="Categorie"
@@ -843,6 +1090,8 @@ const FiltersPanel = ({
               activeSources={activeSources}
               sourceTag={sourceTagFor('categories', sourcesFromOptions(metadata.categories))}
               matchAllSources={matchAllSources}
+              open={advancedSectionStates.categories}
+              onToggle={(isOpen) => toggleAdvancedSection('categories', isOpen)}
             />
           )}
           {isFilterVisible('tags') && hasOptionsForSources(metadata.tags) && (
@@ -854,6 +1103,8 @@ const FiltersPanel = ({
               activeSources={activeSources}
               sourceTag={sourceTagFor('tags', sourcesFromOptions(metadata.tags))}
               matchAllSources={matchAllSources}
+              open={advancedSectionStates.tags}
+              onToggle={(isOpen) => toggleAdvancedSection('tags', isOpen)}
             />
           )}
           {isFilterVisible('wave') && hasOptionsForSources(metadata.waves) && (
@@ -865,6 +1116,8 @@ const FiltersPanel = ({
               activeSources={activeSources}
               sourceTag={sourceTagFor('wave', sourcesFromOptions(metadata.waves))}
               matchAllSources={matchAllSources}
+              open={advancedSectionStates.waves}
+              onToggle={(isOpen) => toggleAdvancedSection('waves', isOpen)}
             />
           )}
           {isFilterVisible('availabilityType') &&
@@ -880,6 +1133,8 @@ const FiltersPanel = ({
                   sourcesFromOptions(metadata.availabilityTypes)
                 )}
                 matchAllSources={matchAllSources}
+                open={advancedSectionStates.availabilityType}
+                onToggle={(isOpen) => toggleAdvancedSection('availabilityType', isOpen)}
               />
             )}
           {isFilterVisible('enabledFor') && hasOptionsForSources(metadata.enabledFor) && (
@@ -891,6 +1146,8 @@ const FiltersPanel = ({
               activeSources={activeSources}
               sourceTag={sourceTagFor('enabledFor', sourcesFromOptions(metadata.enabledFor))}
               matchAllSources={matchAllSources}
+              open={advancedSectionStates.enabledFor}
+              onToggle={(isOpen) => toggleAdvancedSection('enabledFor', isOpen)}
             />
           )}
           {isFilterVisible('geography') && hasOptionsForSources(metadata.geography) && (
@@ -902,6 +1159,8 @@ const FiltersPanel = ({
               activeSources={activeSources}
               sourceTag={sourceTagFor('geography', sourcesFromOptions(metadata.geography))}
               matchAllSources={matchAllSources}
+              open={advancedSectionStates.geography}
+              onToggle={(isOpen) => toggleAdvancedSection('geography', isOpen)}
             />
           )}
           {isFilterVisible('language') && hasOptionsForSources(metadata.language) && (
@@ -913,6 +1172,8 @@ const FiltersPanel = ({
               activeSources={activeSources}
               sourceTag={sourceTagFor('language', sourcesFromOptions(metadata.language))}
               matchAllSources={matchAllSources}
+              open={advancedSectionStates.language}
+              onToggle={(isOpen) => toggleAdvancedSection('language', isOpen)}
             />
           )}
 
@@ -920,7 +1181,11 @@ const FiltersPanel = ({
             isFilterVisible('periodChangedDays') ||
             isFilterVisible('releaseInDays') ||
             isFilterVisible('releaseDateRange')) && (
-              <details className="mt-4" open>
+              <details
+                className="mt-4"
+                open={advancedSectionStates.periods}
+                onToggle={(e) => toggleAdvancedSection('periods', (e.target as HTMLDetailsElement).open)}
+              >
                 <summary className="cursor-pointer text-xs uppercase text-muted-foreground">
                   Periodi
                   {sourceTagFor('periodNewDays') && (

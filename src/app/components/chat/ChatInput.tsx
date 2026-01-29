@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type KeyboardEvent, type ChangeEvent } from 'react';
+import { useState, useRef, useEffect, useImperativeHandle, forwardRef, type KeyboardEvent, type ChangeEvent } from 'react';
 
 type ChatInputProps = {
   onSend: (text: string) => void;
@@ -7,7 +7,12 @@ type ChatInputProps = {
   onInputChange?: (value: string) => void;
 };
 
-const ChatInput = ({ onSend, disabled, suggestions = [], onInputChange }: ChatInputProps) => {
+export type ChatInputHandle = {
+  setValue: (text: string) => void;
+  focus: () => void;
+};
+
+const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(({ onSend, disabled, suggestions = [], onInputChange }, ref) => {
   const [value, setValue] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -21,6 +26,16 @@ const ChatInput = ({ onSend, disabled, suggestions = [], onInputChange }: ChatIn
       setShowSuggestions(false);
     }
   }, [suggestions, value]);
+
+  useImperativeHandle(ref, () => ({
+    setValue: (text: string) => {
+      setValue(text);
+      onInputChange?.(text);
+    },
+    focus: () => {
+      inputRef.current?.focus();
+    }
+  }), [onInputChange]);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
@@ -145,6 +160,8 @@ const ChatInput = ({ onSend, disabled, suggestions = [], onInputChange }: ChatIn
       </div>
     </div>
   );
-};
+});
+
+ChatInput.displayName = 'ChatInput';
 
 export default ChatInput;

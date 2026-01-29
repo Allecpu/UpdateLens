@@ -6,6 +6,8 @@ import type { ReleaseItem } from '../../models/ReleaseItem';
 const HISTORY_KEY = 'updatelens.chat.history';
 const MAX_HISTORY = 10;
 
+export type ChatTab = 'chat' | 'history' | 'help';
+
 export type ChatMessage = {
   id: string;
   type: 'user' | 'bot';
@@ -20,11 +22,14 @@ type ChatState = {
   isOpen: boolean;
   messages: ChatMessage[];
   queryHistory: string[];
+  activeTab: ChatTab;
   toggleChat: () => void;
   closeChat: () => void;
   addMessage: (message: Omit<ChatMessage, 'id'>) => void;
   addToHistory: (query: string) => void;
+  deleteFromHistory: (query: string) => void;
   clearHistory: () => void;
+  setActiveTab: (tab: ChatTab) => void;
 };
 
 const createMessageId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -53,8 +58,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
   isOpen: false,
   messages: [],
   queryHistory: loadHistory(),
+  activeTab: 'chat',
   toggleChat: () => set((state) => ({ isOpen: !state.isOpen })),
-  closeChat: () => set({ isOpen: false }),
+  closeChat: () => set({ isOpen: false, activeTab: 'chat' }),
   addMessage: (message) =>
     set((state) => ({
       messages: [...state.messages, { ...message, id: createMessageId() }]
@@ -70,8 +76,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
     saveHistory(updated);
     set({ queryHistory: updated });
   },
+  deleteFromHistory: (query) => {
+    const current = get().queryHistory;
+    const updated = current.filter(q => q !== query);
+    saveHistory(updated);
+    set({ queryHistory: updated });
+  },
   clearHistory: () => {
     localStorage.removeItem(HISTORY_KEY);
     set({ queryHistory: [] });
-  }
+  },
+  setActiveTab: (tab) => set({ activeTab: tab })
 }));
