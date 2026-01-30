@@ -96,7 +96,9 @@ jobs:
             --settings \
               SCM_DO_BUILD_DURING_DEPLOYMENT=false \
               ENABLE_ORYX_BUILD=false \
-              WEBSITE_NODE_DEFAULT_VERSION="~20"
+              WEBSITE_RUN_FROM_PACKAGE=1 \
+              WEBSITE_NODE_DEFAULT_VERSION="~20" \
+              DB_PATH="/home/data"
 
       - name: Set startup command
         run: |
