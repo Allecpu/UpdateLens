@@ -40,27 +40,45 @@ jobs:
           # Copy frontend build output
           cp -R dist deploy/dist
 
+          # Copy tools folder (for refresh scripts)
+          cp -R tools deploy/tools
+
+          # Copy public folder (for data storage)
+          cp -R public deploy/public
+
+          # Copy source files needed for builds
+          cp -R src deploy/src
+          cp vite.config.ts deploy/
+          cp tsconfig.json deploy/
+          cp tsconfig.node.json deploy/ 2>/dev/null || true
+          cp tsconfig.app.json deploy/ 2>/dev/null || true
+          cp tailwind.config.js deploy/ 2>/dev/null || true
+          cp postcss.config.js deploy/ 2>/dev/null || true
+          cp index.html deploy/
+
+          # Copy server tsconfig for tools that might need it
+          mkdir -p deploy/server
+          cp server/tsconfig.json deploy/server/
+
           # Copy package files
           cp package.json package-lock.json deploy/
 
-          # Install production dependencies (compiles native modules for Linux)
+          # Install ALL dependencies (including dev for refresh/build scripts)
           cd deploy
-          npm ci --omit=dev
+          npm ci
 
-          # Verify node_modules exists
-          echo "=== Checking deploy folder structure ==="
+          # Verify structure
+          echo "=== Deploy folder structure ==="
           ls -la
-          echo "=== Checking node_modules ==="
-          ls node_modules | head -20
-          echo "=== Checking express exists ==="
-          ls node_modules/express
+          echo "=== Tools folder ==="
+          ls tools/
 
-          # Create zip for deployment (include node_modules explicitly)
+          # Create zip for deployment
           zip -r ../deploy.zip . -x "*.git*"
 
-          # Verify zip contents
-          echo "=== Zip contents (first 30 entries) ==="
-          unzip -l ../deploy.zip | head -30
+          # Show zip size
+          echo "=== Zip size ==="
+          ls -lh ../deploy.zip
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -103,7 +121,6 @@ jobs:
             --settings \
               SCM_DO_BUILD_DURING_DEPLOYMENT=false \
               ENABLE_ORYX_BUILD=false \
-              WEBSITE_RUN_FROM_PACKAGE=1 \
               WEBSITE_NODE_DEFAULT_VERSION="~20" \
               DB_PATH="/home/data"
 
