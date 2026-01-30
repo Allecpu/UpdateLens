@@ -47,8 +47,20 @@ jobs:
           cd deploy
           npm ci --omit=dev
 
-          # Create zip for deployment
-          zip -r ../deploy.zip .
+          # Verify node_modules exists
+          echo "=== Checking deploy folder structure ==="
+          ls -la
+          echo "=== Checking node_modules ==="
+          ls node_modules | head -20
+          echo "=== Checking express exists ==="
+          ls node_modules/express
+
+          # Create zip for deployment (include node_modules explicitly)
+          zip -r ../deploy.zip . -x "*.git*"
+
+          # Verify zip contents
+          echo "=== Zip contents (first 30 entries) ==="
+          unzip -l ../deploy.zip | head -30
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -85,6 +97,13 @@ jobs:
               SCM_DO_BUILD_DURING_DEPLOYMENT=false \
               ENABLE_ORYX_BUILD=false \
               WEBSITE_NODE_DEFAULT_VERSION="~20"
+
+      - name: Set startup command
+        run: |
+          az webapp config set \
+            --name updatelens-api \
+            --resource-group rg-updatelens-test \
+            --startup-file "node server-dist/index.js"
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
