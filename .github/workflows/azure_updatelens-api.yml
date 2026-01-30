@@ -28,41 +28,62 @@ jobs:
         shell: bash
         run: |
           set -e
-          INDEX_PATH="$(find . -maxdepth 5 -name index.html -not -path './node_modules/*' | head -n 1)"
+          INDEX_PATH="$(find . -maxdepth 6 -name index.html -not -path './node_modules/*' | head -n 1)"
           if [ -z "$INDEX_PATH" ]; then
-            echo "index.html not found in repo (maxdepth 5). Fix the repository/package." >&2
+            echo "index.html not found in repo (maxdepth 6)." >&2
             exit 1
           fi
           ROOT_DIR="$(dirname "$INDEX_PATH")"
           echo "Found index.html at: $INDEX_PATH"
           echo "VITE_ROOT=$ROOT_DIR" >> $GITHUB_ENV
-          echo "OUT_DIR=$(pwd)/dist" >> $GITHUB_ENV
 
-      # Build frontend (Vite -> dist at repo root, always)
+      # Build frontend (Vite -> $VITE_ROOT/dist)
       - name: Build client
         shell: bash
         run: |
           set -e
+
+          # Se esiste un vite.config.* dentro VITE_ROOT lo usiamo; altrimenti usiamo quello in root repo; altrimenti nulla.
+          CONFIG_ARG=""
+          if ls "$VITE_ROOT"/vite.config.* >/dev/null 2>&1; then
+            CFG="$(ls "$VITE_ROOT"/vite.config.* | head -n 1)"
+            CONFIG_ARG="--config $CFG"
+          elif ls vite.config.* >/dev/null 2>&1; then
+            CFG="$(ls vite.config.* | head -n 1)"
+            CONFIG_ARG="--config $CFG"
+          fi
+
           echo "Using VITE_ROOT=$VITE_ROOT"
-          npx vite build --root "$VITE_ROOT" --outDir "$OUT_DIR"
-          test -f dist/index.html
+          echo "Using CONFIG_ARG=$CONFIG_ARG"
+
+          # ROOT è POSIZIONALE (niente --root)
+          npx vite build "$VITE_ROOT" $CONFIG_ARG
+
+          # Verifica output
+          test -f "$VITE_ROOT/dist/index.html"
 
       # Build server (TS -> server-dist)
       - name: Build server
         run: npm run build:server
 
       - name: Create deploy package (dist + server-dist + prod deps only)
+        shell: bash
         run: |
           set -e
           rm -rf deploy
           mkdir -p deploy
 
+          # Runtime files
           cp package.json package-lock.json deploy/
           cp -R server-dist deploy/server-dist
-          cp -R dist deploy/dist
 
+          # Frontend build output
+          cp -R "$VITE_ROOT/dist" deploy/dist
+
+          # Install production deps in deploy folder
           npm ci --omit=dev --prefix deploy
 
+          # Zip final
           cd deploy
           zip -r ../deploy.zip .
           cd ..
@@ -94,6 +115,7 @@ jobs:
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_DD0E651561084DFDB83AFFB2EE78E235 }}
 
       - name: Disable Oryx build on App Service
+        shell: bash
         run: |
           az webapp config appsettings set \
             --name updatelens-api \
