@@ -88,7 +88,14 @@ jobs:
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_53ABC2563A1D4368A6B5EEC80EB3401A }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_DD0E651561084DFDB83AFFB2EE78E235 }}
 
-      - name: Configure Azure App Settings
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: updatelens-api
+          slot-name: Production
+          package: deploy.zip
+
+      - name: Configure Azure App Settings (post-deploy)
         run: |
           az webapp config appsettings set \
             --name updatelens-api \
@@ -107,12 +114,8 @@ jobs:
             --resource-group rg-updatelens-test \
             --startup-file "node server-dist/index.js"
 
-      - name: Wait for App Service restart
-        run: sleep 60
-
-      - name: Deploy to Azure Web App
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: updatelens-api
-          slot-name: Production
-          package: deploy.zip
+      - name: Restart App Service
+        run: |
+          az webapp restart \
+            --name updatelens-api \
+            --resource-group rg-updatelens-test
