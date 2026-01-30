@@ -101,7 +101,12 @@ jobs:
           YEAR_MONTH=$(date -u '+%Y-%m')
 
           git commit -m "chore(data): monthly data refresh ($YEAR_MONTH)"
+
+          # Push to current branch (main)
           git push
+
+          # Also push to Azure branch to trigger deployment
+          git push origin HEAD:Azure --force-with-lease || echo "Azure branch push skipped (may not exist or no changes)"
 
       - name: Summary
         run: |

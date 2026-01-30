@@ -66,6 +66,13 @@ jobs:
           mkdir -p deploy/server
           cp server/tsconfig.json deploy/server/
 
+          # Copy WebJob for scheduled refresh
+          mkdir -p deploy/App_Data/jobs/triggered/refresh-data
+          cp webjob/refresh-trigger.js deploy/App_Data/jobs/triggered/refresh-data/
+          cp webjob/settings.job deploy/App_Data/jobs/triggered/refresh-data/
+          cp webjob/run.sh deploy/App_Data/jobs/triggered/refresh-data/
+          chmod +x deploy/App_Data/jobs/triggered/refresh-data/run.sh
+
           # Copy package files
           cp package.json package-lock.json deploy/
 
@@ -130,12 +137,13 @@ jobs:
               WEBSITE_NODE_DEFAULT_VERSION="~20" \
               DB_PATH="/home/data"
 
-      - name: Set startup command
+      - name: Set startup command and Always On
         run: |
           az webapp config set \
             --name updatelens-api \
             --resource-group rg-updatelens-test \
-            --startup-file "node server-dist/index.js"
+            --startup-file "node server-dist/index.js" \
+            --always-on true
 
       - name: Restart App Service
         run: |

@@ -18,3 +18,8 @@ pnpm-debug.log*
 
 # TypeScript
 *.tsbuildinfo
+
+# Azure Functions
+functions/local.settings.json
+functions/dist/
+functions/node_modules/

@@ -361,12 +361,89 @@ export const createApi = () => {
   });
 
   app.post('/api/sources/update-all', async (_req, res) => {
-    // Refresh is disabled on Azure - data is updated via scheduled GitHub Actions
+    // On Azure, call Azure Functions for refresh
     if (process.env.DB_PATH === '/home/data') {
-      return res.status(501).json({
-        error: 'Refresh non disponibile su Azure. I dati vengono aggiornati automaticamente ogni mese via GitHub Actions.'
-      });
+      const functionUrl = process.env.AZURE_FUNCTION_URL;
+      const functionKey = process.env.AZURE_FUNCTION_KEY;
+
+      // If Azure Functions are configured, use them
+      if (functionUrl && functionKey) {
+        try {
+          const response = await fetch(`${functionUrl}/api/refreshAll?code=${functionKey}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            return res.json(data);
+          } else {
+            const errorData = await response.json().catch(() => ({}));
+            return res.status(response.status).json({
+              error: `Errore Azure Functions: ${response.status}`,
+              details: errorData
+            });
+          }
+        } catch (error) {
+          return res.status(500).json({
+            error: 'Errore durante la chiamata ad Azure Functions: ' + (error instanceof Error ? error.message : String(error))
+          });
+        }
+      }
+
+      // Fallback to GitHub Actions if Azure Functions not configured
+      const token = process.env.GITHUB_ISSUES_TOKEN || process.env.GITHUB_TOKEN;
+      const owner = process.env.GITHUB_OWNER || 'Allecpu';
+      const repo = process.env.GITHUB_REPO || 'UpdateLens';
+
+      if (!token) {
+        return res.status(503).json({
+          error: 'AZURE_FUNCTION_URL o GITHUB_TOKEN non configurato. Impossibile avviare il refresh.'
+        });
+      }
+
+      try {
+        // Trigger the refresh-data workflow via GitHub API
+        const response = await fetch(
+          `https://api.github.com/repos/${owner}/${repo}/actions/workflows/refresh-data.yml/dispatches`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Accept': 'application/vnd.github.v3+json',
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              ref: 'main'
+            })
+          }
+        );
+
+        if (response.status === 204) {
+          return res.json({
+            completedAt: new Date().toISOString(),
+            results: [],
+            summary: { total: 0, successful: 0, failed: 0 },
+            message: 'Refresh avviato via GitHub Actions. I dati saranno aggiornati entro pochi minuti.',
+            triggeredWorkflow: true
+          });
+        } else {
+          const errorData = await response.json().catch(() => ({}));
+          return res.status(response.status).json({
+            error: `Errore nell'avvio del workflow: ${response.status}`,
+            details: errorData
+          });
+        }
+      } catch (error) {
+        return res.status(500).json({
+          error: 'Errore durante la chiamata a GitHub API: ' + (error instanceof Error ? error.message : String(error))
+        });
+      }
     }
+
+    // Local execution (development)
     try {
       const sources: Array<'microsoft' | 'eos' | 'fabric'> = ['microsoft', 'eos', 'fabric'];
 

@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Local settings (contains secrets)
+local.settings.json
+
+# Azure Functions Core Tools
+bin/
+obj/
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
