@@ -18,7 +18,11 @@
       "Bash(node -e:*)",
       "Bash(npm run:*)",
       "Bash(timeout /t 5 /nobreak)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(wc:*)",
+      "Bash(pkill:*)",
+      "Bash(taskkill:*)",
+      "Bash(timeout:*)"
     ]
   }
 }

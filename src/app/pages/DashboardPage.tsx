@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useRef } from 'react';
+import { useEffect, useMemo, useState, useDeferredValue } from 'react';
 import { loadAllSnapshots, loadRulesConfig } from '../../services/DataLoader';
 import { filterReleaseItems } from '../../services/FilterService';
 import { buildMarkdown, downloadMarkdown } from '../../services/ExportService';
@@ -23,6 +23,8 @@ import {
 import FiltersPanel from '../components/FiltersPanel';
 import { isValidHttpUrl } from '../../utils/url';
 import { getProductColor } from '../../utils/productColors';
+import { useBookmarkStore } from '../store/useBookmarkStore';
+import { getRelativeDateLabel } from '../../utils/date';
 
 type Chip = {
   label: string;
@@ -33,6 +35,214 @@ type DrillSource = ReleaseSource | null;
 
 const isEntryActive = (entry: { isActive?: boolean }): boolean => entry.isActive !== false;
 
+const ReleaseCard = ({ item }: { item: ReleaseItem }) => {
+  const { bookmarkedIds, toggleBookmark } = useBookmarkStore();
+  const [copied, setCopied] = useState(false);
+  const isBookmarked = bookmarkedIds.includes(item.id);
+
+  const handleCopyLink = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const link = item.sourceUrl || item.url;
+    if (link) {
+      navigator.clipboard.writeText(link).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      });
+    }
+  };
+
+  const handleBookmark = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    toggleBookmark(item.id);
+  };
+
+  const productColor = getProductColor(item.productName);
+
+  // Chip helper restricted to this component's needs
+  const renderChip = (label: string, value: string | null | undefined, key: string) => {
+    if (!value) return null;
+    return (
+      <span className="ul-chip" key={key}>
+        {label}: {value}
+      </span>
+    );
+  };
+
+  const availabilityTypes = (item.availabilityTypes ?? [])
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+  const availabilityTypeValues = availabilityTypes.filter((value) =>
+    /preview/i.test(value)
+  );
+  const releaseTypeValues = availabilityTypes.filter(
+    (value) => !/preview/i.test(value)
+  );
+
+  const infoChips = [
+    renderChip('Wave', item.wave, `wave-${item.wave ?? 'none'}`),
+    ...availabilityTypeValues.map((value, index) =>
+      renderChip('Availability', value, `availability-${value}-${index}`)
+    ),
+    ...releaseTypeValues.map((value, index) =>
+      renderChip('Release', value, `release-${value}-${index}`)
+    ),
+    item.minBcVersion ? renderChip('BC', item.minBcVersion.toString(), `bc-${item.minBcVersion}`) : null
+  ].filter(Boolean);
+
+  const sourceLink = item.sourceUrl ?? item.url;
+  const relativeDate = getRelativeDateLabel(item.releaseDate);
+  const isUpdated = item.lastUpdatedDate && item.lastUpdatedDate > item.releaseDate;
+
+  return (
+    <article className="ul-surface relative overflow-visible p-5 pl-6 group transition-all hover:shadow-md border border-transparent hover:border-primary/10">
+      <span
+        className={`absolute left-0 top-0 h-full w-1.5 ${productColor.barClass}`}
+        aria-hidden="true"
+      />
+
+      {/* Header: Category & Actions */}
+      <div className="flex items-start justify-between gap-4 mb-2">
+        <div className="flex-1">
+          {item.category && (
+            <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+              {item.category}
+            </div>
+          )}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span
+              className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${productColor.badgeClass}`}
+            >
+              {item.productName}
+            </span>
+            {isUpdated && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                Aggiornato
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Actions: Pin & Copy */}
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            onClick={handleCopyLink}
+            className="p-1.5 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors relative"
+            title="Copia link"
+          >
+            {copied ? (
+              <svg className="h-4 w-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            ) : (
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+              </svg>
+            )}
+            {copied && <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-[10px] bg-black text-white px-1 py-0.5 rounded shadow-lg whitespace-nowrap">Copiato!</span>}
+          </button>
+          <button
+            onClick={handleBookmark}
+            className={`p-1.5 rounded-full hover:bg-muted transition-colors ${isBookmarked ? 'text-amber-500 hover:text-amber-600' : 'text-muted-foreground hover:text-foreground'}`}
+            title={isBookmarked ? "Rimuovi segnalibro" : "Aggiungi segnalibro"}
+          >
+            <svg className="h-4 w-4" fill={isBookmarked ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div className="flex items-start justify-between gap-4">
+        <h2 className="text-lg font-semibold leading-tight">{item.title}</h2>
+        {/* Status Badge */}
+        {item.status === 'Try now' ? (
+          <span className="shrink-0 inline-flex items-center rounded-md bg-gradient-to-r from-green-500 to-emerald-600 px-2.5 py-1 text-xs font-bold text-white shadow-sm ring-1 ring-white/20">
+            Try now
+          </span>
+        ) : (
+          <span className="ul-chip shrink-0">{item.status}</span>
+        )}
+      </div>
+
+      {infoChips.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {infoChips}
+        </div>
+      )}
+
+      <p className="mt-3 text-sm text-muted-foreground leading-relaxed line-clamp-3 hover:line-clamp-none transition-all duration-300">
+        {item.description}
+      </p>
+
+      {/* Meta Bar: Date & Enabled For */}
+      <div className="mt-4 flex items-center justify-between border-t border-border/50 pt-3">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">Rilascio:</span>
+            <span>{item.releaseDate}</span>
+            {relativeDate && (
+              <span className="text-[10px] text-muted-foreground/70">({relativeDate})</span>
+            )}
+          </div>
+          {item.enabledFor && (
+            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground" title={item.enabledFor}>
+              <svg className="h-3 w-3 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+              </svg>
+              <span className="truncate max-w-[200px]">{item.enabledFor}</span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3 text-xs">
+          {sourceLink && isValidHttpUrl(sourceLink) ? (
+            <a
+              className="group/link flex items-center gap-1 text-primary hover:underline hover:text-primary/80"
+              href={sourceLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`Vai alla fonte di ${item.title}`}
+            >
+              Vai alla fonte
+              <svg className="h-3 w-3 transition-transform group-hover/link:-translate-y-0.5 group-hover/link:translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <line x1="10" y1="14" x2="21" y2="3"></line>
+              </svg>
+            </a>
+          ) : (
+            <span className="text-muted-foreground/60 italic">Fonte n/d</span>
+          )}
+
+          {item.learnUrl && isValidHttpUrl(item.learnUrl) && item.learnUrl !== sourceLink && (
+            <a
+              className="group/doc flex items-center gap-1 text-primary hover:underline hover:text-primary/80"
+              href={item.learnUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`Apri documentazione per ${item.title}`}
+            >
+              <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+                <polyline points="10 9 9 9 8 9"></polyline>
+              </svg>
+              Doc
+            </a>
+          )}
+        </div>
+      </div>
+    </article>
+  );
+};
+
 const DashboardPage = () => {
   const [snapshotItems, setSnapshotItems] = useState<ReleaseItem[]>([]);
   const [snapshotErrors, setSnapshotErrors] = useState<string[]>([]);
@@ -40,6 +250,7 @@ const DashboardPage = () => {
   const rulesConfig = loadRulesConfig();
   const { index, activeCustomerId, customers } = useCustomerStore();
   const { groups } = useCustomerGroupStore();
+  const { bookmarkedIds } = useBookmarkStore();
   const {
     cssFilters,
     customerFilters,
@@ -55,8 +266,6 @@ const DashboardPage = () => {
 
   const [tempFilters, setTempFilters] = useState<Partial<FilterState>>({});
   const activeCustomer = activeCustomerId ? customers[activeCustomerId] : null;
-  const debugLoggedRef = useRef(false);
-
   // Sync session preset with active preset from store on mount
   useEffect(() => {
     // Only when no customer is selected (global scope)
@@ -66,7 +275,6 @@ const DashboardPage = () => {
 
     // If there's an active preset in the store (from GlobalFiltersPage), use it
     if (activePresetId) {
-      console.log('[Dashboard] Syncing with active preset from store:', activePresetId);
       setSessionPresetId(activePresetId);
       return;
     }
@@ -74,7 +282,6 @@ const DashboardPage = () => {
     // Otherwise, use the Default preset if available
     const defaultPreset = getDefaultPreset();
     if (defaultPreset) {
-      console.log('[Dashboard] No active preset, using Default preset:', defaultPreset.id);
       setSessionPresetId(defaultPreset.id);
     }
   }, []); // Run once on mount
@@ -84,6 +291,11 @@ const DashboardPage = () => {
   // =====================================================================
   const [drillSource, setDrillSource] = useState<DrillSource>(null);
   const [drillProduct, setDrillProduct] = useState<string | null>(null);
+  const [showBookmarksOnly, setShowBookmarksOnly] = useState(false);
+
+  // Pagination state
+  const [visibleCount, setVisibleCount] = useState(50);
+  const ITEMS_PER_PAGE = 50;
 
   useEffect(() => {
     let active = true;
@@ -208,6 +420,13 @@ const DashboardPage = () => {
     normContext.sourceOptions.length > 0 && normContext.metadata.products.length > 0;
   const filtersReady = snapshotsLoaded && contextReady && cssFilters !== null;
 
+  // Debug log for filter hydration sequence (can be removed after verification)
+  useEffect(() => {
+    if (filtersReady) {
+      console.log('[FILTERS_HYDRATED] Filters ready before KPI render - no flash expected');
+    }
+  }, [filtersReady]);
+
   // =====================================================================
   // SINGLE SOURCE OF TRUTH: Use selectEffectiveFilters
   // This is the SAME function used by GlobalFiltersPage
@@ -224,11 +443,6 @@ const DashboardPage = () => {
       defaultFilters,
       normContext
     );
-    console.log('[Dashboard] persistentBaseFilters recomputed:', {
-      products: result?.products.length,
-      sources: result?.sources.length,
-      statuses: result?.statuses.length
-    });
     return result;
   }, [
     filtersReady,
@@ -246,6 +460,7 @@ const DashboardPage = () => {
     clearChatFilters();
     setDrillSource(null);
     setDrillProduct(null);
+    setVisibleCount(ITEMS_PER_PAGE); // Reset pagination
 
     // When switching back to global scope, resync with active preset
     if (!activeCustomerId) {
@@ -283,6 +498,15 @@ const DashboardPage = () => {
     return stripTargetingFields(merged);
   }, [persistentBaseFilters, tempFilters, chatFilters]);
 
+  // Deferred filters for expensive computations (filterReleaseItems)
+  // This allows UI to remain responsive while filtering is processed
+  const deferredDashboardFilters = useDeferredValue(dashboardFilters);
+
+  // Reset pagination when filters or drill state changes
+  useEffect(() => {
+    setVisibleCount(ITEMS_PER_PAGE);
+  }, [deferredDashboardFilters, drillSource, drillProduct]);
+
   // updateFilters: local-only, does NOT persist to store
   // Also clears chatFilters when user manually changes filters
   const updateFilters = (nextFilters: Partial<FilterState>) => {
@@ -294,11 +518,9 @@ const DashboardPage = () => {
 
   // Preset selection handler (Dashboard only, session-only)
   const handlePresetSelect = (presetId: string) => {
-    console.log('[Dashboard] handlePresetSelect called with presetId:', presetId);
     setSessionPresetId(presetId);
     applyPresetToFilters(presetId);
     setTempFilters({}); // Clear temp filters to show pure preset effect
-    console.log('[Dashboard] handlePresetSelect completed');
   };
 
   const filterScope = activeCustomerId ? 'customer' : 'global';
@@ -306,6 +528,8 @@ const DashboardPage = () => {
   const hasGroupSelection = (dashboardFilters?.targetGroupIds.length ?? 0) > 0;
   const isGroupDisabled = hasOwnerSelection || filterScope === 'customer';
   const isOwnerDisabled = hasGroupSelection || filterScope === 'customer';
+  const bookmarkedSet = useMemo(() => new Set(bookmarkedIds), [bookmarkedIds]);
+  const hasBookmarks = bookmarkedIds.length > 0;
 
   const onChangeGroupIds = (next: string[]) => {
     updateFilters({
@@ -322,106 +546,53 @@ const DashboardPage = () => {
   };
 
   // =====================================================================
-  // Filter items using dashboardFilters (with targeting fields stripped)
+  // Filter items using deferredDashboardFilters (with targeting fields stripped)
+  // Using deferred value allows UI to remain responsive during filtering
+  // IMPORTANT: Return empty array when filters aren't ready to prevent
+  // flash of unfiltered content (FOUC)
   // =====================================================================
   const filteredItems = useMemo(() => {
-    if (!dashboardFilters) {
-      // Pass-through: if filters not ready, show all items
-      return items;
+    // Prevent flash: don't show any items until filters are fully hydrated
+    if (!deferredDashboardFilters) {
+      return [];
     }
-    return filterReleaseItems(items, {
-      targetCustomerIds: dashboardFilters.targetCustomerIds,
-      targetGroupIds: dashboardFilters.targetGroupIds,
-      targetCssOwners: dashboardFilters.targetCssOwners,
-      products: dashboardFilters.products,
-      sources: dashboardFilters.sources as ReleaseSource[],
-      statuses: dashboardFilters.statuses as ReleaseStatus[],
-      categories: dashboardFilters.categories,
-      tags: dashboardFilters.tags,
-      waves: dashboardFilters.waves,
-      bcVersions: dashboardFilters.bcVersions,
-      months: dashboardFilters.months,
-      availabilityTypes: dashboardFilters.availabilityTypes,
-      enabledFor: dashboardFilters.enabledFor,
-      geography: dashboardFilters.geography,
-      language: dashboardFilters.language,
-      periodNewDays: dashboardFilters.periodNewDays,
-      periodChangedDays: dashboardFilters.periodChangedDays,
-      releaseInDays: dashboardFilters.releaseInDays,
-      minBcVersionMin: dashboardFilters.minBcVersionMin,
-      releaseDateFrom: dashboardFilters.releaseDateFrom,
-      releaseDateTo: dashboardFilters.releaseDateTo,
-      sortOrder: dashboardFilters.sortOrder,
-      query: dashboardFilters.query,
-      horizonMonths: dashboardFilters.horizonMonths,
-      historyMonths: dashboardFilters.historyMonths
-    });
-  }, [dashboardFilters, items]);
-  const dashboardKpis = useMemo(() => {
-    const kpis = computeDashboardKpis(filteredItems);
-    console.log('[Dashboard] dashboardKpis recomputed:', kpis);
-    return kpis;
-  }, [filteredItems]);
-
-  // =====================================================================
-  // MANDATORY DEBUG LOG - one-shot per customer change (per specification)
-  // =====================================================================
-  useEffect(() => {
-    if (!filtersReady || !persistentBaseFilters || !dashboardFilters) {
-      return;
-    }
-    if (debugLoggedRef.current) {
-      return;
-    }
-    debugLoggedRef.current = true;
-
-    console.log('[Dashboard] FILTER_STATE', {
-      'baseline.availabilityTypes': persistentBaseFilters.availabilityTypes,
-      'temp.availabilityTypes': tempFilters.availabilityTypes ?? null,
-      'effective.availabilityTypes': dashboardFilters.availabilityTypes,
-      itemsBefore: items.length,
-      itemsAfter: filteredItems.length
+    const baseItems = filterReleaseItems(items, {
+      targetCustomerIds: deferredDashboardFilters.targetCustomerIds,
+      targetGroupIds: deferredDashboardFilters.targetGroupIds,
+      targetCssOwners: deferredDashboardFilters.targetCssOwners,
+      products: deferredDashboardFilters.products,
+      sources: deferredDashboardFilters.sources as ReleaseSource[],
+      statuses: deferredDashboardFilters.statuses as ReleaseStatus[],
+      categories: deferredDashboardFilters.categories,
+      tags: deferredDashboardFilters.tags,
+      waves: deferredDashboardFilters.waves,
+      bcVersions: deferredDashboardFilters.bcVersions,
+      months: deferredDashboardFilters.months,
+      availabilityTypes: deferredDashboardFilters.availabilityTypes,
+      enabledFor: deferredDashboardFilters.enabledFor,
+      geography: deferredDashboardFilters.geography,
+      language: deferredDashboardFilters.language,
+      periodNewDays: deferredDashboardFilters.periodNewDays,
+      periodChangedDays: deferredDashboardFilters.periodChangedDays,
+      releaseInDays: deferredDashboardFilters.releaseInDays,
+      minBcVersionMin: deferredDashboardFilters.minBcVersionMin,
+      releaseDateFrom: deferredDashboardFilters.releaseDateFrom,
+      releaseDateTo: deferredDashboardFilters.releaseDateTo,
+      sortOrder: deferredDashboardFilters.sortOrder,
+      query: deferredDashboardFilters.query,
+      horizonMonths: deferredDashboardFilters.horizonMonths,
+      historyMonths: deferredDashboardFilters.historyMonths
     });
 
-    console.log('[Dashboard] FILTER_DEBUG', {
-      // Core context
-      activeCustomerId,
-      customerFilterMode: activeCustomerId ? customerFilterMode[activeCustomerId] ?? 'inherit' : null,
-      // Filter sources
-      'cssFilters.products.length': cssFilters?.products?.length ?? 0,
-      'baseFilters.products.length': persistentBaseFilters.products.length,
-      'dashboardFilters.products.length': dashboardFilters.products.length,
-      'tempFilters.keys': Object.keys(tempFilters),
-      // Results
-      'items.length': items.length,
-      'filteredItems.length': filteredItems.length,
-      // Secondary filters (the ones that might eliminate items)
-      'dashboardFilters.categories.length': dashboardFilters.categories.length,
-      'dashboardFilters.months.length': dashboardFilters.months.length,
-      'dashboardFilters.waves.length': dashboardFilters.waves.length,
-      'dashboardFilters.availabilityTypes.length': dashboardFilters.availabilityTypes.length,
-      'dashboardFilters.enabledFor.length': dashboardFilters.enabledFor.length,
-      'dashboardFilters.geography.length': dashboardFilters.geography.length,
-      'dashboardFilters.horizonMonths': dashboardFilters.horizonMonths,
-      'dashboardFilters.historyMonths': dashboardFilters.historyMonths
-    });
-  }, [filtersReady, persistentBaseFilters, dashboardFilters, activeCustomerId, customerFilterMode, cssFilters, tempFilters, items.length, filteredItems.length]);
-
-  // Reset debug flag when customer changes
-  useEffect(() => {
-    debugLoggedRef.current = false;
-  }, [activeCustomerId]);
-
-  // Track cssFilters changes for preset debugging
-  useEffect(() => {
-    if (cssFilters) {
-      console.log('[Dashboard] cssFilters changed:', {
-        products: cssFilters.products.length,
-        sources: cssFilters.sources.length,
-        statuses: cssFilters.statuses.length
-      });
+    if (!showBookmarksOnly) {
+      return baseItems;
     }
-  }, [cssFilters]);
+    return baseItems.filter((item) => bookmarkedSet.has(item.id));
+  }, [deferredDashboardFilters, items, showBookmarksOnly, bookmarkedSet]);
+  const dashboardKpis = useMemo(
+    () => computeDashboardKpis(filteredItems),
+    [filteredItems]
+  );
 
   const sortedItems = useMemo(() => {
     const order = dashboardFilters?.sortOrder ?? 'newest';
@@ -471,6 +642,16 @@ const DashboardPage = () => {
       order === 'oldest' ? toDate(a) - toDate(b) : toDate(b) - toDate(a)
     );
   }, [dashboardFilters, drilledItems]);
+
+  // Pagination: only render visibleCount items to prevent DOM overload
+  const visibleItems = useMemo(
+    () => sortedDrilledItems.slice(0, visibleCount),
+    [sortedDrilledItems, visibleCount]
+  );
+  const hasMoreItems = sortedDrilledItems.length > visibleCount;
+  const handleLoadMore = () => {
+    setVisibleCount((prev) => prev + ITEMS_PER_PAGE);
+  };
 
   // Product breakdown for drill-down (Top products with count)
   const drillProductBreakdown = useMemo(() => {
@@ -604,25 +785,6 @@ const DashboardPage = () => {
     downloadMarkdown(content, 'update-lens-export.md');
   };
 
-  const asChip = (
-    label: string,
-    value: string | number | null | undefined,
-    key: string
-  ) => {
-    if (value === null || value === undefined) {
-      return null;
-    }
-    const text = typeof value === 'string' ? value.trim() : value;
-    if (text === '') {
-      return null;
-    }
-    return (
-      <span className="ul-chip" key={key}>
-        {label}: {text}
-      </span>
-    );
-  };
-
   const visibleChips = chips.slice(0, 8);
   const hiddenCount = chips.length - visibleChips.length;
 
@@ -637,9 +799,8 @@ const DashboardPage = () => {
           <div className="mt-3 text-xs text-muted-foreground">
             <span className="inline-flex items-center gap-1.5">
               <span
-                className={`inline-block h-2 w-2 rounded-full ${
-                  activeMode === 'inherit' ? 'bg-blue-500' : 'bg-amber-500'
-                }`}
+                className={`inline-block h-2 w-2 rounded-full ${activeMode === 'inherit' ? 'bg-blue-500' : 'bg-amber-500'
+                  }`}
               />
               {activeMode === 'inherit'
                 ? 'Eredita filtri CSS'
@@ -738,6 +899,17 @@ const DashboardPage = () => {
             )}
           </div>
           <div className="flex items-center gap-3">
+            <button
+              className={`ul-button ${showBookmarksOnly ? 'ul-button-primary' : 'ul-button-secondary'}`}
+              onClick={() => setShowBookmarksOnly((prev) => !prev)}
+              disabled={!hasBookmarks && !showBookmarksOnly}
+              title={hasBookmarks ? 'Filtra solo i segnalibri' : 'Nessun segnalibro salvato'}
+            >
+              {showBookmarksOnly ? 'Segnalibri attivi' : 'Solo segnalibri'}
+              <span className="ml-2 inline-flex items-center rounded-full bg-black/5 px-2 py-0.5 text-xs text-muted-foreground">
+                {bookmarkedIds.length}
+              </span>
+            </button>
             <button className="ul-button ul-button-primary" onClick={onExport}>
               Esporta Markdown
             </button>
@@ -799,88 +971,95 @@ const DashboardPage = () => {
         )}
 
         {/* KPI Cards - Clickable for drill-down */}
-        <section className="mt-6 grid gap-4 md:grid-cols-4">
-          <button
-            className={`ul-surface p-5 text-left transition-all hover:ring-2 hover:ring-primary/50 ${
-              !isDrillActive ? 'ring-2 ring-primary' : ''
-            }`}
-            onClick={resetDrill}
-          >
-            <div className="text-xs uppercase text-muted-foreground">Totale</div>
-            <div className="mt-3 text-3xl font-semibold">{dashboardKpis.total}</div>
-            {isDrillActive && (
-              <div className="mt-1 text-xs text-muted-foreground">
-                Drilled: {drilledItems.length}
+        {/* Show skeleton while filters are hydrating to prevent flash of unfiltered data */}
+        {!filtersReady ? (
+          <section className="mt-6 grid gap-4 md:grid-cols-4">
+            {['Totale', 'Microsoft', 'EOS', 'Fabric', 'Microsoft 365'].map((label) => (
+              <div key={label} className="ul-surface p-5 animate-pulse">
+                <div className="text-xs uppercase text-muted-foreground">{label}</div>
+                <div className="mt-3 h-9 w-16 rounded bg-muted" />
               </div>
-            )}
-          </button>
-          <button
-            className={`ul-surface p-5 text-left transition-all hover:ring-2 hover:ring-blue-500/50 ${
-              drillSource === 'Microsoft' ? 'ring-2 ring-blue-500' : ''
-            }`}
-            onClick={() => handleDrillSource('Microsoft')}
-          >
-            <div className="text-xs uppercase text-muted-foreground">Microsoft</div>
-            <div className="mt-3 text-3xl font-semibold text-blue-600">
-              {dashboardKpis.Microsoft}
-            </div>
-            {drillSource === 'Microsoft' && drillProduct && (
-              <div className="mt-1 text-xs text-muted-foreground">
-                Prodotto: {drilledItems.length}
+            ))}
+          </section>
+        ) : (
+          <section className="mt-6 grid gap-4 md:grid-cols-4">
+            <button
+              className={`ul-surface p-5 text-left transition-all hover:ring-2 hover:ring-primary/50 ${!isDrillActive ? 'ring-2 ring-primary' : ''
+                }`}
+              onClick={resetDrill}
+            >
+              <div className="text-xs uppercase text-muted-foreground">Totale</div>
+              <div className="mt-3 text-3xl font-semibold">{dashboardKpis.total}</div>
+              {isDrillActive && (
+                <div className="mt-1 text-xs text-muted-foreground">
+                  Drilled: {drilledItems.length}
+                </div>
+              )}
+            </button>
+            <button
+              className={`ul-surface p-5 text-left transition-all hover:ring-2 hover:ring-blue-500/50 ${drillSource === 'Microsoft' ? 'ring-2 ring-blue-500' : ''
+                }`}
+              onClick={() => handleDrillSource('Microsoft')}
+            >
+              <div className="text-xs uppercase text-muted-foreground">Microsoft</div>
+              <div className="mt-3 text-3xl font-semibold text-blue-600">
+                {dashboardKpis.Microsoft}
               </div>
-            )}
-          </button>
-          <button
-            className={`ul-surface p-5 text-left transition-all hover:ring-2 hover:ring-amber-500/50 ${
-              drillSource === 'EOS' ? 'ring-2 ring-amber-500' : ''
-            }`}
-            onClick={() => handleDrillSource('EOS')}
-          >
-            <div className="text-xs uppercase text-muted-foreground">EOS</div>
-            <div className="mt-3 text-3xl font-semibold text-amber-600">
-              {dashboardKpis.EOS}
-            </div>
-            {drillSource === 'EOS' && drillProduct && (
-              <div className="mt-1 text-xs text-muted-foreground">
-                Prodotto: {drilledItems.length}
+              {drillSource === 'Microsoft' && drillProduct && (
+                <div className="mt-1 text-xs text-muted-foreground">
+                  Prodotto: {drilledItems.length}
+                </div>
+              )}
+            </button>
+            <button
+              className={`ul-surface p-5 text-left transition-all hover:ring-2 hover:ring-amber-500/50 ${drillSource === 'EOS' ? 'ring-2 ring-amber-500' : ''
+                }`}
+              onClick={() => handleDrillSource('EOS')}
+            >
+              <div className="text-xs uppercase text-muted-foreground">EOS</div>
+              <div className="mt-3 text-3xl font-semibold text-amber-600">
+                {dashboardKpis.EOS}
               </div>
-            )}
-          </button>
-          <button
-            className={`ul-surface p-5 text-left transition-all hover:ring-2 hover:ring-teal-500/50 ${
-              drillSource === 'Fabric' ? 'ring-2 ring-teal-500' : ''
-            }`}
-            onClick={() => handleDrillSource('Fabric')}
-          >
-            <div className="text-xs uppercase text-muted-foreground">Fabric</div>
-            <div className="mt-3 text-3xl font-semibold text-teal-600">
-              {dashboardKpis.Fabric}
-            </div>
-            {drillSource === 'Fabric' && drillProduct && (
-              <div className="mt-1 text-xs text-muted-foreground">
-                Prodotto: {drilledItems.length}
+              {drillSource === 'EOS' && drillProduct && (
+                <div className="mt-1 text-xs text-muted-foreground">
+                  Prodotto: {drilledItems.length}
+                </div>
+              )}
+            </button>
+            <button
+              className={`ul-surface p-5 text-left transition-all hover:ring-2 hover:ring-teal-500/50 ${drillSource === 'Fabric' ? 'ring-2 ring-teal-500' : ''
+                }`}
+              onClick={() => handleDrillSource('Fabric')}
+            >
+              <div className="text-xs uppercase text-muted-foreground">Fabric</div>
+              <div className="mt-3 text-3xl font-semibold text-teal-600">
+                {dashboardKpis.Fabric}
               </div>
-            )}
-          </button>
-          <button
-            className={`ul-surface p-5 text-left transition-all hover:ring-2 hover:ring-purple-500/50 ${
-              drillSource === 'MICROSOFT 365' ? 'ring-2 ring-purple-500' : ''
-            }`}
-            onClick={() => handleDrillSource('MICROSOFT 365')}
-          >
-            <div className="text-xs uppercase text-muted-foreground">
-              MICROSOFT 365
-            </div>
-            <div className="mt-3 text-3xl font-semibold text-purple-600">
-              {dashboardKpis['MICROSOFT 365']}
-            </div>
-            {drillSource === 'MICROSOFT 365' && drillProduct && (
-              <div className="mt-1 text-xs text-muted-foreground">
-                Prodotto: {drilledItems.length}
+              {drillSource === 'Fabric' && drillProduct && (
+                <div className="mt-1 text-xs text-muted-foreground">
+                  Prodotto: {drilledItems.length}
+                </div>
+              )}
+            </button>
+            <button
+              className={`ul-surface p-5 text-left transition-all hover:ring-2 hover:ring-purple-500/50 ${drillSource === 'MICROSOFT 365' ? 'ring-2 ring-purple-500' : ''
+                }`}
+              onClick={() => handleDrillSource('MICROSOFT 365')}
+            >
+              <div className="text-xs uppercase text-muted-foreground">
+                Microsoft 365
               </div>
-            )}
-          </button>
-        </section>
+              <div className="mt-3 text-3xl font-semibold text-purple-600">
+                {dashboardKpis['MICROSOFT 365']}
+              </div>
+              {drillSource === 'MICROSOFT 365' && drillProduct && (
+                <div className="mt-1 text-xs text-muted-foreground">
+                  Prodotto: {drilledItems.length}
+                </div>
+              )}
+            </button>
+          </section>
+        )}
 
         {/* Product breakdown (shown when drill source is active) */}
         {drillSource && (
@@ -897,11 +1076,10 @@ const DashboardPage = () => {
               {drillProductBreakdown.map((product) => (
                 <button
                   key={product.name}
-                  className={`flex items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-all hover:bg-secondary/50 ${
-                    drillProduct === product.name
+                  className={`flex items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-all hover:bg-secondary/50 ${drillProduct === product.name
                       ? 'bg-primary/10 ring-1 ring-primary'
                       : 'bg-secondary/30'
-                  }`}
+                    }`}
                   onClick={() => handleDrillProduct(product.name)}
                 >
                   <span className="truncate font-medium">{product.name}</span>
@@ -920,8 +1098,24 @@ const DashboardPage = () => {
         )}
 
         {/* Card list - uses drilledItems when drill is active */}
+        {/* Show skeleton cards while filters are hydrating */}
         <section className="mt-6 grid gap-4">
-          {sortedDrilledItems.length === 0 ? (
+          {!filtersReady ? (
+            // Skeleton loading state while filters hydrate
+            <>
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="ul-surface p-5 animate-pulse">
+                  <div className="flex items-start justify-between gap-4 mb-2">
+                    <div className="h-4 w-20 rounded bg-muted" />
+                    <div className="h-6 w-16 rounded bg-muted" />
+                  </div>
+                  <div className="h-6 w-3/4 rounded bg-muted mt-2" />
+                  <div className="h-4 w-full rounded bg-muted mt-3" />
+                  <div className="h-4 w-2/3 rounded bg-muted mt-2" />
+                </div>
+              ))}
+            </>
+          ) : sortedDrilledItems.length === 0 ? (
             <div className="ul-surface p-8 text-sm text-muted-foreground">
               <div className="text-center font-medium">
                 {isDrillActive
@@ -951,103 +1145,24 @@ const DashboardPage = () => {
               )}
             </div>
           ) : (
-            sortedDrilledItems.map((item: ReleaseItem) => {
-              const productColor = getProductColor(item.productName);
-              const availabilityTypes = (item.availabilityTypes ?? [])
-                .map((value) => value.trim())
-                .filter((value) => value.length > 0);
-              const availabilityTypeValues = availabilityTypes.filter((value) =>
-                /preview/i.test(value)
-              );
-              const releaseTypeValues = availabilityTypes.filter(
-                (value) => !/preview/i.test(value)
-              );
-              const infoChips = [
-                asChip('Wave', item.wave, `wave-${item.wave ?? 'none'}`),
-                ...availabilityTypeValues.map((value, index) =>
-                  asChip('Availability', value, `availability-${value}-${index}`)
-                ),
-                ...releaseTypeValues.map((value, index) =>
-                  asChip('Release', value, `release-${value}-${index}`)
-                ),
-                asChip('BC', item.minBcVersion, `bc-${item.minBcVersion ?? 'none'}`)
-              ].filter(Boolean);
-              const sourceLink = item.sourceUrl ?? item.url;
-              return (
-                <article
-                  key={item.id}
-                  className="ul-surface relative overflow-hidden p-5 pl-6"
-                >
-                  <span
-                    className={`absolute left-0 top-0 h-full w-1.5 ${productColor.barClass}`}
-                    aria-hidden="true"
-                  />
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <span
-                        className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${productColor.badgeClass}`}
-                      >
-                        {item.productName}
-                      </span>
-                      <h2 className="mt-2 text-lg font-semibold">{item.title}</h2>
-                      {infoChips.length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {infoChips}
-                        </div>
-                      )}
-                    </div>
-                    <span className="ul-chip">{item.status}</span>
+            <>
+              {visibleItems.map((item: ReleaseItem) => (
+                <ReleaseCard key={item.id} item={item} />
+              ))}
+              {hasMoreItems && (
+                <div className="flex flex-col items-center gap-2 py-4">
+                  <div className="text-xs text-muted-foreground">
+                    Visualizzati {visibleItems.length} di {sortedDrilledItems.length} aggiornamenti
                   </div>
-                  <p className="mt-3 text-sm text-muted-foreground">{item.description}</p>
-                  <div className="mt-4 text-xs text-muted-foreground">
-                    Rilascio: {item.releaseDate}
-                  </div>
-                  <div className="mt-3 flex items-center gap-3 text-xs">
-                    {sourceLink && isValidHttpUrl(sourceLink) ? (
-                      <a
-                        className="text-primary underline-offset-4 hover:underline"
-                        href={sourceLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label={`Vai alla fonte di ${item.title}`}
-                      >
-                        Vai alla fonte
-                      </a>
-                    ) : (
-                      <span className="text-muted-foreground">Fonte non disponibile</span>
-                    )}
-                    {item.learnUrl &&
-                      isValidHttpUrl(item.learnUrl) &&
-                      item.learnUrl !== sourceLink && (
-                        <a
-                          className="inline-flex items-center gap-1 text-primary hover:underline"
-                          href={item.learnUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          aria-label={`Apri documentazione per ${item.title}`}
-                        >
-                          <svg
-                            aria-hidden="true"
-                            viewBox="0 0 24 24"
-                            className="h-4 w-4"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.6"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5V5.5Z" />
-                            <path d="M20 3v16" />
-                            <path d="M7 7h8" />
-                            <path d="M7 10h8" />
-                          </svg>
-                          Documentazione
-                        </a>
-                      )}
-                  </div>
-                </article>
-              );
-            })
+                  <button
+                    className="ul-button ul-button-secondary"
+                    onClick={handleLoadMore}
+                  >
+                    Carica altri {Math.min(ITEMS_PER_PAGE, sortedDrilledItems.length - visibleCount)}
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </section>
       </main>

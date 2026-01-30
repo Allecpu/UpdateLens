@@ -1,70 +1,39 @@
-import { useState } from 'react';
-
-type HelpCategory = {
-  id: string;
-  icon: string;
+type HelpSection = {
   title: string;
   description: string;
-  examples: string[];
+  examples: Array<{
+    query: string;
+    explanation: string;
+  }>;
 };
 
-const HELP_CATEGORIES: HelpCategory[] = [
+const HELP_SECTIONS: HelpSection[] = [
   {
-    id: 'product',
-    icon: '📦',
-    title: 'Filtri Prodotto',
-    description: 'Filtra per prodotto specifico',
-    examples: ['Fabric', 'Business Central', 'Teams', 'Power Platform']
+    title: 'Cosa puoi chiedermi',
+    description: 'Scrivi in linguaggio naturale, capisco italiano e inglese',
+    examples: [
+      { query: 'Fabric ultimi 30 giorni', explanation: 'Novità Fabric recenti' },
+      { query: 'Business Central in GA', explanation: 'BC già disponibili' },
+      { query: 'Teams in preview', explanation: 'Teams in anteprima' },
+      { query: 'quanti elementi ci sono?', explanation: 'Conta risultati' },
+    ]
   },
   {
-    id: 'time',
-    icon: '📅',
-    title: 'Filtri Temporali',
-    description: 'Cerca per periodo di tempo',
-    examples: ['ultimi 30 giorni', 'da gennaio a marzo 2024', 'wave 1 2024', 'wave 2 2025']
-  },
-  {
-    id: 'availability',
-    icon: '🚀',
-    title: 'Disponibilità',
-    description: 'Filtra per stato disponibilità',
-    examples: ['in GA', 'in preview', 'anteprima pubblica']
-  },
-  {
-    id: 'status',
-    icon: '📊',
-    title: 'Stato Rilascio',
-    description: 'Filtra per stato di rilascio',
-    examples: ['lanciato', 'pianificato', 'in sviluppo']
-  },
-  {
-    id: 'source',
-    icon: '🏢',
-    title: 'Sorgente',
-    description: 'Filtra per fonte dati',
-    examples: ['Microsoft', 'EOS', 'Fabric']
-  },
-  {
-    id: 'combined',
-    icon: '🔗',
-    title: 'Combinazioni',
-    description: 'Combina più filtri insieme',
-    examples: ['Fabric ultimi 30 giorni in GA', 'EOS in preview wave 2', 'Teams pianificato 2024']
-  },
-  {
-    id: 'analytics',
-    icon: '📈',
-    title: 'Analytics',
-    description: 'Ottieni informazioni e statistiche',
-    examples: ['quanti elementi?', 'confronta Fabric con EOS', 'trend Microsoft']
-  },
-  {
-    id: 'reset',
-    icon: '🔄',
-    title: 'Reset',
-    description: 'Reimposta i filtri',
-    examples: ['mostra tutto', 'reset filtri']
+    title: 'Esempi di ricerca',
+    description: 'Clicca su un esempio per provarlo',
+    examples: [
+      { query: 'EOS wave 1 2025', explanation: 'EOS Solutions wave 1' },
+      { query: 'Power Platform pianificato', explanation: 'Funzionalità future' },
+      { query: 'da gennaio a marzo 2024', explanation: 'Periodo specifico' },
+      { query: 'mostra tutto', explanation: 'Reset filtri' },
+    ]
   }
+];
+
+const TIPS = [
+  'Puoi combinare più criteri: "Fabric in GA ultimi 30 giorni"',
+  'Usa "wave 1" o "wave 2" per filtrare per release wave',
+  'Scrivi "mostra tutto" per rimuovere i filtri',
 ];
 
 type ChatHelpPanelProps = {
@@ -72,67 +41,57 @@ type ChatHelpPanelProps = {
 };
 
 const ChatHelpPanel = ({ onSelectExample }: ChatHelpPanelProps) => {
-  const [expandedCategory, setExpandedCategory] = useState<string | null>('product');
-
-  const toggleCategory = (categoryId: string) => {
-    setExpandedCategory(prev => prev === categoryId ? null : categoryId);
-  };
-
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
-      <div className="px-4 py-3">
-        <h3 className="text-sm font-medium text-foreground">Come posso aiutarti?</h3>
+    <div className="flex flex-1 flex-col overflow-y-auto">
+      {/* Header */}
+      <div className="px-4 py-3 border-b border-border">
+        <h3 className="text-sm font-semibold text-foreground">Come usare l'assistente</h3>
         <p className="mt-1 text-xs text-muted-foreground">
-          Clicca su un esempio per inserirlo nella chat
+          Scrivi quello che cerchi in linguaggio naturale
         </p>
       </div>
 
-      <div className="flex-1 space-y-1 overflow-y-auto px-3 pb-3">
-        {HELP_CATEGORIES.map((category) => {
-          const isExpanded = expandedCategory === category.id;
-
-          return (
-            <div key={category.id} className="rounded-lg">
-              <button
-                type="button"
-                onClick={() => toggleCategory(category.id)}
-                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors hover:bg-muted/50"
-              >
-                <span>{category.icon}</span>
-                <span className="flex-1">{category.title}</span>
-                <svg
-                  viewBox="0 0 24 24"
-                  className={`h-4 w-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+      {/* Sections */}
+      <div className="flex-1 px-4 py-3 space-y-4">
+        {HELP_SECTIONS.map((section) => (
+          <div key={section.title}>
+            <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+              {section.title}
+            </h4>
+            <div className="space-y-1.5">
+              {section.examples.map((example) => (
+                <button
+                  key={example.query}
+                  type="button"
+                  onClick={() => onSelectExample(example.query)}
+                  className="flex w-full items-center justify-between gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-left transition-colors hover:bg-muted group"
                 >
-                  <path d="m6 9 6 6 6-6" />
-                </svg>
-              </button>
-
-              {isExpanded && (
-                <div className="px-3 pb-2">
-                  <p className="mb-2 text-xs text-muted-foreground">{category.description}</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {category.examples.map((example) => (
-                      <button
-                        key={example}
-                        type="button"
-                        onClick={() => onSelectExample(example)}
-                        className="rounded-full bg-accent/50 px-3 py-1 text-xs transition-colors hover:bg-accent"
-                      >
-                        {example}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+                  <span className="text-sm text-foreground group-hover:text-primary">
+                    "{example.query}"
+                  </span>
+                  <span className="text-xs text-muted-foreground shrink-0">
+                    {example.explanation}
+                  </span>
+                </button>
+              ))}
             </div>
-          );
-        })}
+          </div>
+        ))}
+
+        {/* Tips */}
+        <div className="pt-2 border-t border-border">
+          <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+            Suggerimenti
+          </h4>
+          <ul className="space-y-1.5">
+            {TIPS.map((tip, index) => (
+              <li key={index} className="flex items-start gap-2 text-xs text-muted-foreground">
+                <span className="text-primary mt-0.5">•</span>
+                <span>{tip}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
 
 import { loadAllSnapshots, loadRulesConfig } from '../../services/DataLoader';
+import { useDebouncedInput } from '../../hooks/useDebouncedValue';
 import {
   usePersistedSectionStates,
   STORAGE_KEYS
@@ -26,6 +27,8 @@ import { useBootstrapPresets } from '../../hooks/useBootstrapPresets';
 import FilterListSection from '../components/FilterListSection';
 import FilterSourceToggle from '../components/FilterSourceToggle';
 import PresetSelector from '../components/filters/PresetSelector';
+import TimeHorizonFilter from '../components/TimeHorizonFilter';
+import { isSectionActive } from '../../utils/filterSectionActive';
 import type { ReleaseItem, ReleaseSource } from '../../models/ReleaseItem';
 import type { FilterKey } from '../../services/FilterDefinitions';
 
@@ -83,11 +86,16 @@ const GlobalFiltersPage = () => {
     customerFilters,
     customerFilterMode,
     setCssFilters,
+    setCssFiltersInMemory,
     setCustomerFilters,
     setCustomerMode,
     resetCustomerFilters,
     ensureCssFilters,
-    applyGlobalToCustomers
+    applyGlobalToCustomers,
+    autoSaveEnabled,
+    setAutoSaveUserPreference,
+    disableAutoSaveForPreset,
+    restoreAutoSaveForDefault
   } = useFilterStore();
   const { index, activeCustomerId, customers, updateCustomer } = useCustomerStore();
   const activeIndex = useMemo(() => index.filter((entry) => isEntryActive(entry)), [index]);
@@ -100,7 +108,9 @@ const GlobalFiltersPage = () => {
     activePresetId,
     getDefaultPreset,
     applyPresetToFilters,
-    setActivePreset
+    setActivePreset,
+    isActivePresetDefault,
+    updatePreset
   } = usePresetStore();
 
   const [saveStatus, setSaveStatus] = useState<'saved' | 'pending'>('saved');
@@ -139,18 +149,29 @@ const GlobalFiltersPage = () => {
     const activeId = activePresetId;
 
     if (!activeId && defaultPreset) {
-      // No active preset, load default
       applyPresetToFilters(defaultPreset.id);
       setActivePreset(defaultPreset.id);
+      restoreAutoSaveForDefault(); // Default preset: restore user's auto-save preference
     } else if (activeId) {
-      // Resume active preset
       applyPresetToFilters(activeId);
+      // Check if active preset is default and set auto-save accordingly
+      const activePreset = presets.find(p => p.id === activeId);
+      if (activePreset?.isDefault) {
+        restoreAutoSaveForDefault();
+      } else {
+        disableAutoSaveForPreset();
+      }
     } else if (presets.length > 0) {
-      // Fallback: load first preset
       applyPresetToFilters(presets[0].id);
       setActivePreset(presets[0].id);
+      // First preset might not be default
+      if (presets[0].isDefault) {
+        restoreAutoSaveForDefault();
+      } else {
+        disableAutoSaveForPreset();
+      }
     }
-  }, [snapshotsLoaded, presets.length]); // Run when snapshots loaded and presets available
+  }, [snapshotsLoaded, presets.length]);
 
   const items = snapshotItems;
   const metadata = useMemo(() => buildFilterMetadata(items), [items]);
@@ -378,9 +399,13 @@ const GlobalFiltersPage = () => {
     metadata,
     bcVersionValues
   ]);
+
+  // Deferred filters for expensive computations (filterReleaseItems)
+  const deferredCurrentFilters = useDeferredValue(currentFilters);
+
   const kpiItems = useMemo(
-    () => filterReleaseItems(items, currentFilters),
-    [items, currentFilters]
+    () => filterReleaseItems(items, deferredCurrentFilters),
+    [items, deferredCurrentFilters]
   );
   const dashboardKpis = useMemo(
     () => computeDashboardKpis(kpiItems),
@@ -388,10 +413,10 @@ const GlobalFiltersPage = () => {
   );
 
   const updateFilters = (next: Partial<FilterState>) => {
-    setSaveStatus('pending');
     if (filterScope === 'customer' && activeCustomerId) {
       // Customer Scope: ALWAYS write to override, setting mode to custom
       // STRIP TARGETING FIELDS: they are not part of customer override
+      setSaveStatus('pending');
       const safeNext = { ...next };
       delete safeNext.targetCustomerIds;
       delete safeNext.targetGroupIds;
@@ -401,11 +426,31 @@ const GlobalFiltersPage = () => {
       const nextFilters = { ...currentFilters, ...safeNext };
       setCustomerMode(activeCustomerId, 'custom');
       setCustomerFilters(activeCustomerId, nextFilters);
+      setTimeout(() => setSaveStatus('saved'), 200);
     } else {
       // Global Scope
-      setCssFilters({ ...normalizedGlobal, ...next });
+      // Auto-save behavior:
+      // - ON (Default preset): persist changes immediately AND update the Default preset
+      // - OFF (non-default preset): changes are visible but NOT persisted
+      //   until user clicks "Salva modifiche" on the preset
+      const nextFilters = { ...normalizedGlobal, ...next };
+      if (autoSaveEnabled && isActivePresetDefault()) {
+        setSaveStatus('pending');
+        setCssFilters(nextFilters);
+        // Also auto-update the Default preset
+        const defaultPreset = getDefaultPreset();
+        if (defaultPreset) {
+          updatePreset(defaultPreset.id, { filters: nextFilters });
+        }
+        setTimeout(() => setSaveStatus('saved'), 200);
+      } else {
+        // Non-persistent update: only update in-memory state
+        // User must explicitly save to preset via "Salva modifiche"
+        setCssFiltersInMemory(nextFilters);
+        // Show "non salvato" status to indicate changes need explicit save
+        setSaveStatus('pending');
+      }
     }
-    setTimeout(() => setSaveStatus('saved'), 200);
   };
 
   const onRevertToInherit = () => {
@@ -418,6 +463,13 @@ const GlobalFiltersPage = () => {
   const onResetGlobal = () => {
     setSaveStatus('pending');
     setCssFilters(defaultFilters);
+    // If on Default preset with auto-save ON, also update the preset
+    if (autoSaveEnabled && isActivePresetDefault()) {
+      const defaultPreset = getDefaultPreset();
+      if (defaultPreset) {
+        updatePreset(defaultPreset.id, { filters: defaultFilters });
+      }
+    }
     setTimeout(() => setSaveStatus('saved'), 200);
   };
 
@@ -456,6 +508,15 @@ const GlobalFiltersPage = () => {
     // Even if in customer scope, preset modifies global filters only
     applyPresetToFilters(presetId);
     setActivePreset(presetId);
+
+    // Auto-save management: disable for non-default presets, restore for default
+    const targetPreset = presets.find(p => p.id === presetId);
+    if (targetPreset?.isDefault) {
+      restoreAutoSaveForDefault();
+    } else {
+      disableAutoSaveForPreset();
+    }
+
     setSaveStatus('saved');
   };
 
@@ -941,6 +1002,13 @@ const GlobalFiltersPage = () => {
     });
   };
 
+  // Debounced query input (300ms delay to prevent excessive filtering)
+  const [localQuery, setLocalQuery] = useDebouncedInput(
+    currentFilters.query,
+    (value) => updateFilters({ query: value }),
+    300
+  );
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-4">
@@ -1017,8 +1085,29 @@ const GlobalFiltersPage = () => {
           <span className="inline-flex items-center rounded-full bg-secondary px-2 py-1 text-[11px] text-muted-foreground">
             {ownerBadgeLabel}
           </span>
-          <span>Salvataggio automatico: ON</span>
-          <span>{saveStatus === 'saved' ? 'Salvato' : 'Non salvato'}</span>
+          <label
+            className={`inline-flex items-center gap-2 ${!isActivePresetDefault() ? 'opacity-60' : ''}`}
+            title={!isActivePresetDefault() ? 'Auto-save disponibile solo sul preset Default' : ''}
+          >
+            <input
+              type="checkbox"
+              className="ul-checkbox"
+              checked={autoSaveEnabled}
+              onChange={(e) => {
+                if (isActivePresetDefault()) {
+                  setAutoSaveUserPreference(e.target.checked);
+                }
+              }}
+              disabled={!isActivePresetDefault()}
+            />
+            <span>Auto-save</span>
+            {!isActivePresetDefault() && (
+              <span className="text-[10px] text-amber-500">(solo Default)</span>
+            )}
+          </label>
+          <span className={saveStatus === 'saved' ? 'text-green-600' : 'text-amber-500'}>
+            {saveStatus === 'saved' ? 'Salvato' : 'Non salvato'}
+          </span>
 
           {filterScope === 'global' && (
             <button className="ul-button ul-button-ghost" onClick={onResetGlobal}>
@@ -1106,6 +1195,7 @@ const GlobalFiltersPage = () => {
             activeSources={ALL_RELEASE_SOURCES}
             maxVisible={12}
             disabled={isOwnerDisabled}
+            isActive={isSectionActive('ownerCss', currentFilters)}
           />
           {isOwnerDisabled && (
             <div className="mt-2 text-xs text-amber-400">
@@ -1267,6 +1357,7 @@ const GlobalFiltersPage = () => {
                 activeSources={ALL_RELEASE_SOURCES}
                 maxVisible={12}
                 disabled={isGroupDisabled}
+                isActive={isSectionActive('targetGroups', currentFilters)}
               />
               {isGroupDisabled && (
                 <div className="mt-2 text-xs text-amber-400">
@@ -1384,6 +1475,7 @@ const GlobalFiltersPage = () => {
               matchAllSources={matchAllSources}
               open={baseSectionStates.status}
               onToggle={(isOpen) => toggleBaseSection('status', isOpen)}
+              isActive={isSectionActive('status', currentFilters)}
             />
           )}
           {isFilterVisible('productOrApp') && hasOptionsForSources(metadata.products) && (
@@ -1399,6 +1491,7 @@ const GlobalFiltersPage = () => {
                       activeSources={['Microsoft']}
                       open={baseSectionStates.microsoftProducts}
                       onToggle={(isOpen) => toggleBaseSection('microsoftProducts', isOpen)}
+                      isActive={isSectionActive('products', currentFilters)}
                     />
                   )}
                   {eosProducts.length > 0 && (
@@ -1410,6 +1503,7 @@ const GlobalFiltersPage = () => {
                       activeSources={['EOS']}
                       open={baseSectionStates.eosProducts}
                       onToggle={(isOpen) => toggleBaseSection('eosProducts', isOpen)}
+                      isActive={isSectionActive('products', currentFilters)}
                     />
                   )}
                   {fabricProducts.length > 0 && (
@@ -1421,17 +1515,19 @@ const GlobalFiltersPage = () => {
                       activeSources={['Fabric']}
                       open={baseSectionStates.fabricProducts}
                       onToggle={(isOpen) => toggleBaseSection('fabricProducts', isOpen)}
+                      isActive={isSectionActive('products', currentFilters)}
                     />
                   )}
                   {m365RoadmapProducts.length > 0 && (
                     <FilterListSection
-                      title="Prodotti (MICROSOFT 365)"
+                      title="Prodotti (Microsoft 365)"
                       options={m365RoadmapProducts}
                       selected={currentFilters.products}
                       onChange={(next) => updateProductsForSource('MICROSOFT 365', next)}
                       activeSources={['MICROSOFT 365']}
                       open={baseSectionStates.m365Products}
                       onToggle={(isOpen) => toggleBaseSection('m365Products', isOpen)}
+                      isActive={isSectionActive('products', currentFilters)}
                     />
                   )}
                 </>
@@ -1450,6 +1546,7 @@ const GlobalFiltersPage = () => {
                   matchAllSources={matchAllSources}
                   open={baseSectionStates.products}
                   onToggle={(isOpen) => toggleBaseSection('products', isOpen)}
+                  isActive={isSectionActive('products', currentFilters)}
                 />
               )}
             </>
@@ -1466,6 +1563,7 @@ const GlobalFiltersPage = () => {
               maxVisible={12}
               open={baseSectionStates.bcVersion}
               onToggle={(isOpen) => toggleBaseSection('bcVersion', isOpen)}
+              isActive={isSectionActive('bcVersion', currentFilters)}
             />
           )}
           {isFilterVisible('months') && hasOptionsForSources(metadata.months) && (
@@ -1481,6 +1579,7 @@ const GlobalFiltersPage = () => {
               matchAllSources={matchAllSources}
               open={baseSectionStates.months}
               onToggle={(isOpen) => toggleBaseSection('months', isOpen)}
+              isActive={isSectionActive('months', currentFilters)}
             />
           )}
           {isFilterVisible('query') && (
@@ -1488,8 +1587,8 @@ const GlobalFiltersPage = () => {
               <div className="text-xs uppercase text-muted-foreground">Ricerca</div>
               <input
                 className="ul-input mt-2"
-                value={currentFilters.query}
-                onChange={(event) => updateFilters({ query: event.target.value })}
+                value={localQuery}
+                onChange={(event) => setLocalQuery(event.target.value)}
                 placeholder="Ricerca"
               />
             </div>
@@ -1517,6 +1616,7 @@ const GlobalFiltersPage = () => {
               matchAllSources={matchAllSources}
               open={advancedSectionStates.categories}
               onToggle={(isOpen) => toggleAdvancedSection('categories', isOpen)}
+              isActive={isSectionActive('categories', currentFilters)}
             />
           )}
           {isFilterVisible('tags') && hasOptionsForSources(metadata.tags) && (
@@ -1530,6 +1630,7 @@ const GlobalFiltersPage = () => {
               matchAllSources={matchAllSources}
               open={advancedSectionStates.tags}
               onToggle={(isOpen) => toggleAdvancedSection('tags', isOpen)}
+              isActive={isSectionActive('tags', currentFilters)}
             />
           )}
           {isFilterVisible('wave') && hasOptionsForSources(metadata.waves) && (
@@ -1543,6 +1644,7 @@ const GlobalFiltersPage = () => {
               matchAllSources={matchAllSources}
               open={advancedSectionStates.waves}
               onToggle={(isOpen) => toggleAdvancedSection('waves', isOpen)}
+              isActive={isSectionActive('waves', currentFilters)}
             />
           )}
           {isFilterVisible('availabilityType') &&
@@ -1560,6 +1662,7 @@ const GlobalFiltersPage = () => {
                 matchAllSources={matchAllSources}
                 open={advancedSectionStates.availabilityType}
                 onToggle={(isOpen) => toggleAdvancedSection('availabilityType', isOpen)}
+                isActive={isSectionActive('availabilityType', currentFilters)}
               />
             )}
           {isFilterVisible('enabledFor') && hasOptionsForSources(metadata.enabledFor) && (
@@ -1573,6 +1676,7 @@ const GlobalFiltersPage = () => {
               matchAllSources={matchAllSources}
               open={advancedSectionStates.enabledFor}
               onToggle={(isOpen) => toggleAdvancedSection('enabledFor', isOpen)}
+              isActive={isSectionActive('enabledFor', currentFilters)}
             />
           )}
           {isFilterVisible('geography') && hasOptionsForSources(metadata.geography) && (
@@ -1586,6 +1690,7 @@ const GlobalFiltersPage = () => {
               matchAllSources={matchAllSources}
               open={advancedSectionStates.geography}
               onToggle={(isOpen) => toggleAdvancedSection('geography', isOpen)}
+              isActive={isSectionActive('geography', currentFilters)}
             />
           )}
           {isFilterVisible('language') && hasOptionsForSources(metadata.language) && (
@@ -1599,6 +1704,7 @@ const GlobalFiltersPage = () => {
               matchAllSources={matchAllSources}
               open={advancedSectionStates.language}
               onToggle={(isOpen) => toggleAdvancedSection('language', isOpen)}
+              isActive={isSectionActive('language', currentFilters)}
             />
           )}
 
@@ -1611,7 +1717,9 @@ const GlobalFiltersPage = () => {
                 open={advancedSectionStates.periods}
                 onToggle={(e) => toggleAdvancedSection('periods', (e.target as HTMLDetailsElement).open)}
               >
-                <summary className="cursor-pointer text-xs uppercase text-muted-foreground">
+                <summary className={`cursor-pointer text-xs uppercase text-muted-foreground ${
+                  isSectionActive('periods', currentFilters) ? 'marker:text-primary' : ''
+                }`}>
                   Periodi
                   {sourceTagFor('periodNewDays') && (
                     <span className="ml-2 inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">
@@ -1704,33 +1812,20 @@ const GlobalFiltersPage = () => {
             )}
 
           {isFilterVisible('horizonMonths') && (
-            <div className="mt-4">
-              <div className="text-xs uppercase text-muted-foreground">Orizzonte temporale</div>
-              <div className="mt-2 space-y-3 text-xs">
-                <label className="flex items-center gap-2 text-muted-foreground">
-                  <span className="min-w-[110px]">Horizon (mesi)</span>
-                  <input
-                    type="number"
-                    className="ul-input text-xs"
-                    value={currentFilters.horizonMonths}
-                    onChange={(event) =>
-                      updateFilters({ horizonMonths: Number(event.target.value) })
-                    }
-                  />
-                </label>
-                <label className="flex items-center gap-2 text-muted-foreground">
-                  <span className="min-w-[110px]">History (mesi)</span>
-                  <input
-                    type="number"
-                    className="ul-input text-xs"
-                    value={currentFilters.historyMonths}
-                    onChange={(event) =>
-                      updateFilters({ historyMonths: Number(event.target.value) })
-                    }
-                  />
-                </label>
+            <details className="mt-4">
+              <summary className={`cursor-pointer text-xs uppercase text-muted-foreground ${
+                isSectionActive('timeHorizon', currentFilters) ? 'marker:text-primary' : ''
+              }`}>
+                Orizzonte temporale
+              </summary>
+              <div className="mt-2">
+                <TimeHorizonFilter
+                  historyMonths={currentFilters.historyMonths}
+                  horizonMonths={currentFilters.horizonMonths}
+                  onChange={(values) => updateFilters(values)}
+                />
               </div>
-            </div>
+            </details>
           )}
         </div>
       </section>

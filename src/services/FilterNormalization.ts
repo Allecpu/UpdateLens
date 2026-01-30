@@ -78,11 +78,6 @@ export const normalizeFilters = (
     context.sourceOptions.length === 0 ||
     context.metadata.products.length === 0
   ) {
-    console.log('[FilterDebug] SKIP_NOT_READY', {
-      result: 'No-op (data not ready)',
-      sourcesReady: context.sourceOptions.length,
-      productsReady: context.metadata.products.length
-    });
     return merged;
   }
 

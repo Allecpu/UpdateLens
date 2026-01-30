@@ -5,6 +5,9 @@ import { isFilterSupported } from './FilterDefinitions';
 import { extractCountriesFromHtml } from '../utils/geography';
 import { normalizeProductLabel, normalizeAvailabilityType } from './FilterMetadata';
 
+// Enable debug logging only when needed (set to true for troubleshooting)
+const DEBUG_FILTERS = false;
+
 const toMonthDate = (value: string): Date | null => {
   const [yearRaw, monthRaw] = value.split('-');
   const year = Number(yearRaw);
@@ -35,11 +38,10 @@ const parseDateAny = (value?: string): Date | null => {
   return toMonthDate(value);
 };
 
-const withinLastDays = (date: Date | null, days: number): boolean => {
+const withinLastDays = (date: Date | null, days: number, now: Date): boolean => {
   if (!date) {
     return false;
   }
-  const now = new Date();
   const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
   return date >= cutoff && date <= now;
 };
@@ -48,295 +50,272 @@ export const filterReleaseItems = (
   items: ReleaseItem[],
   filters: FilterState
 ): ReleaseItem[] => {
+  // Pre-compute date boundaries once
   const now = new Date();
+  const nowTime = now.getTime();
   const horizon = addMonths(now, filters.horizonMonths);
   const historyLimit = addMonths(now, -filters.historyMonths);
-  const query = filters.query.trim().toLowerCase();
-  const releaseDateFrom = parseDateAny(filters.releaseDateFrom);
-  const releaseDateTo = parseDateAny(filters.releaseDateTo);
+
+  // Pre-compute filter values as Sets for O(1) lookup
+  const sourcesSet = new Set(filters.sources);
+  const statusesSet = new Set(filters.statuses);
+  const productsSet = new Set(filters.products);
+  const categoriesSet = new Set(filters.categories);
+  const wavesSet = new Set(filters.waves);
+  const tagsSet = new Set(filters.tags);
+  const monthsSet = new Set(filters.months);
+  const enabledForSet = new Set(filters.enabledFor);
+  const geographySet = new Set(filters.geography);
+  const languageSet = new Set(filters.language);
   const bcVersionSet = new Set(
     (filters.bcVersions ?? [])
       .map((value) => Number(value))
       .filter((value) => Number.isFinite(value))
   );
-  // Track which sources have at least one selected product (normalized labels)
+
+  // Pre-compute normalized availability types
+  const normalizedAvailabilityTypes = filters.availabilityTypes.map(normalizeAvailabilityType);
+  const availabilityTypesSet = new Set(normalizedAvailabilityTypes);
+
+  // Pre-compute query
+  const query = filters.query.trim().toLowerCase();
+
+  // Pre-compute date ranges
+  const releaseDateFrom = parseDateAny(filters.releaseDateFrom);
+  const releaseDateTo = parseDateAny(filters.releaseDateTo);
+  const releaseInDaysLimit = filters.releaseInDays > 0
+    ? new Date(nowTime + filters.releaseInDays * 24 * 60 * 60 * 1000)
+    : null;
+
+  // Pre-compute which sources have selected products (single pass)
   const selectedSources = new Set<ReleaseSource>();
-  let matchedProductCount = 0;
-  if (filters.products.length > 0) {
-    items.forEach((item) => {
+  if (productsSet.size > 0) {
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
       const normalizedName = normalizeProductLabel(item.productName);
-      if (filters.products.includes(normalizedName)) {
+      if (productsSet.has(normalizedName)) {
         selectedSources.add(item.source);
-        matchedProductCount++;
       }
-    });
-
-    // Debug: If no products matched, log samples to find the mismatch
-    if (matchedProductCount === 0 && items.length > 0) {
-      const sampleFilterProducts = filters.products.slice(0, 5);
-      const sampleItemProducts = items.slice(0, 5).map(item => ({
-        raw: item.productName,
-        normalized: normalizeProductLabel(item.productName)
-      }));
-      console.warn('[FilterService] PRODUCT_MISMATCH - No filter products matched any items:', {
-        filterProductsCount: filters.products.length,
-        sampleFilterProducts,
-        itemsCount: items.length,
-        sampleItemProducts
-      });
     }
   }
 
-  // DEBUG: Track which filters are eliminating items
-  const debugCounts = {
-    total: items.length,
-    afterSources: 0,
-    afterStatuses: 0,
-    afterProducts: 0,
-    afterHorizon: 0,
-    afterHistory: 0,
-    final: 0
-  };
+  // Check if filters are active (for early exit optimization)
+  const hasSourcesFilter = sourcesSet.size > 0;
+  const hasStatusesFilter = statusesSet.size > 0;
+  const hasProductsFilter = productsSet.size > 0;
+  const hasCategoriesFilter = categoriesSet.size > 0;
+  const hasWavesFilter = wavesSet.size > 0;
+  const hasAvailabilityTypesFilter = availabilityTypesSet.size > 0;
+  const hasEnabledForFilter = enabledForSet.size > 0;
+  const hasGeographyFilter = geographySet.size > 0;
+  const hasLanguageFilter = languageSet.size > 0;
+  const hasBcVersionFilter = bcVersionSet.size > 0;
+  const hasTagsFilter = tagsSet.size > 0;
+  const hasMonthsFilter = monthsSet.size > 0;
+  const hasPeriodNewDays = filters.periodNewDays > 0;
+  const hasPeriodChangedDays = filters.periodChangedDays > 0;
+  const hasReleaseInDays = filters.releaseInDays > 0;
+  const hasQuery = query.length > 0;
 
-  // Step-by-step filtering with debug counts
-  let remaining = [...items];
+  // Single pass filter - much faster than multiple array.filter() calls
+  const result: ReleaseItem[] = [];
 
-  // 1. Sources filter
-  if (filters.sources.length) {
-    remaining = remaining.filter(item => filters.sources.includes(item.source));
-  }
-  debugCounts.afterSources = remaining.length;
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
 
-  // 2. Statuses filter
-  remaining = remaining.filter(item => {
-    if (isFilterSupported(item.source, 'status') && filters.statuses.length) {
-      return filters.statuses.includes(item.status);
+    // 1. Sources filter
+    if (hasSourcesFilter && !sourcesSet.has(item.source)) {
+      continue;
     }
-    return true;
-  });
-  debugCounts.afterStatuses = remaining.length;
 
-  // 3. Products filter (uses normalized product names for comparison)
-  // Debug: Track why items are being filtered out
-  const productFilterDebug = {
-    passedNotSupported: 0,
-    failedEmptyProducts: 0,
-    failedSourceNotSelected: 0,
-    failedProductNotInList: 0,
-    passed: 0
-  };
+    // 2. Statuses filter
+    if (hasStatusesFilter && isFilterSupported(item.source, 'status')) {
+      if (!statusesSet.has(item.status)) {
+        continue;
+      }
+    }
 
-  remaining = remaining.filter(item => {
-    if (!isFilterSupported(item.source, 'productOrApp')) {
-      productFilterDebug.passedNotSupported++;
-      return true;
+    // 3. Products filter
+    if (hasProductsFilter && isFilterSupported(item.source, 'productOrApp')) {
+      if (!selectedSources.has(item.source)) {
+        continue;
+      }
+      const normalizedItemProduct = normalizeProductLabel(item.productName);
+      if (!productsSet.has(normalizedItemProduct)) {
+        continue;
+      }
     }
-    if (filters.products.length === 0) {
-      productFilterDebug.failedEmptyProducts++;
-      return false;
-    }
-    if (!selectedSources.has(item.source)) {
-      productFilterDebug.failedSourceNotSelected++;
-      return false;
-    }
-    const normalizedItemProduct = normalizeProductLabel(item.productName);
-    if (filters.products.includes(normalizedItemProduct)) {
-      productFilterDebug.passed++;
-      return true;
-    }
-    productFilterDebug.failedProductNotInList++;
-    return false;
-  });
-  debugCounts.afterProducts = remaining.length;
 
-  // Log product filter breakdown when results are 0
-  if (remaining.length === 0 && items.length > 0) {
-    console.warn('[FilterService] PRODUCT_FILTER_BREAKDOWN:', productFilterDebug);
-    console.warn('[FilterService] selectedSources:', Array.from(selectedSources));
-    console.warn('[FilterService] matchedProductCount:', matchedProductCount);
-  }
-
-  // 4. Horizon filter
-  remaining = remaining.filter(item => {
+    // 4. Horizon filter
     const itemDate = toMonthDate(item.availabilityDate);
     if (itemDate && itemDate > horizon) {
-      return false;
+      continue;
     }
-    return true;
-  });
-  debugCounts.afterHorizon = remaining.length;
 
-  // 5. History filter
-  remaining = remaining.filter(item => {
-    const itemDate = toMonthDate(item.availabilityDate);
+    // 5. History filter
     if (itemDate && itemDate < historyLimit) {
-      return false;
+      continue;
     }
-    return true;
-  });
-  debugCounts.afterHistory = remaining.length;
 
-  // 6. All other filters
-  const result = remaining.filter((item) => {
-    if (isFilterSupported(item.source, 'categories') && filters.categories.length) {
-      if (!item.category || !filters.categories.includes(item.category)) {
-        return false;
+    // 6. Categories filter
+    if (hasCategoriesFilter && isFilterSupported(item.source, 'categories')) {
+      if (!item.category || !categoriesSet.has(item.category)) {
+        continue;
       }
     }
 
-    if (isFilterSupported(item.source, 'wave') && filters.waves.length) {
-      if (!item.wave || !filters.waves.includes(item.wave)) {
-        return false;
+    // 7. Wave filter
+    if (hasWavesFilter && isFilterSupported(item.source, 'wave')) {
+      if (!item.wave || !wavesSet.has(item.wave)) {
+        continue;
       }
     }
 
-    if (
-      isFilterSupported(item.source, 'availabilityType') &&
-      filters.availabilityTypes.length
-    ) {
+    // 8. Availability types filter
+    if (hasAvailabilityTypesFilter && isFilterSupported(item.source, 'availabilityType')) {
       const types = item.availabilityTypes ?? [];
-      // Normalize both item types and filter types for consistent matching
-      const normalizedItemTypes = types.map(normalizeAvailabilityType);
-      const normalizedFilterTypes = filters.availabilityTypes.map(normalizeAvailabilityType);
-      const hasType = normalizedFilterTypes.some((type) => normalizedItemTypes.includes(type));
+      let hasType = false;
+      for (let j = 0; j < types.length; j++) {
+        if (availabilityTypesSet.has(normalizeAvailabilityType(types[j]))) {
+          hasType = true;
+          break;
+        }
+      }
       if (!hasType) {
-        return false;
+        continue;
       }
     }
 
-    if (isFilterSupported(item.source, 'enabledFor') && filters.enabledFor.length) {
-      if (!item.enabledFor || !filters.enabledFor.includes(item.enabledFor)) {
-        return false;
+    // 9. Enabled for filter
+    if (hasEnabledForFilter && isFilterSupported(item.source, 'enabledFor')) {
+      if (!item.enabledFor || !enabledForSet.has(item.enabledFor)) {
+        continue;
       }
     }
 
-    if (isFilterSupported(item.source, 'geography') && filters.geography.length) {
+    // 10. Geography filter
+    if (hasGeographyFilter && isFilterSupported(item.source, 'geography')) {
       const geographyValues =
         item.geographyCountries && item.geographyCountries.length > 0
           ? item.geographyCountries
           : extractCountriesFromHtml(item.geography ?? '');
-      const hasGeography = filters.geography.some((geo) => geographyValues.includes(geo));
+      let hasGeography = false;
+      for (let j = 0; j < geographyValues.length; j++) {
+        if (geographySet.has(geographyValues[j])) {
+          hasGeography = true;
+          break;
+        }
+      }
       if (!hasGeography) {
-        return false;
+        continue;
       }
     }
 
-    if (isFilterSupported(item.source, 'language') && filters.language.length) {
-      if (!item.language || !filters.language.includes(item.language)) {
-        return false;
+    // 11. Language filter
+    if (hasLanguageFilter && isFilterSupported(item.source, 'language')) {
+      if (!item.language || !languageSet.has(item.language)) {
+        continue;
       }
     }
 
+    // 12. BC Version filter
     if (isFilterSupported(item.source, 'bcMinVersion')) {
-      if (bcVersionSet.size > 0) {
+      if (hasBcVersionFilter) {
         if (item.minBcVersion == null || !bcVersionSet.has(item.minBcVersion)) {
-          return false;
+          continue;
         }
       } else if (filters.minBcVersionMin !== null) {
         if (item.minBcVersion != null && item.minBcVersion < filters.minBcVersionMin) {
-          return false;
+          continue;
         }
       }
     }
 
-    if (isFilterSupported(item.source, 'tags') && filters.tags.length) {
+    // 13. Tags filter
+    if (hasTagsFilter && isFilterSupported(item.source, 'tags')) {
       const tags = item.tags ?? [];
-      const hasTag = filters.tags.some((tag) => tags.includes(tag));
+      let hasTag = false;
+      for (let j = 0; j < tags.length; j++) {
+        if (tagsSet.has(tags[j])) {
+          hasTag = true;
+          break;
+        }
+      }
       if (!hasTag) {
-        return false;
+        continue;
       }
     }
 
-    if (isFilterSupported(item.source, 'months') && filters.months.length) {
-      if (!filters.months.includes(item.availabilityDate)) {
-        return false;
+    // 14. Months filter
+    if (hasMonthsFilter && isFilterSupported(item.source, 'months')) {
+      if (!monthsSet.has(item.availabilityDate)) {
+        continue;
       }
     }
 
-    if (isFilterSupported(item.source, 'periodNewDays') && filters.periodNewDays > 0) {
+    // 15. Period new days filter
+    if (hasPeriodNewDays && isFilterSupported(item.source, 'periodNewDays')) {
       const firstDate = parseDateAny(item.releaseDate);
-      if (!withinLastDays(firstDate, filters.periodNewDays)) {
-        return false;
+      if (!withinLastDays(firstDate, filters.periodNewDays, now)) {
+        continue;
       }
     }
 
-    if (
-      isFilterSupported(item.source, 'periodChangedDays') &&
-      filters.periodChangedDays > 0
-    ) {
+    // 16. Period changed days filter
+    if (hasPeriodChangedDays && isFilterSupported(item.source, 'periodChangedDays')) {
       const updated = parseDateAny(item.lastUpdatedDate) ?? parseDateAny(item.releaseDate);
-      if (!withinLastDays(updated, filters.periodChangedDays)) {
-        return false;
+      if (!withinLastDays(updated, filters.periodChangedDays, now)) {
+        continue;
       }
     }
 
-    if (isFilterSupported(item.source, 'releaseInDays') && filters.releaseInDays > 0) {
+    // 17. Release in days filter
+    if (hasReleaseInDays && isFilterSupported(item.source, 'releaseInDays')) {
       const releaseDate = parseDateAny(item.releaseDate);
-      if (!releaseDate) {
-        return false;
-      }
-      const nowTime = new Date();
-      const limit = new Date(nowTime.getTime() + filters.releaseInDays * 24 * 60 * 60 * 1000);
-      if (releaseDate < nowTime || releaseDate > limit) {
-        return false;
+      if (!releaseDate || releaseDate < now || releaseDate > releaseInDaysLimit!) {
+        continue;
       }
     }
 
-    if (isFilterSupported(item.source, 'releaseDateRange') && releaseDateFrom) {
+    // 18. Release date range filter
+    if (releaseDateFrom && isFilterSupported(item.source, 'releaseDateRange')) {
       const releaseDate = parseDateAny(item.releaseDate);
       if (!releaseDate || releaseDate < releaseDateFrom) {
-        return false;
+        continue;
       }
     }
 
-    if (isFilterSupported(item.source, 'releaseDateRange') && releaseDateTo) {
+    if (releaseDateTo && isFilterSupported(item.source, 'releaseDateRange')) {
       const releaseDate = parseDateAny(item.releaseDate);
       if (!releaseDate || releaseDate > releaseDateTo) {
-        return false;
+        continue;
       }
     }
 
-    if (isFilterSupported(item.source, 'query') && query) {
+    // 19. Query filter (text search)
+    if (hasQuery && isFilterSupported(item.source, 'query')) {
       const haystack =
         `${item.title} ${item.description} ${item.productName}`.toLowerCase();
       if (!haystack.includes(query)) {
-        return false;
+        continue;
       }
     }
 
-    return true;
-  });
+    // Item passed all filters
+    result.push(item);
+  }
 
-  debugCounts.final = result.length;
-
-  // Log debug info when results are 0 but input > 0
-  if (result.length === 0 && items.length > 0) {
-    console.log('[FilterService] DEBUG_PIPELINE', {
-      ...debugCounts,
-      'filters.sources': filters.sources,
-      'filters.statuses': filters.statuses,
-      'filters.products.length': filters.products.length,
-      'filters.horizonMonths': filters.horizonMonths,
-      'filters.historyMonths': filters.historyMonths,
-      'horizon': horizon.toISOString(),
-      'historyLimit': historyLimit.toISOString(),
-      // Secondary filters that might be eliminating items
-      'filters.categories.length': filters.categories.length,
-      'filters.waves.length': filters.waves.length,
-      'filters.availabilityTypes.length': filters.availabilityTypes.length,
-      'filters.enabledFor.length': filters.enabledFor.length,
-      'filters.geography.length': filters.geography.length,
-      'filters.language.length': filters.language.length,
-      'filters.tags.length': filters.tags.length,
-      'filters.months.length': filters.months.length,
-      'filters.months': filters.months.slice(0, 5),
-      'filters.periodNewDays': filters.periodNewDays,
-      'filters.periodChangedDays': filters.periodChangedDays,
-      'filters.releaseInDays': filters.releaseInDays,
-      'filters.releaseDateFrom': filters.releaseDateFrom,
-      'filters.releaseDateTo': filters.releaseDateTo,
-      'filters.bcVersions.length': filters.bcVersions.length,
-      'filters.query': filters.query
+  // Debug logging (only when enabled)
+  if (DEBUG_FILTERS) {
+    console.log('[FilterService] FILTER_RESULT', {
+      inputCount: items.length,
+      outputCount: result.length,
+      filters: {
+        sources: filters.sources.length,
+        statuses: filters.statuses.length,
+        products: filters.products.length,
+        query: query.length > 0
+      }
     });
   }
 

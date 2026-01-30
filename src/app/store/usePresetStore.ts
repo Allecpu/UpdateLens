@@ -10,6 +10,7 @@ type PresetStoreState = {
   getPreset: (id: string) => FilterPreset | undefined;
   getDefaultPreset: () => FilterPreset | undefined;
   getActivePreset: () => FilterPreset | undefined;
+  isActivePresetDefault: () => boolean;
 
   // Actions
   loadPresets: () => void;
@@ -86,6 +87,11 @@ export const usePresetStore = create<PresetStoreState>((set, get) => {
       const { activePresetId, presets } = get();
       if (!activePresetId) return undefined;
       return presets.find((p) => p.id === activePresetId);
+    },
+
+    isActivePresetDefault: () => {
+      const activePreset = get().getActivePreset();
+      return activePreset?.isDefault === true;
     },
 
     // Actions
@@ -214,15 +220,9 @@ export const usePresetStore = create<PresetStoreState>((set, get) => {
         return;
       }
 
-      console.log(`[PresetStore] Applying preset "${preset.name}" (${id})`);
-      console.log('[PresetStore] Preset filters:', preset.filters);
-
       // Apply to global filters (cssFilters) via useFilterStore
-      // Use getState() to ensure we're updating the current store instance
       const filterStore = useFilterStore.getState();
       filterStore.setCssFilters(preset.filters);
-
-      console.log('[PresetStore] Filters applied to store');
     },
 
     // Internal

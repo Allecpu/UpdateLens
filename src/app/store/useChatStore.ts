@@ -8,6 +8,8 @@ const MAX_HISTORY = 10;
 
 export type ChatTab = 'chat' | 'history' | 'help';
 
+export type SearchScope = 'current' | 'all';
+
 export type ChatMessage = {
   id: string;
   type: 'user' | 'bot';
@@ -23,6 +25,7 @@ type ChatState = {
   messages: ChatMessage[];
   queryHistory: string[];
   activeTab: ChatTab;
+  searchScope: SearchScope;
   toggleChat: () => void;
   closeChat: () => void;
   addMessage: (message: Omit<ChatMessage, 'id'>) => void;
@@ -30,6 +33,7 @@ type ChatState = {
   deleteFromHistory: (query: string) => void;
   clearHistory: () => void;
   setActiveTab: (tab: ChatTab) => void;
+  setSearchScope: (scope: SearchScope) => void;
 };
 
 const createMessageId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -59,8 +63,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
   messages: [],
   queryHistory: loadHistory(),
   activeTab: 'chat',
+  searchScope: 'all',
   toggleChat: () => set((state) => ({ isOpen: !state.isOpen })),
-  closeChat: () => set({ isOpen: false, activeTab: 'chat' }),
+  closeChat: () => set({ isOpen: false, activeTab: 'chat', searchScope: 'all' }),
   addMessage: (message) =>
     set((state) => ({
       messages: [...state.messages, { ...message, id: createMessageId() }]
@@ -86,5 +91,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
     localStorage.removeItem(HISTORY_KEY);
     set({ queryHistory: [] });
   },
-  setActiveTab: (tab) => set({ activeTab: tab })
+  setActiveTab: (tab) => set({ activeTab: tab }),
+  setSearchScope: (scope) => set({ searchScope: scope })
 }));

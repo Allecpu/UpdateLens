@@ -11,7 +11,7 @@ export const RELEASE_SOURCE_LABELS: Record<ReleaseSource, string> = {
   Microsoft: 'Microsoft Release Plans',
   EOS: 'EOS Apps',
   Fabric: 'Microsoft Fabric Roadmap',
-  'MICROSOFT 365': 'MICROSOFT 365'
+  'MICROSOFT 365': 'Microsoft 365'
 };
 
 export type SourceKey = 'microsoft' | 'eos' | 'fabric' | 'm365roadmap';

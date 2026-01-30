@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useChatStore } from '../../store/useChatStore';
 import { useFilterStore } from '../../store/useFilterStore';
@@ -47,19 +47,22 @@ const ChatPanel = () => {
     messages,
     queryHistory,
     activeTab,
+    searchScope,
     toggleChat,
     closeChat,
     addMessage,
     addToHistory,
     deleteFromHistory,
     clearHistory,
-    setActiveTab
+    setActiveTab,
+    setSearchScope
   } = useChatStore();
   const { cssFilters, setChatFilters, clearChatFilters } = useFilterStore();
 
   const [items, setItems] = useState<ReleaseItem[]>([]);
   const [metadata, setMetadata] = useState<FilterMetadata | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Load data on first open
   useEffect(() => {
@@ -88,50 +91,92 @@ const ChatPanel = () => {
 
   const handleSend = useCallback(
     (text: string) => {
-      if (!metadata) return;
+      if (!metadata || isProcessing) return;
 
-      // Add user message and save to history
+      // Add user message and save to history immediately
       addMessage({
         type: 'user',
         text
       });
       addToHistory(text);
 
-      // Parse intent
-      const intent = parseIntent(text, metadata);
+      // Show processing state
+      setIsProcessing(true);
 
-      // Get base filters
-      const baseFilters = cssFilters ?? DEFAULT_FILTERS;
+      // Defer heavy operations to next tick to allow UI to update
+      setTimeout(() => {
+        try {
+          // Parse intent (NLP processing)
+          const intent = parseIntent(text, metadata);
 
-      // Apply filter patch
-      let appliedFilters: FilterState;
-      if (intent.type === 'RESET_FILTERS') {
-        appliedFilters = DEFAULT_FILTERS;
-      } else {
-        appliedFilters = {
-          ...baseFilters,
-          ...intent.filterPatch
-        };
-      }
+          // Get base filters based on search scope
+          const baseFilters = searchScope === 'all'
+            ? DEFAULT_FILTERS
+            : (cssFilters ?? DEFAULT_FILTERS);
 
-      // Filter items
-      const filtered = filterReleaseItems(items, appliedFilters);
+          // Apply filter patch
+          let appliedFilters: FilterState;
+          if (intent.type === 'RESET_FILTERS') {
+            appliedFilters = DEFAULT_FILTERS;
+          } else {
+            appliedFilters = {
+              ...baseFilters,
+              ...intent.filterPatch
+            };
+          }
 
-      // Generate response
-      const response = generateResponse(intent, filtered, items.length);
+          // Filter items (O(n) operation)
+          const filtered = filterReleaseItems(items, appliedFilters);
 
-      // Add bot message
-      addMessage({
-        type: 'bot',
-        text: response.message,
-        items: response.items,
-        showPreview: response.showPreview,
-        canApplyFilters: response.canApplyFilters,
-        filterPatch: intent.filterPatch
-      });
+          // Generate response
+          const response = generateResponse(intent, filtered, items.length);
+
+          // Add bot message
+          addMessage({
+            type: 'bot',
+            text: response.message,
+            items: response.items,
+            showPreview: response.showPreview,
+            canApplyFilters: response.canApplyFilters,
+            filterPatch: intent.filterPatch
+          });
+        } finally {
+          setIsProcessing(false);
+        }
+      }, 0);
     },
-    [metadata, items, cssFilters, addMessage]
+    [metadata, items, cssFilters, searchScope, addMessage, addToHistory, isProcessing]
   );
+
+  // Calculate number of active filters
+  const activeFilterCount = useMemo(() => {
+    if (!cssFilters) return 0;
+
+    let count = 0;
+    const arrayFields: (keyof FilterState)[] = [
+      'targetCustomerIds', 'targetGroupIds', 'targetCssOwners',
+      'products', 'sources', 'statuses', 'categories', 'tags',
+      'waves', 'months', 'availabilityTypes', 'enabledFor',
+      'geography', 'language', 'bcVersions'
+    ];
+
+    for (const field of arrayFields) {
+      const value = cssFilters[field];
+      if (Array.isArray(value) && value.length > 0) {
+        count++;
+      }
+    }
+
+    // Also count non-empty string/number filters
+    if (cssFilters.query && cssFilters.query.trim() !== '') count++;
+    if (cssFilters.periodNewDays && cssFilters.periodNewDays > 0) count++;
+    if (cssFilters.periodChangedDays && cssFilters.periodChangedDays > 0) count++;
+    if (cssFilters.releaseInDays && cssFilters.releaseInDays > 0) count++;
+    if (cssFilters.releaseDateFrom && cssFilters.releaseDateFrom !== '') count++;
+    if (cssFilters.releaseDateTo && cssFilters.releaseDateTo !== '') count++;
+
+    return count;
+  }, [cssFilters]);
 
   const handleApplyFilters = useCallback(
     (filterPatch: Partial<FilterState>) => {
@@ -160,10 +205,14 @@ const ChatPanel = () => {
             messages={messages}
             queryHistory={queryHistory}
             activeTab={activeTab}
+            searchScope={searchScope}
+            activeFilterCount={activeFilterCount}
+            isProcessing={isProcessing}
             onClose={closeChat}
             onSend={handleSend}
             onApplyFilters={handleApplyFilters}
             onSetActiveTab={setActiveTab}
+            onSetSearchScope={setSearchScope}
             onDeleteFromHistory={deleteFromHistory}
             onClearHistory={clearHistory}
           />

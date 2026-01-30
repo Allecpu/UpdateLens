@@ -1,9 +1,10 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef } from 'react';
 import type React from 'react';
 import type { ReleaseSource } from '../../models/ReleaseItem';
 import type { FilterState } from '../store/useFilterStore';
 import type { FilterMetadata, FilterOption } from '../../services/FilterMetadata';
 import type { FilterKey } from '../../services/FilterDefinitions';
+import { useDebouncedInput } from '../../hooks/useDebouncedValue';
 import {
   usePersistedSectionStates,
   STORAGE_KEYS
@@ -15,8 +16,10 @@ import {
   getSupportedSourcesForFilter,
   resolveActiveSources
 } from '../../services/FilterDefinitions';
+import { isSectionActive, isAdvancedSectionActive } from '../../utils/filterSectionActive';
 import FilterListSection from './FilterListSection';
 import FilterSourceToggle from './FilterSourceToggle';
+import TimeHorizonFilter from './TimeHorizonFilter';
 
 export type HideSections = {
   ownerCss?: boolean;
@@ -72,6 +75,41 @@ const optionValuesForSources = (
     .map((option) => option.value);
 };
 
+// Expand/Collapse All button component - defined outside FiltersPanel to prevent
+// recreation on every render (which breaks event handlers)
+const ExpandCollapseButtons = ({
+  onExpandAll,
+  onCollapseAll,
+  hasCollapsed,
+  hasExpanded
+}: {
+  onExpandAll: () => void;
+  onCollapseAll: () => void;
+  hasCollapsed: boolean;
+  hasExpanded: boolean;
+}) => (
+  <div className="flex gap-2 text-[11px]">
+    {hasCollapsed && (
+      <button
+        type="button"
+        className="text-primary underline"
+        onClick={onExpandAll}
+      >
+        Espandi tutto
+      </button>
+    )}
+    {hasExpanded && (
+      <button
+        type="button"
+        className="text-primary underline"
+        onClick={onCollapseAll}
+      >
+        Comprimi tutto
+      </button>
+    )}
+  </div>
+);
+
 const FiltersPanel = ({
   filters,
   onChange,
@@ -88,6 +126,12 @@ const FiltersPanel = ({
   customerPreviewSlot,
   variant = 'full'
 }: Props) => {
+  // Debounced query input (300ms delay to prevent excessive filtering)
+  const [localQuery, setLocalQuery] = useDebouncedInput(
+    filters.query ?? '',
+    (value) => onChange({ query: value }),
+    300
+  );
   const {
     cssOwnerOptions = [],
     customerOptions = [],
@@ -259,6 +303,28 @@ const FiltersPanel = ({
     defaultSidebarAdvancedStates
   );
 
+  // Refs for <details> elements that need programmatic open/close sync
+  // (HTML <details> doesn't fully work as a controlled component in React)
+  const avanzatiDetailsRef = useRef<HTMLDetailsElement>(null);
+  const periodsDetailsRef = useRef<HTMLDetailsElement>(null);
+  const periodsDetailsRefFull = useRef<HTMLDetailsElement>(null);
+
+  // Sync <details> elements' open state with React state
+  useLayoutEffect(() => {
+    if (avanzatiDetailsRef.current) {
+      avanzatiDetailsRef.current.open = advancedSectionStates.avanzati;
+    }
+  }, [advancedSectionStates.avanzati]);
+
+  useLayoutEffect(() => {
+    if (periodsDetailsRef.current) {
+      periodsDetailsRef.current.open = advancedSectionStates.periods;
+    }
+    if (periodsDetailsRefFull.current) {
+      periodsDetailsRefFull.current.open = advancedSectionStates.periods;
+    }
+  }, [advancedSectionStates.periods]);
+
   const toggleBaseSection = useCallback((key: SectionKey, isOpen: boolean) => {
     setBaseSectionStates((prev) => ({ ...prev, [key]: isOpen }));
   }, []);
@@ -313,40 +379,6 @@ const FiltersPanel = ({
   const hasCollapsedAdvanced = Object.values(advancedSectionStates).some((v) => !v);
   const hasExpandedAdvanced = Object.values(advancedSectionStates).some((v) => v);
 
-  // Expand/Collapse All button component
-  const ExpandCollapseButtons = ({
-    onExpandAll,
-    onCollapseAll,
-    hasCollapsed,
-    hasExpanded
-  }: {
-    onExpandAll: () => void;
-    onCollapseAll: () => void;
-    hasCollapsed: boolean;
-    hasExpanded: boolean;
-  }) => (
-    <div className="flex gap-2 text-[11px]">
-      {hasCollapsed && (
-        <button
-          type="button"
-          className="text-primary underline"
-          onClick={onExpandAll}
-        >
-          Espandi tutto
-        </button>
-      )}
-      {hasExpanded && (
-        <button
-          type="button"
-          className="text-primary underline"
-          onClick={onCollapseAll}
-        >
-          Comprimi tutto
-        </button>
-      )}
-    </div>
-  );
-
   // Sidebar layout (compact)
   if (isSidebar) {
     return (
@@ -380,8 +412,8 @@ const FiltersPanel = ({
             <input
               className="ul-input mt-2 text-xs"
               placeholder="Cerca aggiornamenti"
-              value={filters.query ?? ''}
-              onChange={(event) => onChange({ query: event.target.value })}
+              value={localQuery}
+              onChange={(event) => setLocalQuery(event.target.value)}
             />
           </div>
         )}
@@ -400,6 +432,7 @@ const FiltersPanel = ({
                     activeSources={['Microsoft']}
                     open={baseSectionStates.microsoftProducts}
                     onToggle={(isOpen) => toggleBaseSection('microsoftProducts', isOpen)}
+                    isActive={isSectionActive('microsoftProducts', filters, productSourceMap)}
                   />
                 )}
                 {eosProducts.length > 0 && (
@@ -411,6 +444,7 @@ const FiltersPanel = ({
                     activeSources={['EOS']}
                     open={baseSectionStates.eosProducts}
                     onToggle={(isOpen) => toggleBaseSection('eosProducts', isOpen)}
+                    isActive={isSectionActive('eosProducts', filters, productSourceMap)}
                   />
                 )}
                 {fabricProducts.length > 0 && (
@@ -422,17 +456,19 @@ const FiltersPanel = ({
                     activeSources={['Fabric']}
                     open={baseSectionStates.fabricProducts}
                     onToggle={(isOpen) => toggleBaseSection('fabricProducts', isOpen)}
+                    isActive={isSectionActive('fabricProducts', filters, productSourceMap)}
                   />
                 )}
                 {m365RoadmapProducts.length > 0 && (
                   <FilterListSection
-                    title="Prodotti (MICROSOFT 365)"
+                    title="Prodotti (Microsoft 365)"
                     options={m365RoadmapProducts}
                     selected={filters.products ?? []}
                     onChange={(next) => updateProductsForSource('MICROSOFT 365', next)}
                     activeSources={['MICROSOFT 365']}
                     open={baseSectionStates.m365Products}
                     onToggle={(isOpen) => toggleBaseSection('m365Products', isOpen)}
+                    isActive={isSectionActive('m365Products', filters, productSourceMap)}
                   />
                 )}
               </>
@@ -451,6 +487,7 @@ const FiltersPanel = ({
                 matchAllSources={matchAllSources}
                 open={baseSectionStates.products}
                 onToggle={(isOpen) => toggleBaseSection('products', isOpen)}
+                isActive={isSectionActive('products', filters)}
               />
             )}
           </>
@@ -469,6 +506,7 @@ const FiltersPanel = ({
             matchAllSources={matchAllSources}
             open={baseSectionStates.status}
             onToggle={(isOpen) => toggleBaseSection('status', isOpen)}
+            isActive={isSectionActive('status', filters)}
           />
         )}
 
@@ -485,6 +523,7 @@ const FiltersPanel = ({
             maxVisible={12}
             open={baseSectionStates.bcVersion}
             onToggle={(isOpen) => toggleBaseSection('bcVersion', isOpen)}
+            isActive={isSectionActive('bcVersion', filters)}
           />
         )}
 
@@ -502,6 +541,7 @@ const FiltersPanel = ({
             matchAllSources={matchAllSources}
             open={baseSectionStates.months}
             onToggle={(isOpen) => toggleBaseSection('months', isOpen)}
+            isActive={isSectionActive('months', filters)}
           />
         )}
 
@@ -517,15 +557,19 @@ const FiltersPanel = ({
             matchAllSources={matchAllSources}
             open={baseSectionStates.tags}
             onToggle={(isOpen) => toggleBaseSection('tags', isOpen)}
+            isActive={isSectionActive('tags', filters)}
           />
         )}
 
         {/* Avanzati Section (collapsible) */}
         <details
+          ref={avanzatiDetailsRef}
           open={advancedSectionStates.avanzati}
-          onToggle={(e) => toggleAdvancedSection('avanzati', (e.target as HTMLDetailsElement).open)}
+          onToggle={(e) => toggleAdvancedSection('avanzati', (e.currentTarget as HTMLDetailsElement).open)}
         >
-          <summary className="cursor-pointer text-xs font-semibold uppercase text-muted-foreground">
+          <summary className={`cursor-pointer text-xs font-semibold uppercase text-muted-foreground ${
+            isAdvancedSectionActive(filters) ? 'marker:text-primary' : ''
+          }`}>
             Avanzati
           </summary>
           <div className="mt-2 space-y-3">
@@ -551,6 +595,7 @@ const FiltersPanel = ({
                 matchAllSources={matchAllSources}
                 open={advancedSectionStates.categories}
                 onToggle={(isOpen) => toggleAdvancedSection('categories', isOpen)}
+                isActive={isSectionActive('categories', filters)}
               />
             )}
 
@@ -566,6 +611,7 @@ const FiltersPanel = ({
                 matchAllSources={matchAllSources}
                 open={advancedSectionStates.waves}
                 onToggle={(isOpen) => toggleAdvancedSection('waves', isOpen)}
+                isActive={isSectionActive('waves', filters)}
               />
             )}
 
@@ -585,6 +631,7 @@ const FiltersPanel = ({
                   matchAllSources={matchAllSources}
                   open={advancedSectionStates.availabilityType}
                   onToggle={(isOpen) => toggleAdvancedSection('availabilityType', isOpen)}
+                  isActive={isSectionActive('availabilityType', filters)}
                 />
               )}
 
@@ -600,6 +647,7 @@ const FiltersPanel = ({
                 matchAllSources={matchAllSources}
                 open={advancedSectionStates.enabledFor}
                 onToggle={(isOpen) => toggleAdvancedSection('enabledFor', isOpen)}
+                isActive={isSectionActive('enabledFor', filters)}
               />
             )}
 
@@ -615,6 +663,7 @@ const FiltersPanel = ({
                 matchAllSources={matchAllSources}
                 open={advancedSectionStates.geography}
                 onToggle={(isOpen) => toggleAdvancedSection('geography', isOpen)}
+                isActive={isSectionActive('geography', filters)}
               />
             )}
 
@@ -630,6 +679,7 @@ const FiltersPanel = ({
                 matchAllSources={matchAllSources}
                 open={advancedSectionStates.language}
                 onToggle={(isOpen) => toggleAdvancedSection('language', isOpen)}
+                isActive={isSectionActive('language', filters)}
               />
             )}
           </div>
@@ -641,10 +691,16 @@ const FiltersPanel = ({
           isFilterVisible('releaseInDays') ||
           isFilterVisible('releaseDateRange')) && (
           <details
+            ref={periodsDetailsRef}
             open={advancedSectionStates.periods}
-            onToggle={(e) => toggleAdvancedSection('periods', (e.target as HTMLDetailsElement).open)}
+            onToggle={(e) => {
+              e.stopPropagation();
+              toggleAdvancedSection('periods', (e.target as HTMLDetailsElement).open);
+            }}
           >
-            <summary className="cursor-pointer text-xs uppercase text-muted-foreground">
+            <summary className={`cursor-pointer text-xs uppercase text-muted-foreground ${
+              isSectionActive('periods', filters) ? 'marker:text-primary' : ''
+            }`}>
               Periodi
               {sourceTagFor('periodNewDays') && (
                 <span className="ml-2 inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">
@@ -666,6 +722,7 @@ const FiltersPanel = ({
                     <option value={0}>Tutti</option>
                     <option value={7}>Ultimi 7 giorni</option>
                     <option value={30}>Ultimi 30 giorni</option>
+                    <option value={60}>Ultimi 60 giorni</option>
                   </select>
                 </label>
               )}
@@ -682,6 +739,7 @@ const FiltersPanel = ({
                     <option value={0}>Tutti</option>
                     <option value={7}>Ultimi 7 giorni</option>
                     <option value={30}>Ultimi 30 giorni</option>
+                    <option value={60}>Ultimi 60 giorni</option>
                   </select>
                 </label>
               )}
@@ -753,35 +811,21 @@ const FiltersPanel = ({
 
         {/* Orizzonte temporale (Horizon + History) */}
         {isFilterVisible('horizonMonths') && (
-          <div>
-            <div className="text-xs uppercase text-muted-foreground">Orizzonte temporale</div>
-            <div className="mt-2 space-y-2">
-              <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="min-w-[80px]">Horizon</span>
-                <input
-                  type="number"
-                  className="ul-input text-xs"
-                  value={filters.horizonMonths ?? 12}
-                  onChange={(event) =>
-                    onChange({ horizonMonths: Number(event.target.value) })
-                  }
-                />
-                <span>mesi</span>
-              </label>
-              <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="min-w-[80px]">History</span>
-                <input
-                  type="number"
-                  className="ul-input text-xs"
-                  value={filters.historyMonths ?? 12}
-                  onChange={(event) =>
-                    onChange({ historyMonths: Number(event.target.value) })
-                  }
-                />
-                <span>mesi</span>
-              </label>
+          <details className="mt-4">
+            <summary className={`cursor-pointer text-xs uppercase text-muted-foreground ${
+              isSectionActive('timeHorizon', filters) ? 'marker:text-primary' : ''
+            }`}>
+              Orizzonte temporale
+            </summary>
+            <div className="mt-2">
+              <TimeHorizonFilter
+                historyMonths={filters.historyMonths ?? 12}
+                horizonMonths={filters.horizonMonths ?? 12}
+                onChange={(values) => onChange(values)}
+                compact
+              />
             </div>
-          </div>
+          </details>
         )}
       </div>
     );
@@ -812,6 +856,7 @@ const FiltersPanel = ({
               activeSources={ALL_RELEASE_SOURCES}
               maxVisible={12}
               disabled={isOwnerDisabled}
+              isActive={isSectionActive('ownerCss', filters)}
             />
             {isOwnerDisabled && (
               <div className="mt-2 text-xs text-amber-400">
@@ -884,6 +929,7 @@ const FiltersPanel = ({
               defaultOpen
               activeSources={ALL_RELEASE_SOURCES}
               maxVisible={12}
+              isActive={isSectionActive('targetCustomers', filters)}
             />
             {groupOptions.length > 0 ? (
               <>
@@ -896,6 +942,7 @@ const FiltersPanel = ({
                   activeSources={ALL_RELEASE_SOURCES}
                   maxVisible={12}
                   disabled={isGroupDisabled}
+                  isActive={isSectionActive('targetGroups', filters)}
                 />
                 {isGroupDisabled && (
                   <div className="mt-2 text-xs text-amber-400">
@@ -958,6 +1005,7 @@ const FiltersPanel = ({
               matchAllSources={matchAllSources}
               open={baseSectionStates.status}
               onToggle={(isOpen) => toggleBaseSection('status', isOpen)}
+              isActive={isSectionActive('status', filters)}
             />
           )}
           {isFilterVisible('productOrApp') && hasOptionsForSources(metadata.products) && (
@@ -973,6 +1021,7 @@ const FiltersPanel = ({
                       activeSources={['Microsoft']}
                       open={baseSectionStates.microsoftProducts}
                       onToggle={(isOpen) => toggleBaseSection('microsoftProducts', isOpen)}
+                      isActive={isSectionActive('microsoftProducts', filters, productSourceMap)}
                     />
                   )}
                   {eosProducts.length > 0 && (
@@ -984,6 +1033,7 @@ const FiltersPanel = ({
                       activeSources={['EOS']}
                       open={baseSectionStates.eosProducts}
                       onToggle={(isOpen) => toggleBaseSection('eosProducts', isOpen)}
+                      isActive={isSectionActive('eosProducts', filters, productSourceMap)}
                     />
                   )}
                   {fabricProducts.length > 0 && (
@@ -995,17 +1045,19 @@ const FiltersPanel = ({
                       activeSources={['Fabric']}
                       open={baseSectionStates.fabricProducts}
                       onToggle={(isOpen) => toggleBaseSection('fabricProducts', isOpen)}
+                      isActive={isSectionActive('fabricProducts', filters, productSourceMap)}
                     />
                   )}
                   {m365RoadmapProducts.length > 0 && (
                     <FilterListSection
-                      title="Prodotti (MICROSOFT 365)"
+                      title="Prodotti (Microsoft 365)"
                       options={m365RoadmapProducts}
                       selected={filters.products ?? []}
                       onChange={(next) => updateProductsForSource('MICROSOFT 365', next)}
                       activeSources={['MICROSOFT 365']}
                       open={baseSectionStates.m365Products}
                       onToggle={(isOpen) => toggleBaseSection('m365Products', isOpen)}
+                      isActive={isSectionActive('m365Products', filters, productSourceMap)}
                     />
                   )}
                 </>
@@ -1024,6 +1076,7 @@ const FiltersPanel = ({
                   matchAllSources={matchAllSources}
                   open={baseSectionStates.products}
                   onToggle={(isOpen) => toggleBaseSection('products', isOpen)}
+                  isActive={isSectionActive('products', filters)}
                 />
               )}
             </>
@@ -1040,6 +1093,7 @@ const FiltersPanel = ({
               maxVisible={12}
               open={baseSectionStates.bcVersion}
               onToggle={(isOpen) => toggleBaseSection('bcVersion', isOpen)}
+              isActive={isSectionActive('bcVersion', filters)}
             />
           )}
           {isFilterVisible('months') && hasOptionsForSources(metadata.months) && (
@@ -1055,6 +1109,7 @@ const FiltersPanel = ({
               matchAllSources={matchAllSources}
               open={baseSectionStates.months}
               onToggle={(isOpen) => toggleBaseSection('months', isOpen)}
+              isActive={isSectionActive('months', filters)}
             />
           )}
           {isFilterVisible('query') && (
@@ -1062,8 +1117,8 @@ const FiltersPanel = ({
               <div className="text-xs uppercase text-muted-foreground">Ricerca</div>
               <input
                 className="ul-input mt-2"
-                value={filters.query ?? ''}
-                onChange={(event) => onChange({ query: event.target.value })}
+                value={localQuery}
+                onChange={(event) => setLocalQuery(event.target.value)}
                 placeholder="Ricerca"
               />
             </div>
@@ -1092,6 +1147,7 @@ const FiltersPanel = ({
               matchAllSources={matchAllSources}
               open={advancedSectionStates.categories}
               onToggle={(isOpen) => toggleAdvancedSection('categories', isOpen)}
+              isActive={isSectionActive('categories', filters)}
             />
           )}
           {isFilterVisible('tags') && hasOptionsForSources(metadata.tags) && (
@@ -1105,6 +1161,7 @@ const FiltersPanel = ({
               matchAllSources={matchAllSources}
               open={advancedSectionStates.tags}
               onToggle={(isOpen) => toggleAdvancedSection('tags', isOpen)}
+              isActive={isSectionActive('tags', filters)}
             />
           )}
           {isFilterVisible('wave') && hasOptionsForSources(metadata.waves) && (
@@ -1118,6 +1175,7 @@ const FiltersPanel = ({
               matchAllSources={matchAllSources}
               open={advancedSectionStates.waves}
               onToggle={(isOpen) => toggleAdvancedSection('waves', isOpen)}
+              isActive={isSectionActive('waves', filters)}
             />
           )}
           {isFilterVisible('availabilityType') &&
@@ -1135,6 +1193,7 @@ const FiltersPanel = ({
                 matchAllSources={matchAllSources}
                 open={advancedSectionStates.availabilityType}
                 onToggle={(isOpen) => toggleAdvancedSection('availabilityType', isOpen)}
+                isActive={isSectionActive('availabilityType', filters)}
               />
             )}
           {isFilterVisible('enabledFor') && hasOptionsForSources(metadata.enabledFor) && (
@@ -1148,6 +1207,7 @@ const FiltersPanel = ({
               matchAllSources={matchAllSources}
               open={advancedSectionStates.enabledFor}
               onToggle={(isOpen) => toggleAdvancedSection('enabledFor', isOpen)}
+              isActive={isSectionActive('enabledFor', filters)}
             />
           )}
           {isFilterVisible('geography') && hasOptionsForSources(metadata.geography) && (
@@ -1161,6 +1221,7 @@ const FiltersPanel = ({
               matchAllSources={matchAllSources}
               open={advancedSectionStates.geography}
               onToggle={(isOpen) => toggleAdvancedSection('geography', isOpen)}
+              isActive={isSectionActive('geography', filters)}
             />
           )}
           {isFilterVisible('language') && hasOptionsForSources(metadata.language) && (
@@ -1174,6 +1235,7 @@ const FiltersPanel = ({
               matchAllSources={matchAllSources}
               open={advancedSectionStates.language}
               onToggle={(isOpen) => toggleAdvancedSection('language', isOpen)}
+              isActive={isSectionActive('language', filters)}
             />
           )}
 
@@ -1182,11 +1244,17 @@ const FiltersPanel = ({
             isFilterVisible('releaseInDays') ||
             isFilterVisible('releaseDateRange')) && (
               <details
+                ref={periodsDetailsRefFull}
                 className="mt-4"
                 open={advancedSectionStates.periods}
-                onToggle={(e) => toggleAdvancedSection('periods', (e.target as HTMLDetailsElement).open)}
+                onToggle={(e) => {
+                  e.stopPropagation();
+                  toggleAdvancedSection('periods', (e.target as HTMLDetailsElement).open);
+                }}
               >
-                <summary className="cursor-pointer text-xs uppercase text-muted-foreground">
+                <summary className={`cursor-pointer text-xs uppercase text-muted-foreground ${
+                  isSectionActive('periods', filters) ? 'marker:text-primary' : ''
+                }`}>
                   Periodi
                   {sourceTagFor('periodNewDays') && (
                     <span className="ml-2 inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">
@@ -1208,6 +1276,7 @@ const FiltersPanel = ({
                         <option value={0}>Tutti</option>
                         <option value={7}>Ultimi 7 giorni</option>
                         <option value={30}>Ultimi 30 giorni</option>
+                        <option value={60}>Ultimi 60 giorni</option>
                       </select>
                     </label>
                   )}
@@ -1224,6 +1293,7 @@ const FiltersPanel = ({
                         <option value={0}>Tutti</option>
                         <option value={7}>Ultimi 7 giorni</option>
                         <option value={30}>Ultimi 30 giorni</option>
+                        <option value={60}>Ultimi 60 giorni</option>
                       </select>
                     </label>
                   )}
@@ -1277,33 +1347,20 @@ const FiltersPanel = ({
             )}
 
           {isFilterVisible('horizonMonths') && (
-            <div className="mt-4">
-              <div className="text-xs uppercase text-muted-foreground">Orizzonte temporale</div>
-              <div className="mt-2 space-y-3 text-xs">
-                <label className="flex items-center gap-2 text-muted-foreground">
-                  <span className="min-w-[110px]">Horizon (mesi)</span>
-                  <input
-                    type="number"
-                    className="ul-input text-xs"
-                    value={filters.horizonMonths ?? 12}
-                    onChange={(event) =>
-                      onChange({ horizonMonths: Number(event.target.value) })
-                    }
-                  />
-                </label>
-                <label className="flex items-center gap-2 text-muted-foreground">
-                  <span className="min-w-[110px]">History (mesi)</span>
-                  <input
-                    type="number"
-                    className="ul-input text-xs"
-                    value={filters.historyMonths ?? 12}
-                    onChange={(event) =>
-                      onChange({ historyMonths: Number(event.target.value) })
-                    }
-                  />
-                </label>
+            <details className="mt-4">
+              <summary className={`cursor-pointer text-xs uppercase text-muted-foreground ${
+                isSectionActive('timeHorizon', filters) ? 'marker:text-primary' : ''
+              }`}>
+                Orizzonte temporale
+              </summary>
+              <div className="mt-2">
+                <TimeHorizonFilter
+                  historyMonths={filters.historyMonths ?? 12}
+                  horizonMonths={filters.horizonMonths ?? 12}
+                  onChange={(values) => onChange(values)}
+                />
               </div>
-            </div>
+            </details>
           )}
         </div>
       </section>

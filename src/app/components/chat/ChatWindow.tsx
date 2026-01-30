@@ -1,5 +1,5 @@
-import { useEffect, useRef, useMemo } from 'react';
-import type { ChatMessage as ChatMessageData, ChatTab } from '../../store/useChatStore';
+import { useEffect, useRef, useMemo, useCallback } from 'react';
+import type { ChatMessage as ChatMessageData, ChatTab, SearchScope } from '../../store/useChatStore';
 import ChatMessage from './ChatMessage';
 import ChatInput, { type ChatInputHandle } from './ChatInput';
 import ChatHistoryPanel from './ChatHistoryPanel';
@@ -29,10 +29,14 @@ type ChatWindowProps = {
   messages: ChatMessageData[];
   queryHistory: string[];
   activeTab: ChatTab;
+  searchScope: SearchScope;
+  activeFilterCount: number;
+  isProcessing?: boolean;
   onClose: () => void;
   onSend: (text: string) => void;
   onApplyFilters: (filterPatch: Partial<Record<string, unknown>>) => void;
   onSetActiveTab: (tab: ChatTab) => void;
+  onSetSearchScope: (scope: SearchScope) => void;
   onDeleteFromHistory: (query: string) => void;
   onClearHistory: () => void;
 };
@@ -47,28 +51,47 @@ const ChatWindow = ({
   messages,
   queryHistory,
   activeTab,
+  searchScope,
+  activeFilterCount,
+  isProcessing = false,
   onClose,
   onSend,
   onApplyFilters,
   onSetActiveTab,
+  onSetSearchScope,
   onDeleteFromHistory,
   onClearHistory
 }: ChatWindowProps) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<ChatInputHandle>(null);
+  const isProcessingRef = useRef(false);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSelectQuery = (query: string) => {
-    inputRef.current?.setValue(query);
+  // Handle selecting a query from history or help examples
+  // Automatically switches to chat tab and sends the message
+  const handleSelectQuery = useCallback((query: string) => {
+    // Debounce protection against double-clicks
+    if (isProcessingRef.current) return;
+
+    const trimmedQuery = query.trim();
+    if (!trimmedQuery) return;
+
+    isProcessingRef.current = true;
+
+    // Switch to chat tab first
     onSetActiveTab('chat');
-    // Focus the input after a small delay to ensure the tab has switched
+
+    // Send the query immediately
+    onSend(trimmedQuery);
+
+    // Reset debounce flag after a short delay
     setTimeout(() => {
-      inputRef.current?.focus();
-    }, 50);
-  };
+      isProcessingRef.current = false;
+    }, 300);
+  }, [onSetActiveTab, onSend]);
 
   const handleApplyFilters = (message: ChatMessageData) => {
     if (message.filterPatch) {
@@ -161,6 +184,18 @@ const ChatWindow = ({
                 onApplyFilters={() => handleApplyFilters(message)}
               />
             ))}
+            {/* Typing indicator */}
+            {isProcessing && (
+              <div className="flex justify-start">
+                <div className="rounded-2xl rounded-bl-md bg-muted px-4 py-3">
+                  <div className="flex items-center gap-1">
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/60" style={{ animationDelay: '0ms' }} />
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/60" style={{ animationDelay: '150ms' }} />
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/60" style={{ animationDelay: '300ms' }} />
+                  </div>
+                </div>
+              </div>
+            )}
             <div ref={messagesEndRef} />
           </div>
 
@@ -185,8 +220,44 @@ const ChatWindow = ({
             </div>
           )}
 
+          {/* Search Scope Toggle */}
+          <div className="border-t border-border px-3 py-2">
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-muted-foreground">🔍 Cerca in:</span>
+              <div className="flex rounded-lg border border-border bg-muted/30">
+                <button
+                  type="button"
+                  onClick={() => onSetSearchScope('current')}
+                  className={`px-2 py-1 rounded-l-lg transition-colors ${
+                    searchScope === 'current'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'hover:bg-muted'
+                  }`}
+                >
+                  Filtri attuali
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onSetSearchScope('all')}
+                  className={`px-2 py-1 rounded-r-lg transition-colors ${
+                    searchScope === 'all'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'hover:bg-muted'
+                  }`}
+                >
+                  Tutti
+                </button>
+              </div>
+            </div>
+            {searchScope === 'current' && activeFilterCount > 0 && (
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                {activeFilterCount} filtri attivi
+              </p>
+            )}
+          </div>
+
           {/* Input */}
-          <ChatInput ref={inputRef} onSend={onSend} />
+          <ChatInput ref={inputRef} onSend={onSend} disabled={isProcessing} />
         </>
       )}
 

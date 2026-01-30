@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { FilterState } from '../../../models/Filters';
 import { usePresetStore } from '../../store/usePresetStore';
+import { useFilterStore } from '../../store/useFilterStore';
 
 type PresetSelectorProps = {
   currentFilters: FilterState;
@@ -45,7 +46,11 @@ const PresetSelector = ({ currentFilters, onPresetChange, disabled, loading, ope
 
   const handleSave = () => {
     if (!activePresetId) return;
+    // Update the preset with current filters
     updatePreset(activePresetId, { filters: currentFilters });
+    // Also persist to cssFilters (in case we were in non-auto-save mode)
+    const { setCssFilters } = useFilterStore.getState();
+    setCssFilters(currentFilters);
     alert('Preset aggiornato con successo');
   };
 

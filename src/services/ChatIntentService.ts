@@ -188,16 +188,22 @@ const fuzzyMatchWithTypo = (
 const fuzzyMatchProduct = (
   query: string,
   metadata: FilterMetadata
-): { match: string | null; correction?: { original: string; corrected: string } } => {
+): { match: string | null; matches?: string[]; correction?: { original: string; corrected: string } } => {
   const normalized = query.toLowerCase().trim();
 
-  // Check aliases first
+  // Check aliases first - find ALL products containing the alias term
   const aliasMatch = PRODUCT_ALIASES[normalized];
   if (aliasMatch) {
-    const found = metadata.products.find(
-      p => p.value.toLowerCase() === aliasMatch.toLowerCase()
+    const matchingProducts = metadata.products.filter(
+      p => p.value.toLowerCase().includes(aliasMatch.toLowerCase()) ||
+           aliasMatch.toLowerCase().includes(p.value.toLowerCase())
     );
-    if (found) return { match: found.value };
+    if (matchingProducts.length > 0) {
+      return {
+        match: matchingProducts[0].value,
+        matches: matchingProducts.map(p => p.value)
+      };
+    }
   }
 
   // Check alias with typo tolerance
@@ -205,12 +211,14 @@ const fuzzyMatchProduct = (
   const aliasTypoResult = fuzzyMatchWithTypo(normalized, aliasKeys);
   if (aliasTypoResult.match && aliasTypoResult.corrected) {
     const aliasValue = PRODUCT_ALIASES[aliasTypoResult.match];
-    const found = metadata.products.find(
-      p => p.value.toLowerCase() === aliasValue.toLowerCase()
+    const matchingProducts = metadata.products.filter(
+      p => p.value.toLowerCase().includes(aliasValue.toLowerCase()) ||
+           aliasValue.toLowerCase().includes(p.value.toLowerCase())
     );
-    if (found) {
+    if (matchingProducts.length > 0) {
       return {
-        match: found.value,
+        match: matchingProducts[0].value,
+        matches: matchingProducts.map(p => p.value),
         correction: { original: query, corrected: aliasTypoResult.match }
       };
     }
@@ -234,12 +242,17 @@ const fuzzyMatchProduct = (
     };
   }
 
-  // Partial match
-  const partialMatch = metadata.products.find(
+  // Partial match - find ALL products containing the search term
+  const partialMatches = metadata.products.filter(
     p => p.value.toLowerCase().includes(normalized) ||
       normalized.includes(p.value.toLowerCase())
   );
-  if (partialMatch) return { match: partialMatch.value };
+  if (partialMatches.length > 0) {
+    return {
+      match: partialMatches[0].value,
+      matches: partialMatches.map(p => p.value)
+    };
+  }
 
   return { match: null };
 };
@@ -506,6 +519,7 @@ const extractSource = (text: string): ExtractResult<ReleaseSource> => {
 
 /**
  * Extract multiple products from text (supports "e", ",")
+ * When an alias matches, finds ALL products containing that term (not just exact matches)
  */
 const extractMultipleProducts = (
   text: string,
@@ -522,12 +536,20 @@ const extractMultipleProducts = (
   for (const [alias, productName] of sortedAliases) {
     const pattern = new RegExp(`\\b${alias.replace(/\s+/g, '\\s+')}\\b`, 'i');
     if (pattern.test(remaining.toLowerCase())) {
-      const found = metadata.products.find(
-        p => p.value.toLowerCase() === productName.toLowerCase()
+      // Find ALL products containing the alias term (partial match)
+      const matchingProducts = metadata.products.filter(
+        p => p.value.toLowerCase().includes(productName.toLowerCase()) ||
+             productName.toLowerCase().includes(p.value.toLowerCase())
       );
-      if (found && !values.includes(found.value)) {
-        values.push(found.value);
-        labels.push(found.value);
+
+      for (const found of matchingProducts) {
+        if (!values.includes(found.value)) {
+          values.push(found.value);
+          labels.push(found.value);
+        }
+      }
+
+      if (matchingProducts.length > 0) {
         remaining = remaining.replace(pattern, ' ').replace(/\s+/g, ' ').trim();
       }
     }
@@ -764,11 +786,12 @@ export const parseIntent = (
     }
 
     if (productResult.match) {
+      const matchedProducts = productResult.matches ?? [productResult.match];
       const newIntent: ParsedIntent = {
         ...lastIntent,
-        type: 'FILTER_BY_PRODUCT',
-        entities: [productResult.match],
-        filterPatch: { ...lastIntent.filterPatch, products: [productResult.match] },
+        type: matchedProducts.length > 1 ? 'FILTER_COMBINED' : 'FILTER_BY_PRODUCT',
+        entities: matchedProducts,
+        filterPatch: { ...lastIntent.filterPatch, products: matchedProducts },
         correction: productResult.correction
       };
       lastIntent = newIntent;
@@ -805,6 +828,26 @@ export const parseIntent = (
     .replace(/^(?:le\s+)?(?:ultime\s+)?novit[àa]\s*/i, '')
     .replace(/^(?:per|di|su|da)\s+/i, '')
     .trim();
+
+  // For simple single-word queries (like "copilot", "teams", "excel"),
+  // use text search to find ALL items containing that term anywhere
+  // (in title, description, or product name)
+  const isSingleWord = !workingText.includes(' ') && workingText.length >= 3;
+  const looksLikeProductKeyword = isSingleWord && (
+    PRODUCT_ALIASES[workingText.toLowerCase()] !== undefined ||
+    metadata.products.some(p => p.value.toLowerCase().includes(workingText.toLowerCase()))
+  );
+
+  if (isSingleWord && looksLikeProductKeyword) {
+    const intent: ParsedIntent = {
+      type: 'SEARCH_TEXT',
+      entities: [workingText],
+      filterPatch: { query: workingText },
+      negated
+    };
+    lastIntent = intent;
+    return intent;
+  }
 
   // Extract all entities
   const filterPatch: Partial<FilterState> = {};
@@ -904,12 +947,34 @@ export const parseIntent = (
         return intent;
       }
 
+      // For single terms that could be product-related keywords (like "copilot"),
+      // use text search instead of product filter to find ALL matching items
+      // (in title, description, AND product name)
       const productTypo = fuzzyMatchProduct(cleanedText, metadata);
-      if (productTypo.match) {
+
+      // If it's a common product keyword or has multiple matches, prefer text search
+      // This ensures we find items where the term appears anywhere, not just in product name
+      const isProductKeyword = productTypo.matches && productTypo.matches.length > 1;
+      const isSingleWord = !cleanedText.includes(' ');
+
+      if (isProductKeyword || isSingleWord) {
+        // Use text search for broader results
         const intent: ParsedIntent = {
-          type: 'FILTER_BY_PRODUCT',
-          entities: [productTypo.match],
-          filterPatch: { products: [productTypo.match] },
+          type: 'SEARCH_TEXT',
+          entities: [cleanedText],
+          filterPatch: { query: cleanedText }
+        };
+        lastIntent = intent;
+        return intent;
+      }
+
+      if (productTypo.match) {
+        // Use all matching products if available, otherwise use single match
+        const matchedProducts = productTypo.matches ?? [productTypo.match];
+        const intent: ParsedIntent = {
+          type: matchedProducts.length > 1 ? 'FILTER_COMBINED' : 'FILTER_BY_PRODUCT',
+          entities: matchedProducts,
+          filterPatch: { products: matchedProducts },
           negated,
           correction: productTypo.correction
         };

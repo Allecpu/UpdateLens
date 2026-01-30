@@ -1,4 +1,4 @@
-import { useDeferredValue, useMemo, useState } from 'react';
+import { useDeferredValue, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReleaseSource } from '../../models/ReleaseItem';
 import { ALL_RELEASE_SOURCES } from '../../services/FilterDefinitions';
 import type { FilterOption } from '../../services/FilterMetadata';
@@ -22,6 +22,8 @@ type Props = {
   open?: boolean;
   /** Callback when section is toggled (enables controlled mode) */
   onToggle?: (isOpen: boolean) => void;
+  /** Indicates the section has active filters (colors the caret) */
+  isActive?: boolean;
 };
 
 const FilterListSection = ({
@@ -40,12 +42,23 @@ const FilterListSection = ({
   showBulkActions = true,
   scrollable = true,
   open,
-  onToggle
+  onToggle,
+  isActive = false
 }: Props) => {
   // Controlled mode: use open prop; Uncontrolled mode: use defaultOpen
   const isControlled = open !== undefined;
   const effectiveOpen = isControlled ? open : defaultOpen;
+  const detailsRef = useRef<HTMLDetailsElement>(null);
   const [query, setQuery] = useState('');
+
+  // Sync the <details> element's open state with React state
+  // This is necessary because <details> manages its own internal state
+  // and doesn't respond correctly to programmatic prop changes (React quirk)
+  useLayoutEffect(() => {
+    if (isControlled && detailsRef.current) {
+      detailsRef.current.open = effectiveOpen;
+    }
+  }, [isControlled, effectiveOpen]);
   const [showAll, setShowAll] = useState(false);
   const deferredQuery = useDeferredValue(query);
   const effectiveSources = useMemo(
@@ -99,6 +112,9 @@ const FilterListSection = ({
     : 'underline';
 
   const handleToggle = (event: React.SyntheticEvent<HTMLDetailsElement>) => {
+    // Stop propagation to prevent parent <details> elements from receiving
+    // the toggle event (fixes nested accordion collapse bug)
+    event.stopPropagation();
     if (onToggle) {
       onToggle(event.currentTarget.open);
     }
@@ -106,15 +122,16 @@ const FilterListSection = ({
 
   return (
     <details
+      ref={detailsRef}
       className={`mt-4 ${disabled ? 'opacity-60' : ''}`}
       open={effectiveOpen}
       onToggle={handleToggle}
       aria-disabled={disabled}
     >
       <summary
-        className={`text-xs uppercase text-muted-foreground ${
-          disabled ? 'cursor-not-allowed' : 'cursor-pointer'
-        }`}
+        className={`text-xs uppercase ${
+          isActive ? 'text-muted-foreground marker:text-primary' : 'text-muted-foreground'
+        } ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}
       >
         <span>{title}</span>
         {sourceTag && (

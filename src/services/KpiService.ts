@@ -7,7 +7,7 @@ export const DASHBOARD_KPI_DEFINITIONS: { key: DashboardKpiKey; label: string }[
   { key: 'Microsoft', label: 'Microsoft' },
   { key: 'EOS', label: 'EOS' },
   { key: 'Fabric', label: 'Fabric' },
-  { key: 'MICROSOFT 365', label: 'MICROSOFT 365' }
+  { key: 'MICROSOFT 365', label: 'Microsoft 365' }
 ];
 
 export const computeDashboardKpis = (
