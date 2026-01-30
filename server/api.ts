@@ -104,6 +104,10 @@ export const createApi = () => {
 
   app.use(express.json({ limit: '10mb' }));
 
+  // Serve static frontend files
+  const distPath = path.resolve(__dirname, '..', 'dist');
+  app.use(express.static(distPath));
+
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok' });
   });
@@ -537,6 +541,11 @@ export const createApi = () => {
     } catch (error) {
       res.status(500).json({ error: 'Errore durante l\'upload dell\'immagine.' });
     }
+  });
+
+  // SPA fallback - serve index.html for non-API routes
+  app.get('*', (_req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'));
   });
 
   return app;
