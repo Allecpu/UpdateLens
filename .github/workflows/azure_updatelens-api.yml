@@ -1,3 +1,11 @@
+name: Build and deploy Node.js app to Azure Web App - updatelens-api
+
+on:
+  push:
+    branches:
+      - Azure
+  workflow_dispatch:
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -15,9 +23,29 @@ jobs:
       - name: Install deps
         run: npm ci
 
-      # Build frontend (Vite -> dist)
+      - name: Detect Vite root (where index.html is)
+        id: vite_root
+        shell: bash
+        run: |
+          set -e
+          INDEX_PATH="$(find . -maxdepth 5 -name index.html -not -path './node_modules/*' | head -n 1)"
+          if [ -z "$INDEX_PATH" ]; then
+            echo "index.html not found in repo (maxdepth 5). Fix the repository/package." >&2
+            exit 1
+          fi
+          ROOT_DIR="$(dirname "$INDEX_PATH")"
+          echo "Found index.html at: $INDEX_PATH"
+          echo "VITE_ROOT=$ROOT_DIR" >> $GITHUB_ENV
+          echo "OUT_DIR=$(pwd)/dist" >> $GITHUB_ENV
+
+      # Build frontend (Vite -> dist at repo root, always)
       - name: Build client
-        run: npm run build
+        shell: bash
+        run: |
+          set -e
+          echo "Using VITE_ROOT=$VITE_ROOT"
+          npx vite build --root "$VITE_ROOT" --outDir "$OUT_DIR"
+          test -f dist/index.html
 
       # Build server (TS -> server-dist)
       - name: Build server
@@ -25,6 +53,7 @@ jobs:
 
       - name: Create deploy package (dist + server-dist + prod deps only)
         run: |
+          set -e
           rm -rf deploy
           mkdir -p deploy
 
@@ -43,3 +72,37 @@ jobs:
         with:
           name: deploy-package
           path: deploy.zip
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: deploy-package
+
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_3657520D6E074B449CAC38EFA4EF8865 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_53ABC2563A1D4368A6B5EEC80EB3401A }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_DD0E651561084DFDB83AFFB2EE78E235 }}
+
+      - name: Disable Oryx build on App Service
+        run: |
+          az webapp config appsettings set \
+            --name updatelens-api \
+            --resource-group rg-updatelens-test \
+            --settings SCM_DO_BUILD_DURING_DEPLOYMENT=false ENABLE_ORYX_BUILD=false
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: updatelens-api
+          slot-name: Production
+          package: deploy.zip
