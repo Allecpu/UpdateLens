@@ -1,4 +1,4 @@
-name: Build and deploy API to Azure Web App - updatelens-api
+name: Build and deploy Node.js app to Azure Web App - updatelens-api
 
 on:
   push:
@@ -15,30 +15,45 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Node.js version
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
 
-      - name: Install dependencies
+      # Install completo (serve per compilare server-dist)
+      - name: Install deps
         run: npm ci
 
-      - name: Build backend
+      # Compila il server
+      - name: Build server
         run: npm run build:server
 
-      - name: Prepare deploy package
+      # Crea una cartella di deploy "pulita" e installa SOLO deps production lì dentro
+      - name: Create deploy package (prod deps only)
         run: |
           rm -rf deploy
           mkdir -p deploy
-          cp -R server-dist deploy/server-dist
-          cp package.json package-lock.json deploy/
 
-      - name: Upload artifact for deployment job
+          # Copia ciò che serve in runtime
+          cp package.json package-lock.json deploy/
+          cp -R server-dist deploy/server-dist
+
+          # Installa solo production deps nella cartella deploy
+          npm ci --omit=dev --prefix deploy
+
+          # (Opzionale) verifica rapida che express ci sia
+          test -d deploy/node_modules/express
+
+          # Zip finale
+          cd deploy
+          zip -r ../deploy.zip .
+          cd ..
+
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: api-package
-          path: deploy
+          name: deploy-package
+          path: deploy.zip
 
   deploy:
     runs-on: ubuntu-latest
@@ -48,11 +63,10 @@ jobs:
       contents: read
 
     steps:
-      - name: Download artifact from build job
+      - name: Download artifact
         uses: actions/download-artifact@v4
         with:
-          name: api-package
-          path: deploy
+          name: deploy-package
 
       - name: Login to Azure
         uses: azure/login@v2
@@ -64,9 +78,6 @@ jobs:
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
-          app-name: 'updatelens-api'
-          slot-name: 'Production'
-          package: deploy
-
-
-          
+          app-name: updatelens-api
+          slot-name: Production
+          package: deploy.zip
