@@ -105,6 +105,9 @@ jobs:
             --resource-group rg-updatelens-test \
             --startup-file "node server-dist/index.js"
 
+      - name: Wait for App Service restart
+        run: sleep 60
+
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
