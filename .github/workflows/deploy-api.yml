@@ -79,6 +79,10 @@ jobs:
           # Install ALL dependencies (including dev for refresh/build scripts)
           cd deploy
           npm ci
+          if [ ! -d "node_modules/express" ]; then
+            echo "ERROR: express not installed in deploy/node_modules"
+            exit 1
+          fi
 
           # Verify structure
           echo "=== Deploy folder structure ==="
@@ -142,7 +146,7 @@ jobs:
           az webapp config set \
             --name updatelens-api \
             --resource-group rg-updatelens-test \
-            --startup-file "node server-dist/index.js" \
+            --startup-file "node /home/site/wwwroot/server-dist/index.js" \
             --always-on true
 
       - name: Restart App Service
