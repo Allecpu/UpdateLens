@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
-import { initSchema } from './schema';
+import { initSchema } from "./schema.js";
 
 const resolveDbPath = (): string => {
   const baseDir = path.resolve(process.cwd(), 'data');

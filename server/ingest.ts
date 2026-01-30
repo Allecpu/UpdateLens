@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
-import { createDb } from './db';
-import { buildReleasePlansUrl, isValidGuid } from './releaseplans';
-import { normalizeText, parseDateFull, parseMonthDate, resolveAppName } from './normalize';
+import { createDb } from "./db.js";
+import { buildReleasePlansUrl, isValidGuid } from "./releaseplans.js";
+import { normalizeText, parseDateFull, parseMonthDate, resolveAppName } from "./normalize.js";
 
 type RawMicrosoftItem = {
   ['Product name']?: string;

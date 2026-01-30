@@ -1,7 +1,7 @@
 import express from 'express';
-import { createDb } from './db';
-import { buildRefreshZip, type RefreshSource } from './refreshZip';
-import { buildReleaseZip } from './releaseZip';
+import { createDb } from "./db.js";
+import { buildRefreshZip, type RefreshSource } from "./refreshZip.js";
+import { buildReleaseZip } from "./releaseZip.js";
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

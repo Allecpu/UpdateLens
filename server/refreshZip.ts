@@ -93,7 +93,8 @@ export type RefreshZipResult = {
 export const buildRefreshZip = async (
   sources: RefreshSource[]
 ): Promise<RefreshZipResult> => {
-  const refreshSources = sources.length > 0 ? sources : ['microsoft', 'eos'];
+  const refreshSources: RefreshSource[] =
+    sources.length > 0 ? sources : ['microsoft', 'eos'];
   await runRefreshScripts(refreshSources);
 
   const latestPath = path.resolve(repoRoot, 'public', 'data', 'latest.json');
