@@ -6,6 +6,7 @@
     "scripts":  {
                     "server:dev":  "tsx server/index.ts",
                     "test:releaseplans":  "tsx tools/releaseplansUrlCheck.ts",
+                    "refresh:all":  "npm run refresh:microsoft && npm run refresh:eos && npm run refresh:m365roadmap && npm run refresh:fabric",
                     "refresh:eos":  "tsx tools/refreshEos.ts",
                     "refresh:m365roadmap":  "tsx tools/refreshM365Roadmap.ts",
                     "build":  "vite build",

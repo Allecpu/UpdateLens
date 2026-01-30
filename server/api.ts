@@ -304,6 +304,12 @@ export const createApi = () => {
   });
 
   app.post('/api/refresh-zip', async (req, res) => {
+    // Refresh is disabled on Azure - data is updated via scheduled GitHub Actions
+    if (process.env.DB_PATH === '/home/data') {
+      return res.status(501).json({
+        error: 'Refresh non disponibile su Azure. I dati vengono aggiornati automaticamente ogni mese via GitHub Actions.'
+      });
+    }
     try {
       const sourcesRaw = (req.body?.sources ?? []) as string[];
       const sources = sourcesRaw
@@ -355,6 +361,12 @@ export const createApi = () => {
   });
 
   app.post('/api/sources/update-all', async (_req, res) => {
+    // Refresh is disabled on Azure - data is updated via scheduled GitHub Actions
+    if (process.env.DB_PATH === '/home/data') {
+      return res.status(501).json({
+        error: 'Refresh non disponibile su Azure. I dati vengono aggiornati automaticamente ogni mese via GitHub Actions.'
+      });
+    }
     try {
       const sources: Array<'microsoft' | 'eos' | 'fabric'> = ['microsoft', 'eos', 'fabric'];
 
