@@ -366,79 +366,46 @@ export const createApi = () => {
       const functionUrl = process.env.AZURE_FUNCTION_URL;
       const functionKey = process.env.AZURE_FUNCTION_KEY;
 
-      // If Azure Functions are configured, use them
-      if (functionUrl && functionKey) {
-        try {
-          const response = await fetch(`${functionUrl}/api/refreshAll?code=${functionKey}`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            }
-          });
-
-          if (response.ok) {
-            const data = await response.json();
-            return res.json(data);
-          } else {
-            const errorData = await response.json().catch(() => ({}));
-            return res.status(response.status).json({
-              error: `Errore Azure Functions: ${response.status}`,
-              details: errorData
-            });
-          }
-        } catch (error) {
-          return res.status(500).json({
-            error: 'Errore durante la chiamata ad Azure Functions: ' + (error instanceof Error ? error.message : String(error))
-          });
-        }
-      }
-
-      // Fallback to GitHub Actions if Azure Functions not configured
-      const token = process.env.GITHUB_ISSUES_TOKEN || process.env.GITHUB_TOKEN;
-      const owner = process.env.GITHUB_OWNER || 'Allecpu';
-      const repo = process.env.GITHUB_REPO || 'UpdateLens';
-
-      if (!token) {
-        return res.status(503).json({
-          error: 'AZURE_FUNCTION_URL o GITHUB_TOKEN non configurato. Impossibile avviare il refresh.'
+      if (!functionUrl || !functionKey) {
+        return res.status(500).json({
+          error: 'Azure Functions non configurata: manca AZURE_FUNCTION_URL o AZURE_FUNCTION_KEY'
         });
       }
 
       try {
-        // Trigger the refresh-data workflow via GitHub API
-        const response = await fetch(
-          `https://api.github.com/repos/${owner}/${repo}/actions/workflows/refresh-data.yml/dispatches`,
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Accept': 'application/vnd.github.v3+json',
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              ref: 'main'
-            })
+        const baseUrl = functionUrl.replace(/\/$/, '');
+        const url = `${baseUrl}/api/refreshAll?code=${encodeURIComponent(functionKey)}`;
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
           }
-        );
+        });
 
-        if (response.status === 204) {
-          return res.json({
-            completedAt: new Date().toISOString(),
-            results: [],
-            summary: { total: 0, successful: 0, failed: 0 },
-            message: 'Refresh avviato via GitHub Actions. I dati saranno aggiornati entro pochi minuti.',
-            triggeredWorkflow: true
-          });
-        } else {
-          const errorData = await response.json().catch(() => ({}));
+        const text = await response.text();
+        const data = (() => {
+          try {
+            return JSON.parse(text);
+          } catch {
+            return text;
+          }
+        })();
+
+        if (!response.ok) {
           return res.status(response.status).json({
-            error: `Errore nell'avvio del workflow: ${response.status}`,
-            details: errorData
+            error: `Errore Azure Functions: ${response.status}`,
+            details: data
           });
         }
+
+        return res.status(202).json({
+          ok: true,
+          message: 'Refresh avviato via Azure Functions',
+          details: data
+        });
       } catch (error) {
         return res.status(500).json({
-          error: 'Errore durante la chiamata a GitHub API: ' + (error instanceof Error ? error.message : String(error))
+          error: 'Errore durante la chiamata ad Azure Functions: ' + (error instanceof Error ? error.message : String(error))
         });
       }
     }
