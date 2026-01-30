@@ -1,35 +1,94 @@
-name: Deploy API (App Service)
+name: Build and deploy to Azure Web App - updatelens-api
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - Azure
   workflow_dispatch:
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "npm"
 
-      - run: npm ci
-      - run: npm run build:server
+      - name: Install dependencies
+        run: npm ci
 
-      - name: Package app
+      - name: Build frontend (Vite)
+        run: npm run build
+
+      - name: Build server (TypeScript)
+        run: npm run build:server
+
+      - name: Create deploy package
         run: |
-          mkdir deploy
+          mkdir -p deploy
+
+          # Copy server build output
           cp -R server-dist deploy/server-dist
+
+          # Copy frontend build output
+          cp -R dist deploy/dist
+
+          # Copy package files
           cp package.json package-lock.json deploy/
+
+          # Install production dependencies (compiles native modules for Linux)
           cd deploy
-          zip -r ../app.zip .
+          npm ci --omit=dev
+
+          # Create zip for deployment
+          zip -r ../deploy.zip .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-package
+          path: deploy.zip
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: deploy-package
+
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_3657520D6E074B449CAC38EFA4EF8865 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_53ABC2563A1D4368A6B5EEC80EB3401A }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_DD0E651561084DFDB83AFFB2EE78E235 }}
+
+      - name: Configure Azure App Settings
+        run: |
+          az webapp config appsettings set \
+            --name updatelens-api \
+            --resource-group rg-updatelens-test \
+            --settings \
+              SCM_DO_BUILD_DURING_DEPLOYMENT=false \
+              ENABLE_ORYX_BUILD=false \
+              WEBSITE_NODE_DEFAULT_VERSION="~20"
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
           app-name: updatelens-api
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          package: app.zip
+          slot-name: Production
+          package: deploy.zip
