@@ -23,3 +23,11 @@ pnpm-debug.log*
 functions/local.settings.json
 functions/dist/
 functions/node_modules/
+
+# Migration artifacts (local only)
+_migration/
+_tools/
+*.zip
+
+# Azure resource exports (local only)
+rg-*.json

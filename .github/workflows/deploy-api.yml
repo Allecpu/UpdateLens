@@ -66,13 +66,6 @@ jobs:
           mkdir -p deploy/server
           cp server/tsconfig.json deploy/server/
 
-          # Copy WebJob for scheduled refresh
-          mkdir -p deploy/App_Data/jobs/triggered/refresh-data
-          cp webjob/refresh-trigger.js deploy/App_Data/jobs/triggered/refresh-data/
-          cp webjob/settings.job deploy/App_Data/jobs/triggered/refresh-data/
-          cp webjob/run.sh deploy/App_Data/jobs/triggered/refresh-data/
-          chmod +x deploy/App_Data/jobs/triggered/refresh-data/run.sh
-
           # Copy package files
           cp package.json package-lock.json deploy/
 
@@ -119,9 +112,9 @@ jobs:
       - name: Login to Azure
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_3657520D6E074B449CAC38EFA4EF8865 }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_53ABC2563A1D4368A6B5EEC80EB3401A }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_DD0E651561084DFDB83AFFB2EE78E235 }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
@@ -134,7 +127,7 @@ jobs:
         run: |
           az webapp config appsettings set \
             --name updatelens-api \
-            --resource-group rg-updatelens-test \
+            --resource-group rg-updatelens-runtime \
             --settings \
               SCM_DO_BUILD_DURING_DEPLOYMENT=false \
               ENABLE_ORYX_BUILD=false \
@@ -145,7 +138,7 @@ jobs:
         run: |
           az webapp config set \
             --name updatelens-api \
-            --resource-group rg-updatelens-test \
+            --resource-group rg-updatelens-runtime \
             --startup-file "node /home/site/wwwroot/server-dist/index.js" \
             --always-on true
 
@@ -153,4 +146,4 @@ jobs:
         run: |
           az webapp restart \
             --name updatelens-api \
-            --resource-group rg-updatelens-test
+            --resource-group rg-updatelens-runtime
