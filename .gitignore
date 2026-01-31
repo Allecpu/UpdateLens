@@ -18,3 +18,7 @@ pnpm-debug.log*
 
 # TypeScript
 *.tsbuildinfo
+
+# Local migration/artifact folders
+_migration/
+_tools/

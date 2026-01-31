@@ -1,0 +1,25 @@
+{
+  "name": "updatelens-functions",
+  "version": "1.0.0",
+  "description": "Azure Functions for UpdateLens data refresh",
+  "main": "dist/functions/refreshAll/index.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "start": "func start",
+    "prestart": "npm run build"
+  },
+  "dependencies": {
+    "@azure/functions": "^4.0.0",
+    "@azure/identity": "^4.2.0",
+    "@azure/storage-blob": "^12.17.0",
+    "cheerio": "^1.0.0-rc.12"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.5.3"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
