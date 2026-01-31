@@ -1,0 +1,126 @@
+name: Monthly Data Refresh
+
+on:
+  schedule:
+    # Run at 02:00 UTC on the 1st day of every month
+    - cron: '0 2 1 * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Force refresh even if no changes detected'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Discover refresh scripts
+        id: discover
+        run: |
+          echo "=== Discovering refresh:* scripts from package.json ==="
+          SCRIPTS=$(node -e "
+            const pkg = require('./package.json');
+            const refreshScripts = Object.keys(pkg.scripts || {})
+              .filter(name => name.startsWith('refresh:'))
+              .filter(name => !['refresh:all', 'refresh:local', 'refresh:dev', 'refresh:test'].includes(name));
+            console.log(refreshScripts.join(' '));
+          ")
+          echo "Found scripts: $SCRIPTS"
+          echo "scripts=$SCRIPTS" >> $GITHUB_OUTPUT
+
+      - name: Run all refresh scripts
+        run: |
+          SCRIPTS="${{ steps.discover.outputs.scripts }}"
+          FAILED=0
+
+          for script in $SCRIPTS; do
+            echo ""
+            echo "=============================================="
+            echo "  Starting: npm run $script"
+            echo "  Time: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo "=============================================="
+
+            if npm run "$script"; then
+              echo "  [OK] $script completed successfully"
+            else
+              echo "  [FAIL] $script failed with exit code $?"
+              FAILED=1
+            fi
+
+            echo "  Finished: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo "=============================================="
+          done
+
+          if [ $FAILED -ne 0 ]; then
+            echo ""
+            echo "[ERROR] One or more refresh scripts failed!"
+            exit 1
+          fi
+
+          echo ""
+          echo "[SUCCESS] All refresh scripts completed successfully!"
+
+      - name: Check for changes
+        id: changes
+        run: |
+          git add -A
+          if git diff --staged --quiet; then
+            echo "No changes detected in data files"
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "Changes detected in data files:"
+            git diff --staged --stat
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit and push changes
+        if: steps.changes.outputs.has_changes == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          YEAR_MONTH=$(date -u '+%Y-%m')
+
+          git commit -m "chore(data): monthly data refresh ($YEAR_MONTH)"
+
+          # Push to current branch (main)
+          git push
+
+          # Also push to Azure branch to trigger deployment
+          git push origin HEAD:Azure --force-with-lease || echo "Azure branch push skipped (may not exist or no changes)"
+
+      - name: Summary
+        run: |
+          echo "## Data Refresh Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Scripts executed:**" >> $GITHUB_STEP_SUMMARY
+          for script in ${{ steps.discover.outputs.scripts }}; do
+            echo "- \`$script\`" >> $GITHUB_STEP_SUMMARY
+          done
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.changes.outputs.has_changes }}" == "true" ]; then
+            echo "**Result:** Changes committed and pushed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Result:** No changes detected (data already up-to-date)" >> $GITHUB_STEP_SUMMARY
+          fi

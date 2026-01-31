@@ -1,0 +1,149 @@
+name: Build and deploy to Azure Web App - updatelens-api
+
+on:
+  push:
+    branches:
+      - Azure
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend (Vite)
+        run: npm run build
+
+      - name: Build server (TypeScript)
+        run: npm run build:server
+
+      - name: Build release package
+        run: npm run build:release
+
+      - name: Create deploy package
+        run: |
+          mkdir -p deploy
+
+          # Copy server build output
+          cp -R server-dist deploy/server-dist
+
+          # Copy frontend build output
+          cp -R dist deploy/dist
+
+          # Copy tools folder (for refresh scripts)
+          cp -R tools deploy/tools
+
+          # Copy public folder (for data storage)
+          cp -R public deploy/public
+
+          # Copy pre-built release folder
+          cp -R release deploy/release
+
+          # Copy source files needed for builds
+          cp -R src deploy/src
+          cp vite.config.ts deploy/
+          cp tsconfig.json deploy/
+          cp tsconfig.node.json deploy/ 2>/dev/null || true
+          cp tsconfig.app.json deploy/ 2>/dev/null || true
+          cp tailwind.config.js deploy/ 2>/dev/null || true
+          cp postcss.config.js deploy/ 2>/dev/null || true
+          cp index.html deploy/
+
+          # Copy server tsconfig for tools that might need it
+          mkdir -p deploy/server
+          cp server/tsconfig.json deploy/server/
+
+          # Copy package files
+          cp package.json package-lock.json deploy/
+
+          # Install ALL dependencies (including dev for refresh/build scripts)
+          cd deploy
+          npm ci
+          if [ ! -d "node_modules/express" ]; then
+            echo "ERROR: express not installed in deploy/node_modules"
+            exit 1
+          fi
+
+          # Verify structure
+          echo "=== Deploy folder structure ==="
+          ls -la
+          echo "=== Tools folder ==="
+          ls tools/
+
+          # Create zip for deployment
+          zip -r ../deploy.zip . -x "*.git*"
+
+          # Show zip size
+          echo "=== Zip size ==="
+          ls -lh ../deploy.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-package
+          path: deploy.zip
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: deploy-package
+
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: updatelens-api
+          slot-name: Production
+          package: deploy.zip
+
+      - name: Configure Azure App Settings (post-deploy)
+        run: |
+          az webapp config appsettings set \
+            --name updatelens-api \
+            --resource-group rg-updatelens-runtime \
+            --settings \
+              SCM_DO_BUILD_DURING_DEPLOYMENT=false \
+              ENABLE_ORYX_BUILD=false \
+              WEBSITE_NODE_DEFAULT_VERSION="~20" \
+              DB_PATH="/home/data"
+
+      - name: Set startup command and Always On
+        run: |
+          az webapp config set \
+            --name updatelens-api \
+            --resource-group rg-updatelens-runtime \
+            --startup-file "node /home/site/wwwroot/server-dist/index.js" \
+            --always-on true
+
+      - name: Restart App Service
+        run: |
+          az webapp restart \
+            --name updatelens-api \
+            --resource-group rg-updatelens-runtime
