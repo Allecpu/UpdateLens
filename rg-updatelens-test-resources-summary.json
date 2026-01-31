@@ -1,0 +1,23 @@
+﻿[
+  {
+    "kind": "linux",
+    "location": "italynorth",
+    "name": "plan-updatelens",
+    "tags": null,
+    "type": "Microsoft.Web/serverFarms"
+  },
+  {
+    "kind": "app,linux",
+    "location": "italynorth",
+    "name": "updatelens-api",
+    "tags": null,
+    "type": "Microsoft.Web/sites"
+  },
+  {
+    "kind": null,
+    "location": "italynorth",
+    "name": "oidc-msi-a4b7",
+    "tags": {},
+    "type": "Microsoft.ManagedIdentity/userAssignedIdentities"
+  }
+]

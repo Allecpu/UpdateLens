@@ -1,0 +1,32 @@
+﻿[
+  {
+    "kind": "StorageV2",
+    "location": "westeurope",
+    "name": "updatelensdata",
+    "tags": {},
+    "type": "Microsoft.Storage/storageAccounts"
+  },
+  {
+    "kind": "functionapp",
+    "location": "westeurope",
+    "name": "updatelens-functions",
+    "tags": {
+      "hidden-link: /app-insights-resource-id": "/subscriptions/045b424d-a988-4c07-a1f3-ded83ba91749/resourceGroups/rg-updatelens/providers/microsoft.insights/components/updatelens-functions"
+    },
+    "type": "Microsoft.Web/sites"
+  },
+  {
+    "kind": "functionapp",
+    "location": "westeurope",
+    "name": "WestEuropePlan",
+    "tags": null,
+    "type": "Microsoft.Web/serverFarms"
+  },
+  {
+    "kind": "web",
+    "location": "westeurope",
+    "name": "updatelens-functions",
+    "tags": {},
+    "type": "Microsoft.Insights/components"
+  }
+]

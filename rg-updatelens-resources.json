@@ -1,0 +1,95 @@
+﻿[
+  {
+    "changedTime": "2026-01-30T21:17:23.326433+00:00",
+    "createdTime": "2026-01-30T21:07:01.108241+00:00",
+    "extendedLocation": null,
+    "id": "/subscriptions/045b424d-a988-4c07-a1f3-ded83ba91749/resourceGroups/rg-updatelens/providers/Microsoft.Storage/storageAccounts/updatelensdata",
+    "identity": null,
+    "kind": "StorageV2",
+    "location": "westeurope",
+    "managedBy": null,
+    "name": "updatelensdata",
+    "plan": null,
+    "properties": null,
+    "provisioningState": "Succeeded",
+    "resourceGroup": "rg-updatelens",
+    "sku": {
+      "capacity": null,
+      "family": null,
+      "model": null,
+      "name": "Standard_LRS",
+      "size": null,
+      "tier": "Standard"
+    },
+    "tags": {},
+    "type": "Microsoft.Storage/storageAccounts"
+  },
+  {
+    "changedTime": "2026-01-30T23:20:07.657346+00:00",
+    "createdTime": "2026-01-30T21:07:29.844454+00:00",
+    "extendedLocation": null,
+    "id": "/subscriptions/045b424d-a988-4c07-a1f3-ded83ba91749/resourceGroups/rg-updatelens/providers/Microsoft.Web/sites/updatelens-functions",
+    "identity": {
+      "principalId": "7347a22c-f7a5-4127-b803-a417f5375302",
+      "tenantId": "3adaa466-b160-4460-a75f-e0fedd9f8209",
+      "type": "SystemAssigned",
+      "userAssignedIdentities": null
+    },
+    "kind": "functionapp",
+    "location": "westeurope",
+    "managedBy": null,
+    "name": "updatelens-functions",
+    "plan": null,
+    "properties": null,
+    "provisioningState": "Succeeded",
+    "resourceGroup": "rg-updatelens",
+    "sku": null,
+    "tags": {
+      "hidden-link: /app-insights-resource-id": "/subscriptions/045b424d-a988-4c07-a1f3-ded83ba91749/resourceGroups/rg-updatelens/providers/microsoft.insights/components/updatelens-functions"
+    },
+    "type": "Microsoft.Web/sites"
+  },
+  {
+    "changedTime": "2026-01-30T21:18:22.827504+00:00",
+    "createdTime": "2026-01-30T21:08:22.366850+00:00",
+    "extendedLocation": null,
+    "id": "/subscriptions/045b424d-a988-4c07-a1f3-ded83ba91749/resourceGroups/rg-updatelens/providers/Microsoft.Web/serverFarms/WestEuropePlan",
+    "identity": null,
+    "kind": "functionapp",
+    "location": "westeurope",
+    "managedBy": null,
+    "name": "WestEuropePlan",
+    "plan": null,
+    "properties": null,
+    "provisioningState": "Succeeded",
+    "resourceGroup": "rg-updatelens",
+    "sku": {
+      "capacity": 0,
+      "family": "Y",
+      "model": null,
+      "name": "Y1",
+      "size": "Y1",
+      "tier": "Dynamic"
+    },
+    "tags": null,
+    "type": "Microsoft.Web/serverFarms"
+  },
+  {
+    "changedTime": "2026-01-30T21:18:58.754687+00:00",
+    "createdTime": "2026-01-30T21:08:57.867394+00:00",
+    "extendedLocation": null,
+    "id": "/subscriptions/045b424d-a988-4c07-a1f3-ded83ba91749/resourceGroups/rg-updatelens/providers/Microsoft.Insights/components/updatelens-functions",
+    "identity": null,
+    "kind": "web",
+    "location": "westeurope",
+    "managedBy": null,
+    "name": "updatelens-functions",
+    "plan": null,
+    "properties": null,
+    "provisioningState": "Succeeded",
+    "resourceGroup": "rg-updatelens",
+    "sku": null,
+    "tags": {},
+    "type": "Microsoft.Insights/components"
+  }
+]
