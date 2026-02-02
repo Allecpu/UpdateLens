@@ -1,5 +1,91 @@
 # UpdateLens - Changelog Dettagliato
 
+## v0.4.0 (2026-02-02) - Azure Migration \u0026 Cloud Deployment
+
+### 🎉 Nuove Funzionalità
+
+#### Azure Cloud Deployment
+- ✅ **Azure Functions** - Ingestion automatica con Timer Triggers
+  - `refreshAllScheduled` - Refresh tutte le fonti ogni 6 ore
+  - `refreshMicrosoft`, `refreshEos`, `refreshFabric`, `refreshM365` - Refresh singole fonti
+  - HTTP triggers per health check e API
+- ✅ **Azure Blob Storage** - Storage snapshot versionati
+  - Container `snapshots` per tutti i file JSON
+  - Versioning automatico: `fonte_YYYY_MM_DD.json`
+  - Manifest `latest.json` aggiornato automaticamente
+- ✅ **Azure App Service** - Hosting Web App
+  - Deployment su `updatelens-api.azurewebsites.net`
+  - Runtime Node.js 20 LTS
+  - Persistent storage per SQLite database
+- ✅ **Application Insights** - Monitoring e logging
+  - Telemetry automatica per tutte le funzioni
+  - Log centralizzati in Log Analytics Workspace
+  - Query Kusto per diagnostica avanzata
+- ✅ **Managed Identity** - RBAC sicuro
+  - System Assigned MI per Function App e Web App
+  - User Assigned MI per GitHub OIDC
+  - Cross-RG access con role assignments
+- ✅ **GitHub Actions CI/CD** - Deployment automatico
+  - `deploy-api.yml` - Deploy Web App su branch `Azure`
+  - `deploy-functions.yml` - Deploy Functions su branch `main`
+  - OIDC authentication (no publish profiles)
+
+#### Automated Data Refresh
+- ✅ **Scheduled Refresh** - Refresh automatico ogni 6 ore (00:00, 06:00, 12:00, 18:00 UTC)
+- ✅ **All Sources** - Microsoft Release Plans, EOS Apps, Fabric Roadmap, M365 Roadmap
+- ✅ **Blob Storage Integration** - Snapshot salvati su Azure Storage
+- ✅ **Versioning** - Snapshot datati con rollback capability
+- ✅ **Error Handling** - Retry logic e fallback su errori
+
+### 🔧 Miglioramenti Tecnici
+
+#### Architettura
+- ✅ **Migrazione Italy North** - Tutti i componenti migrati da West Europe
+- ✅ **Resource Groups** - Separazione runtime (`rg-updatelens-runtime`) e shared (`rg-updatelens-shared`)
+- ✅ **OIDC Authentication** - GitHub Actions con federated credentials
+- ✅ **Cross-RG RBAC** - Configurazione role assignments per accesso sicuro
+
+#### Deployment
+- ✅ **GitHub Actions Workflows** - Automazione completa deploy
+- ✅ **Environment Variables** - Gestione via Azure App Settings
+- ✅ **Secrets Management** - Token e chiavi in App Settings (Key Vault ready)
+- ✅ **Health Checks** - Endpoint `/api/health` per monitoring
+
+#### Performance
+- ✅ **Blob Storage CDN-ready** - Preparato per Azure CDN integration
+- ✅ **Function Cold Start** - Ottimizzato con Always On (App Service Plan)
+- ✅ **Caching** - Snapshot cached per ridurre latenza
+
+### 📝 Documentazione
+- ✅ **README.md** - Sezione "Modalità di Deployment" con Azure
+- ✅ **ARCHITECTURE.md** - Capitolo "Azure Architecture" (in progress)
+- ✅ **DEVELOPER_GUIDE.md** - Setup Azure e debugging Functions (in progress)
+- ✅ **Azure Deployment Guide** - Nuova guida completa (in progress)
+- ✅ **Implementation Plan** - Aggiornato con v0.4.0 scope
+
+### 🐛 Bug Fix
+- ✅ Fix CORS issues in Web mode con Azure Functions
+- ✅ Fix snapshot loading da Blob Storage con fallback
+- ✅ Fix GitHub token rotation e sicurezza
+- ✅ Fix timezone handling per scheduled triggers
+
+### ⚠️ Breaking Changes
+- **Deployment Mode**: Azure deployment richiede Azure subscription
+- **Environment Variables**: Nuove variabili richieste per Azure Functions:
+  - `AZURE_STORAGE_CONNECTION_STRING` o Managed Identity
+  - `APPLICATIONINSIGHTS_CONNECTION_STRING`
+- **Snapshot Location**: In Azure mode, snapshot caricati da Blob Storage invece di `/public/data/`
+- **Backend URL**: Web App URL cambiato da localhost a `updatelens-api.azurewebsites.net`
+
+### 🔄 Migration Notes
+- **Da v0.3.0 a v0.4.0**:
+  - Nessuna breaking change per modalità Offline e Web (locale)
+  - Azure mode è completamente nuovo e opzionale
+  - LocalStorage schema invariato (compatibilità completa)
+  - Snapshot format invariato (compatibilità completa)
+
+---
+
 ## v0.3.0 (2026-01-23) - GitHub Issues Integration
 
 ### 🎉 Nuove Funzionalità

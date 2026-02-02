@@ -30,12 +30,94 @@ Funziona completamente offline con snapshot locali. In alternativa, è disponibi
 
 ## 🛠️ Tech Stack
 
-- **Frontend**: Vite + React + TypeScript
+### Frontend
+- **Framework**: Vite + React + TypeScript
 - **Styling**: Tailwind CSS
 - **State Management**: Zustand
 - **Validation**: Zod
 - **Routing**: React Router
-- **Backend (opzionale)**: Express + SQLite + Better-SQLite3
+
+### Backend \u0026 Cloud
+- **Backend Locale**: Express + SQLite + Better-SQLite3
+- **Azure Functions**: Node.js 20 (Timer + HTTP triggers)
+- **Azure Storage**: Blob Storage per snapshot
+- **Azure App Service**: Hosting Web App
+- **Monitoring**: Application Insights
+
+---
+
+## 🌐 Modalità di Deployment
+
+UpdateLens supporta **tre modalità di deployment** per adattarsi a diverse esigenze:
+
+### 1. 📦 Offline Mode (ZIP Distribution)
+**Ideale per**: Distribuzione locale, demo, ambienti senza internet
+
+- ✅ Completamente offline (file:// protocol)
+- ✅ Nessun server richiesto
+- ✅ Snapshot embedded nel ZIP
+- ✅ Dati statici (refresh manuale)
+
+**Setup**:
+```bash
+npm run build:release
+# Distribuisci release/ come ZIP
+```
+
+### 2. 🖥️ Web Mode (Local Server)
+**Ideale per**: Sviluppo, testing, deployment intranet
+
+- ✅ Backend Express locale
+- ✅ SQLite database
+- ✅ API REST interne
+- ✅ GitHub Issues proxy
+
+**Setup**:
+```bash
+npm run build
+npm run server:dev
+```
+
+### 3. ☁️ Azure Mode (Cloud Deployment)
+**Ideale per**: Produzione, scalabilità, refresh automatico
+
+- ✅ **Azure Functions** per ingestion automatica
+- ✅ **Azure Blob Storage** per snapshot versionati
+- ✅ **Azure App Service** per hosting Web App
+- ✅ **Application Insights** per monitoring
+- ✅ **GitHub Actions CI/CD** per deployment automatico
+
+**Architettura Azure**:
+```
+┌─────────────────────────────────────────────────────────┐
+│                    GitHub Actions                        │
+│  (CI/CD: deploy-api.yml, deploy-functions.yml)         │
+└────────────────────┬────────────────────────────────────┘
+                     │ Deploy
+         ┌───────────┴───────────┐
+         │                       │
+    ┌────▼─────┐          ┌─────▼──────┐
+    │ Azure    │          │  Azure     │
+    │ Functions│          │ App Service│
+    │ (Timer)  │          │ (Web App)  │
+    └────┬─────┘          └─────┬──────┘
+         │ Write                │ Read
+         │                      │
+    ┌────▼──────────────────────▼──────┐
+    │   Azure Blob Storage              │
+    │   - snapshots/                    │
+    │   - latest.json                   │
+    └───────────────────────────────────┘
+```
+
+**Componenti Attivi**:
+- **Azure Functions** (`updatelens-functions-itn`) - Refresh automatico ogni 6 ore
+- **Azure Blob Storage** (`updatelensdataitn`) - Storage snapshot
+- **Azure App Service** (`updatelens-api`) - Hosting portale
+- **Application Insights** - Monitoring e logging
+- **Managed Identity** - RBAC sicuro
+
+**Setup**: Vedi [Azure Deployment Guide](./docs/AZURE_DEPLOYMENT.md)
 
 ---
 
@@ -94,8 +176,9 @@ UpdateLens integra **4 fonti dati** con refresh automatizzato:
 - **Refresh**: `npm run refresh:m365roadmap`
 - **Formato**: REST API JSON
 
-### Esecuzione Refresh Completo
+### Esecuzione Refresh
 
+#### Modalità Manuale (Locale)
 ```bash
 # Refresh singola fonte
 npm run refresh:microsoft
@@ -103,9 +186,25 @@ npm run refresh:eos
 npm run refresh:fabric
 npm run refresh:m365roadmap
 
-# Refresh tutte le fonti (manuale)
+# Refresh tutte le fonti
 npm run refresh:microsoft && npm run refresh:eos && npm run refresh:fabric && npm run refresh:m365roadmap
 ```
+
+#### Modalità Automatica (Azure Functions)
+In **Azure Mode**, il refresh è completamente automatizzato:
+
+- ✅ **Timer Trigger** - Esecuzione schedulata ogni 6 ore
+- ✅ **Tutte le Fonti** - Microsoft, EOS, Fabric, M365 Roadmap
+- ✅ **Blob Storage** - Snapshot salvati automaticamente
+- ✅ **Versioning** - Snapshot datati (`fonte_YYYY_MM_DD.json`)
+- ✅ **latest.json** - Aggiornato automaticamente
+
+**Schedule**:
+```
+0 */6 * * *  # Ogni 6 ore (00:00, 06:00, 12:00, 18:00 UTC)
+```
+
+**Monitoring**: Application Insights traccia ogni esecuzione con successo/errori.
 
 ---
 
@@ -195,7 +294,12 @@ La funzionalità **Issues** permette di leggere e creare segnalazioni GitHub dir
 
 ---
 
-## 🖥️ Backend Opzionale
+## 🖥️ Backend e Azure Functions
+
+UpdateLens supporta due architetture backend:
+
+### Backend Locale (Express + SQLite)
+**Uso**: Sviluppo, testing, deployment intranet
 
 Il backend Node.js esegue:
 - Ingestione periodica da Microsoft Release Plans
@@ -203,8 +307,7 @@ Il backend Node.js esegue:
 - API REST interne
 - Proxy GitHub Issues (modalità Web)
 
-### Avvio Backend
-
+**Avvio**:
 ```bash
 # Ingestione manuale
 npm run ingest:releaseplans
@@ -213,8 +316,7 @@ npm run ingest:releaseplans
 npm run server:dev
 ```
 
-### Endpoint API
-
+**Endpoint API**:
 ```
 GET  /api/releaseplans          # Lista release plans
 GET  /api/releaseplans/:planId  # Dettaglio plan
@@ -226,6 +328,35 @@ GET  /api/github/issues         # Lista issues
 POST /api/github/issues         # Crea issue
 POST /api/github/upload         # Upload immagine
 ```
+
+### Azure Functions (Cloud)
+**Uso**: Produzione, refresh automatico, scalabilità
+
+**Funzioni Attive**:
+- **Timer Triggers** (refresh automatico):
+  - `refreshAllScheduled` - Refresh tutte le fonti (ogni 6 ore)
+  - `refreshMicrosoft` - Refresh Microsoft Release Plans
+  - `refreshEos` - Refresh EOS Apps
+  - `refreshFabric` - Refresh Microsoft Fabric
+  - `refreshM365` - Refresh Microsoft 365 Roadmap
+
+- **HTTP Triggers** (API):
+  - `GET /api/health` - Health check
+  - `GET /api/snapshots` - Lista snapshot disponibili
+  - `GET /api/snapshots/:source/latest` - Latest snapshot per fonte
+
+**Storage**:
+- **Azure Blob Storage** (`updatelensdataitn`)
+  - Container: `snapshots`
+  - Snapshot versionati: `microsoft_releaseplans_2026_02_02.json`
+  - Manifest: `latest.json`
+
+**Deployment**:
+- **GitHub Actions** - CI/CD automatico su push
+- **Managed Identity** - Accesso sicuro a Blob Storage (RBAC)
+- **Application Insights** - Monitoring e logging
+
+**Configurazione**: Vedi [Azure Deployment Guide](./docs/AZURE_DEPLOYMENT.md)
 
 ---
 
@@ -329,6 +460,8 @@ release/
 ### Per Sviluppatori
 - **[Developer Guide](./docs/DEVELOPER_GUIDE.md)** - Setup ambiente, workflow, convenzioni di codice
 - **[Architettura](./docs/ARCHITECTURE.md)** - Architettura dettagliata, componenti, flusso dati
+- **[Azure Deployment Guide](./docs/AZURE_DEPLOYMENT.md)** - Guida completa deployment Azure
+- **[Azure Tagging Strategy](./docs/AZURE_TAGS.md)** - Standardizzazione tags per governance e cost management ⭐ NEW
 - **[Implementation Plan](./implementation_plan.md)** - Piano architetturale e decisioni tecniche
 - **[Data Source Integration Template](./docs/DATA_SOURCE_INTEGRATION_TEMPLATE.md)** - Guida per integrare nuove fonti dati
 
@@ -340,19 +473,30 @@ release/
 
 ## 📝 Changelog
 
-### v0.3.0 (2026-01-23)
+### v0.4.0 (2026-02-02) - Azure Migration \u0026 Cloud Deployment
+- ✅ **Azure Functions** - Ingestion automatica con Timer Triggers (ogni 6 ore)
+- ✅ **Azure Blob Storage** - Storage snapshot versionati
+- ✅ **Azure App Service** - Hosting Web App in cloud
+- ✅ **Application Insights** - Monitoring e logging centralizzato
+- ✅ **GitHub Actions CI/CD** - Deployment automatico su push
+- ✅ **Azure Resource Tags** - Implementazione tags standardizzati per governance e cost management
+- ✅ **Managed Identity** - RBAC sicuro per accesso risorse Azure
+- ✅ **Refresh Automatico** - Tutte le 4 fonti dati aggiornate automaticamente
+- ✅ **Italy North Region** - Migrazione da West Europe completata
+
+### v0.3.0 (2026-01-23) - GitHub Issues Integration
 - ✅ Integrazione GitHub Issues (lettura/creazione)
 - ✅ Persistenza token GitHub in localStorage
 - ✅ Upload immagini via GitHub Content API (modalità Web)
 - ✅ Validazione token con test preventivo
 
-### v0.2.0
+### v0.2.0 (2026-01-15) - Multi-Client \u0026 Global Filters
 - ✅ Integrazione Microsoft 365 Roadmap (4a fonte dati)
 - ✅ Gestione multi-cliente avanzata
 - ✅ Filtri globali e per-cliente
 - ✅ Dashboard con drill-down
 
-### v0.1.0
+### v0.1.0 (2025-12-20) - MVP Release
 - ✅ MVP con 3 fonti dati (Microsoft, EOS, Fabric)
 - ✅ Offline-first architecture
 - ✅ Export Markdown

@@ -23,7 +23,8 @@
       "Bash(pkill:*)",
       "Bash(taskkill:*)",
       "Bash(timeout:*)",
-      "Bash(dir /b \"C:\\\\Github\\\\UpdateLens\\\\server\")"
+      "Bash(dir /b \"C:\\\\Github\\\\UpdateLens\\\\server\")",
+      "Bash(git push:*)"
     ]
   }
 }

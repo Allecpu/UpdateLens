@@ -90,28 +90,62 @@
 - [x] Document multi-client workflow.
 - [x] Add changelog to README.
 
+## Phase 11 - Azure Migration ✅
+- [x] Azure Functions deployment (Timer + HTTP triggers).
+- [x] Azure Blob Storage integration for snapshots.
+- [x] Azure App Service deployment for Web App.
+- [x] Application Insights setup for monitoring.
+- [x] GitHub Actions CI/CD pipelines.
+- [x] Managed Identity configuration (System + User Assigned).
+- [x] OIDC authentication for GitHub Actions.
+- [x] Resource Groups setup (runtime + shared).
+- [x] Migration from West Europe to Italy North.
+- [x] Automated refresh scheduling (every 6 hours).
+
+---
+
+## Phase 12 - Governance & Automation ✅
+- [x] **Azure Resource Tags** - Standardizzazione tags per governance, cost management e ownership.
+  - [x] Tags comuni: Environment, Project, Owner, CostCenter, ManagedBy
+  - [x] Applicazione a: Resource Groups, Web App, Functions, Storage, App Insights, App Service Plans
+  - [x] Script PowerShell/CLI per applicazione batch (`scripts/azure-tags-apply.ps1`)
+  - [x] Validazione compliance (`scripts/azure-tags-verify.ps1`)
+  - [x] Documentation (`docs/AZURE_TAGS.md`)
+  - [ ] Policy Azure per enforcement tags obbligatori
+
+## Phase 13 - Advanced Documentation [/]
+- [/] **Developer Architecture Update** - Aggiornamento `ARCHITECTURE.md` con dettagli Azure.
+- [ ] **Developer Setup Guide** - Aggiornamento `DEVELOPER_GUIDE.md` con Azure setup.
+- [ ] **Azure Deployment Guide** - Creazione `AZURE_DEPLOYMENT.md` completa.
+- [ ] **User Guide Cloud Update** - Aggiornamento `USER_GUIDE.md` per modalità Web Cloud.
+
 ---
 
 ## Future Enhancements 🚀
 
-### High Priority
-- [ ] Automated refresh scheduler (cron job for all sources).
-- [ ] Export to PDF/HTML (in addition to Markdown).
-- [ ] Advanced analytics dashboard (charts, trends).
-- [ ] Notification system for new releases.
+### High Priority (Azure)
+- [ ] **Azure Key Vault** - Secrets management sicuro (GitHub token, Function keys).
+- [ ] **Application Insights Alerting** - Alert su failures, 5xx errors, storage quota.
+- [ ] **Health Check Endpoint** - `/api/health` con diagnostics.
+- [ ] **Export to PDF/HTML** - In addition to Markdown.
+- [ ] **Advanced analytics dashboard** - Charts, trends, time-series.
 
-### Medium Priority
-- [ ] User authentication (optional for Web mode).
-- [ ] Role-based access control (Admin, Viewer).
-- [ ] Custom tags and categorization.
-- [ ] Saved filter presets.
-- [ ] Dark mode toggle (currently auto-detects system preference).
+### Medium Priority (Azure)
+- [ ] **Cosmos DB** - Change tracking e storico modifiche.
+- [ ] **Delta-based Snapshots** - Riduzione storage e bandwidth.
+- [ ] **Email/Teams Notifications** - Notifiche nuove release.
+- [ ] **User authentication** - Azure AD / Entra ID integration.
+- [ ] **Role-based access control** - Admin, Viewer roles.
+- [ ] **Custom tags and categorization** - Tagging personalizzato.
+- [ ] **Saved filter presets** - Preset filtri salvati.
 
-### Low Priority
-- [ ] Multi-language support (English, Italian).
-- [ ] Mobile app (React Native).
-- [ ] Integration with Teams/Slack for notifications.
-- [ ] AI-powered release summarization.
+### Low Priority (Azure)
+- [ ] **Private Endpoints** - VNet integration per Storage e Key Vault.
+- [ ] **Azure OpenAI Integration** - Miglioramento chatbot e assistenza utenti.
+- [ ] **CDN** - Azure CDN per snapshot delivery.
+- [ ] **Multi-language support** - English, Italian.
+- [ ] **Mobile app** - React Native.
+- [ ] **Teams/Slack Integration** - Notifiche e bot.
 
 ---
 
@@ -133,5 +167,5 @@
 
 ---
 
-**Last Updated**: 2026-01-23
-**Version**: 0.3.0
+**Last Updated**: 2026-02-02
+**Version**: 0.4.0

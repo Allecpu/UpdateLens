@@ -2,15 +2,327 @@
 
 ## Indice
 
-1. [Panoramica](#panoramica)
-2. [Architettura Generale](#architettura-generale)
-3. [Struttura Cartelle](#struttura-cartelle)
-4. [Componenti Principali](#componenti-principali)
-5. [Flusso Dati](#flusso-dati)
-6. [Gestione Stato](#gestione-stato)
-7. [Persistenza](#persistenza)
-8. [Integrazione Fonti Dati](#integrazione-fonti-dati)
-9. [Build e Deployment](#build-e-deployment)
+1. [Azure Architecture](#azure-architecture) ⭐ NEW
+2. [Panoramica](#panoramica)
+3. [Architettura Generale](#architettura-generale)
+4. [Struttura Cartelle](#struttura-cartelle)
+5. [Componenti Principali](#componenti-principali)
+6. [Flusso Dati](#flusso-dati)
+7. [Gestione Stato](#gestione-stato)
+8. [Persistenza](#persistenza)
+9. [Integrazione Fonti Dati](#integrazione-fonti-dati)
+10. [Build e Deployment](#build-e-deployment)
+11. [Azure Tagging Strategy](file:///c:/Github/UpdateLens/docs/AZURE_TAGS.md) ⭐ NEW
+
+---
+
+## Azure Architecture
+
+### Panoramica Azure
+
+UpdateLens è deployato su **Azure** con un'architettura **cloud-native** che supporta:
+- ✅ **Automated Data Ingestion** - Refresh automatico ogni 6 ore
+- ✅ **Scalable Storage** - Azure Blob Storage per snapshot versionati
+- ✅ **Serverless Functions** - Azure Functions per processing
+- ✅ **Managed Hosting** - Azure App Service per Web App
+- ✅ **Monitoring** - Application Insights per telemetry
+- ✅ **CI/CD** - GitHub Actions per deployment automatico
+- ✅ **Governance** - [Tagging standardizzato](file:///c:/Github/UpdateLens/docs/AZURE_TAGS.md) per tutte le risorse
+
+### Architettura Completa Azure
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                          GitHub Repository                            │
+│  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐         │
+│  │  Source Code   │  │  GitHub Actions│  │   Workflows    │         │
+│  │  (main/Azure)  │  │   (CI/CD)      │  │  deploy-*.yml  │         │
+│  └────────┬───────┘  └────────┬───────┘  └────────┬───────┘         │
+└───────────┼──────────────────┼──────────────────┼──────────────────┘
+            │                  │                  │
+            │ Push             │ OIDC Auth        │ Deploy
+            ▼                  ▼                  ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│                         Azure Italy North                             │
+│                                                                       │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │              rg-updatelens-runtime                           │    │
+│  │  ┌──────────────────┐         ┌──────────────────┐          │    │
+│  │  │ Azure Functions  │         │ Azure App Service│          │    │
+│  │  │ (Timer Triggers) │         │   (Web App)      │          │    │
+│  │  │                  │         │                  │          │    │
+│  │  │ • refreshAll     │         │ updatelens-api   │          │    │
+│  │  │ • refreshMS      │         │ (Node.js 20)     │          │    │
+│  │  │ • refreshEOS     │         │                  │          │    │
+│  │  │ • refreshFabric  │         │ Express + React  │          │    │
+│  │  │ • refreshM365    │         │                  │          │    │
+│  │  └────────┬─────────┘         └────────┬─────────┘          │    │
+│  │           │ Write                      │ Read               │    │
+│  └───────────┼────────────────────────────┼────────────────────┘    │
+│              │                            │                          │
+│  ┌───────────┼────────────────────────────┼────────────────────┐    │
+│  │           │  rg-updatelens-shared      │                    │    │
+│  │           │                            │                    │    │
+│  │      ┌────▼────────────────────────────▼──────┐             │    │
+│  │      │   Azure Blob Storage                   │             │    │
+│  │      │   (updatelensdataitn)                  │             │    │
+│  │      │                                        │             │    │
+│  │      │   Container: snapshots/                │             │    │
+│  │      │   • microsoft_releaseplans_*.json      │             │    │
+│  │      │   • eos_whatsnew_*.json                │             │    │
+│  │      │   • fabric_roadmap_*.json              │             │    │
+│  │      │   • m365_roadmap_*.json                │             │    │
+│  │      │   • latest.json (manifest)             │             │    │
+│  │      └────────────────────────────────────────┘             │    │
+│  │                                                              │    │
+│  │      ┌────────────────────────────────────────┐             │    │
+│  │      │   Application Insights                 │             │    │
+│  │      │   (updatelens-appinsights)             │             │    │
+│  │      │                                        │             │    │
+│  │      │   • Function telemetry                 │             │    │
+│  │      │   • Web App metrics                    │             │    │
+│  │      │   • Custom events                      │             │    │
+│  │      │   • Performance monitoring             │             │    │
+│  │      └────────────────────────────────────────┘             │    │
+│  │                                                              │    │
+│  │      ┌────────────────────────────────────────┐             │    │
+│  │      │   Log Analytics Workspace              │             │    │
+│  │      │   (updatelens-law)                     │             │    │
+│  │      └────────────────────────────────────────┘             │    │
+│  │                                                              │    │
+│  │      ┌────────────────────────────────────────┐             │    │
+│  │      │   Managed Identity (OIDC)              │             │    │
+│  │      │   (oidc-updatelens-msi)                │             │    │
+│  │      │                                        │             │    │
+│  │      │   • GitHub Actions auth                │             │    │
+│  │      │   • Cross-RG access                    │             │    │
+│  │      └────────────────────────────────────────┘             │    │
+│  └──────────────────────────────────────────────────────────────┘    │
+└──────────────────────────────────────────────────────────────────────┘
+                              │
+                              │ HTTPS
+                              ▼
+                    ┌──────────────────┐
+                    │   End Users      │
+                    │   (Browser)      │
+                    └──────────────────┘
+```
+
+### Resource Groups
+
+UpdateLens utilizza **due Resource Groups** separati per organizzazione logica:
+
+#### 1. rg-updatelens-runtime
+**Scopo**: Componenti runtime e computazionali
+
+| Risorsa | Nome | Tipo | Scopo |
+|---------|------|------|-------|
+| Function App | `updatelens-functions-itn` | Azure Functions | Timer triggers per refresh automatico |
+| Web App | `updatelens-api` | Azure App Service | Hosting portale web |
+| App Service Plan (Functions) | `plan-updatelens-functions` | Consumption/Premium | Hosting Functions |
+| App Service Plan (Web) | `plan-updatelens-api` | Basic/Standard | Hosting Web App |
+
+#### 2. rg-updatelens-shared
+**Scopo**: Componenti condivisi e dati
+
+| Risorsa | Nome | Tipo | Scopo |
+|---------|------|------|-------|
+| Storage Account | `updatelensdataitn` | Blob Storage | Snapshot JSON versionati |
+| Application Insights | `updatelens-appinsights` | Monitoring | Telemetry e logging |
+| Log Analytics Workspace | `updatelens-law` | Logging | Centralizzazione log |
+| Managed Identity | `oidc-updatelens-msi` | User Assigned MI | GitHub OIDC auth |
+
+### Data Flow End-to-End
+
+#### 1. Ingestion Flow (Automated)
+
+```
+Timer Trigger (Cron: 0 */6 * * *)
+         │
+         ▼
+Azure Function (refreshAllScheduled)
+         │
+         ├─► refreshMicrosoft() ──► Fetch Microsoft Release Plans API
+         ├─► refreshEOS() ────────► Scrape EOS Docs
+         ├─► refreshFabric() ─────► Fetch Fabric GPS API
+         └─► refreshM365() ───────► Fetch M365 Roadmap API
+                 │
+                 ▼
+         Normalize to ReleaseItem[]
+                 │
+                 ▼
+         Write to Blob Storage
+         • snapshots/microsoft_releaseplans_2026_02_02.json
+         • snapshots/eos_whatsnew_2026_02_02.json
+         • snapshots/fabric_roadmap_2026_02_02.json
+         • snapshots/m365_roadmap_2026_02_02.json
+                 │
+                 ▼
+         Update latest.json manifest
+         {
+           "microsoft": "snapshots/microsoft_releaseplans_2026_02_02.json",
+           "eos": "snapshots/eos_whatsnew_2026_02_02.json",
+           "fabric": "snapshots/fabric_roadmap_2026_02_02.json",
+           "m365": "snapshots/m365_roadmap_2026_02_02.json",
+           "lastUpdate": "2026-02-02T10:00:00Z"
+         }
+                 │
+                 ▼
+         Log to Application Insights
+         • Success/Failure
+         • Duration
+         • Item count
+```
+
+#### 2. Frontend Load Flow (User Access)
+
+```
+User opens https://updatelens-api.azurewebsites.net
+         │
+         ▼
+Azure App Service serves index.html
+         │
+         ▼
+React App boots
+         │
+         ▼
+DataLoader.loadLatestManifest()
+         │
+         ▼
+Fetch latest.json from Blob Storage
+         │
+         ▼
+Parse manifest → Get snapshot URLs
+         │
+         ▼
+Parallel fetch all snapshots
+         ├─► microsoft_releaseplans_2026_02_02.json
+         ├─► eos_whatsnew_2026_02_02.json
+         ├─► fabric_roadmap_2026_02_02.json
+         └─► m365_roadmap_2026_02_02.json
+                 │
+                 ▼
+         Merge + Deduplicate → ReleaseItem[]
+                 │
+                 ▼
+         Store in Zustand (dataStore)
+                 │
+                 ▼
+         Apply filters (FilterService)
+                 │
+                 ▼
+         Render Dashboard
+```
+
+### Managed Identity \u0026 RBAC
+
+#### System Assigned Managed Identity
+- **Function App** → Accesso Blob Storage (Storage Blob Data Contributor)
+- **Web App** → Accesso Blob Storage (Storage Blob Data Reader)
+
+#### User Assigned Managed Identity
+- **GitHub Actions** → OIDC Federated Credentials
+  - Deploy Function App
+  - Deploy Web App
+  - Access Resource Groups
+
+#### Role Assignments
+
+| Principal | Role | Scope | Scopo |
+|-----------|------|-------|-------|
+| `updatelens-functions-itn` (System MI) | Storage Blob Data Contributor | `updatelensdataitn` | Write snapshots |
+| `updatelens-api` (System MI) | Storage Blob Data Reader | `updatelensdataitn` | Read snapshots |
+| `oidc-updatelens-msi` (User MI) | Contributor | `rg-updatelens-runtime` | Deploy resources |
+| `oidc-updatelens-msi` (User MI) | Contributor | `rg-updatelens-shared` | Deploy resources |
+
+### Deployment Pipeline (GitHub Actions)
+
+#### Workflow: deploy-functions.yml
+**Trigger**: Push to `main` branch
+
+```yaml
+Steps:
+1. Checkout code
+2. Setup Node.js 20
+3. npm install (functions/)
+4. npm run build (TypeScript → JavaScript)
+5. Azure Login (OIDC with oidc-updatelens-msi)
+6. Deploy to updatelens-functions-itn
+7. Verify deployment
+8. Log to Application Insights
+```
+
+#### Workflow: deploy-api.yml
+**Trigger**: Push to `Azure` branch
+
+```yaml
+Steps:
+1. Checkout code
+2. Setup Node.js 20
+3. npm install
+4. npm run build (Vite build)
+5. Azure Login (OIDC)
+6. Deploy to updatelens-api
+7. Restart Web App
+8. Health check (GET /api/health)
+```
+
+### Monitoring \u0026 Observability
+
+#### Application Insights Telemetry
+
+**Function App**:
+- Execution count per function
+- Duration (avg, p50, p95, p99)
+- Success/Failure rate
+- Exceptions and stack traces
+- Custom events (snapshot size, item count)
+
+**Web App**:
+- HTTP request metrics (latency, status codes)
+- Page views and user sessions
+- Browser performance (load time, render time)
+- Custom events (filter applied, export triggered)
+
+#### Log Analytics Queries
+
+**Query 1: Function Execution Summary**
+```kusto
+traces
+| where cloud_RoleName == "updatelens-functions-itn"
+| where message contains "Refresh completed"
+| summarize 
+    count(), 
+    avg(duration), 
+    percentile(duration, 95) 
+  by bin(timestamp, 1h), operation_Name
+```
+
+**Query 2: Snapshot Size Trends**
+```kusto
+customEvents
+| where name == "SnapshotWritten"
+| extend source = tostring(customDimensions.source)
+| extend sizeBytes = tolong(customDimensions.sizeBytes)
+| summarize avg(sizeBytes), max(sizeBytes) by bin(timestamp, 1d), source
+```
+
+### Security
+
+#### Secrets Management
+- **GitHub Token**: Stored in App Settings (migrate to Key Vault)
+- **Function Keys**: Auto-generated, rotated periodically
+- **Connection Strings**: Managed Identity (no connection strings needed)
+
+#### Network Security
+- **Public Endpoints**: Currently enabled (migrate to Private Endpoints)
+- **HTTPS Only**: Enforced on Web App and Functions
+- **CORS**: Configured for `updatelens-api.azurewebsites.net`
+
+#### Authentication
+- **GitHub Actions**: OIDC Federated Credentials (no secrets)
+- **Function App**: System Assigned MI for Blob Storage
+- **Web App**: System Assigned MI for Blob Storage
 
 ---
 
@@ -618,6 +930,203 @@ pm2 start server/index.ts --name updatelens-server
 
 ---
 
+## Build e Deployment
+
+UpdateLens supporta **tre modalità di deployment** per adattarsi a diverse esigenze:
+
+### 1. Offline Mode (ZIP Distribution)
+
+**Ideale per**: Distribuzione locale, demo, ambienti senza internet
+
+#### Build
+```bash
+npm run build:release
+```
+
+#### Output
+```
+release/
+├── index.html          # Entry point
+├── assets/             # JS/CSS bundled (con hash)
+│   ├── index-[hash].js
+│   └── index-[hash].css
+└── data/               # Snapshot JSON embedded
+    ├── snapshots/
+    │   ├── microsoft_releaseplans_latest.json
+    │   ├── eos_whatsnew_latest.json
+    │   ├── fabric_roadmap_latest.json
+    │   └── m365_roadmap_latest.json
+    └── latest.json
+```
+
+#### Distribuzione
+1. Comprimi cartella `release/` → `UpdateLens_v0.4.0.zip`
+2. Distribuisci ZIP ai clienti
+3. Istruzioni: "Estrai ZIP → Apri `index.html`"
+
+#### Caratteristiche
+- ✅ Funziona con `file://` protocol
+- ✅ Nessun server richiesto
+- ✅ Snapshot embedded (dati statici)
+- ✅ Refresh manuale (sostituire JSON files)
+- ⚠️ GitHub Issues non disponibile (CORS)
+
+---
+
+### 2. Web Mode (Local Server)
+
+**Ideale per**: Sviluppo, testing, deployment intranet
+
+#### Build
+```bash
+npm run build
+```
+
+#### Avvio Server
+```bash
+# Development
+npm run server:dev
+
+# Production
+npm run server:start
+```
+
+#### Architettura
+```
+┌─────────────────────────────────────┐
+│   Express Server (localhost:3000)   │
+│  ┌───────────────────────────────┐  │
+│  │  Static Files (dist/)         │  │
+│  │  • index.html                 │  │
+│  │  • assets/                    │  │
+│  └───────────────────────────────┘  │
+│  ┌───────────────────────────────┐  │
+│  │  API Routes                   │  │
+│  │  • /api/releaseplans          │  │
+│  │  • /api/github/issues         │  │
+│  │  • /api/github/upload         │  │
+│  └───────────────────────────────┘  │
+│  ┌───────────────────────────────┐  │
+│  │  SQLite Database              │  │
+│  │  • releaseplans.db            │  │
+│  └───────────────────────────────┘  │
+└─────────────────────────────────────┘
+```
+
+#### Caratteristiche
+- ✅ Backend Express locale
+- ✅ SQLite database
+- ✅ GitHub Issues proxy (no CORS)
+- ✅ API REST interne
+- ✅ Refresh manuale con script
+
+#### Environment Variables
+```env
+PORT=3000
+GITHUB_ISSUES_TOKEN=ghp_xxx...
+GITHUB_OWNER=Allecpu
+GITHUB_REPO=UpdateLens
+```
+
+---
+
+### 3. Azure Mode (Cloud Deployment)
+
+**Ideale per**: Produzione, scalabilità, refresh automatico
+
+#### Architettura
+Vedi sezione [Azure Architecture](#azure-architecture) per dettagli completi.
+
+#### Deployment via GitHub Actions
+
+**Workflow 1: deploy-functions.yml**
+```yaml
+name: Deploy Azure Functions
+on:
+  push:
+    branches: [main]
+    paths: ['functions/**']
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Deploy Functions
+        run: |
+          cd functions
+          npm install
+          npm run build
+          func azure functionapp publish updatelens-functions-itn
+```
+
+**Workflow 2: deploy-api.yml**
+```yaml
+name: Deploy Web App
+on:
+  push:
+    branches: [Azure]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Build and Deploy
+        run: |
+          npm install
+          npm run build
+          az webapp deploy \
+            --resource-group rg-updatelens-runtime \
+            --name updatelens-api \
+            --src-path dist.zip
+```
+
+#### Caratteristiche
+- ✅ Automated refresh (ogni 6 ore)
+- ✅ Scalable storage (Azure Blob)
+- ✅ Serverless functions
+- ✅ Managed hosting
+- ✅ Application Insights monitoring
+- ✅ CI/CD automatico
+
+#### Costi Stimati (Italy North)
+| Componente | Tier | Costo/mese (€) |
+|------------|------|----------------|
+| Azure Functions | Consumption | ~5-10 |
+| Azure App Service | Basic B1 | ~13 |
+| Blob Storage | Standard LRS | ~1-2 |
+| Application Insights | Pay-as-you-go | ~5 |
+| **Totale** | | **~24-30 €/mese** |
+
+---
+
+### Comparison Matrix
+
+| Feature | Offline | Web (Local) | Azure (Cloud) |
+|---------|---------|-------------|---------------|
+| **Internet Required** | ❌ No | ⚠️ Optional | ✅ Yes |
+| **Server Required** | ❌ No | ✅ Yes (local) | ✅ Yes (cloud) |
+| **Automated Refresh** | ❌ Manual | ⚠️ Script | ✅ Automatic |
+| **GitHub Issues** | ❌ No (CORS) | ✅ Yes (proxy) | ✅ Yes (proxy) |
+| **Scalability** | ❌ Single user | ⚠️ Limited | ✅ High |
+| **Monitoring** | ❌ No | ⚠️ Basic logs | ✅ App Insights |
+| **Cost** | Free | Free (hosting) | ~25 €/month |
+| **Deployment** | ZIP file | npm run | GitHub Actions |
+| **Best For** | Demo, offline | Dev, intranet | Production |
+
+---
+
 ## Troubleshooting
 
 ### Common Issues
@@ -653,5 +1162,5 @@ Sviluppato per **CSS S.r.l.**
 
 ---
 
-**Versione**: 0.3.0  
-**Ultimo Aggiornamento**: 2026-01-23
+**Versione**: 0.4.0  
+**Ultimo Aggiornamento**: 2026-02-02
