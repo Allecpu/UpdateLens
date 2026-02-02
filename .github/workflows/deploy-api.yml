@@ -147,7 +147,11 @@ jobs:
             --always-on true
 
       - name: Configure Easy Auth (if secrets are set)
-        if: ${{ secrets.AZURE_AUTH_CLIENT_ID != '' }}
+        if: ${{ vars.ENABLE_EASY_AUTH == 'true' }}
+        env:
+          AUTH_CLIENT_ID: ${{ secrets.AZURE_AUTH_CLIENT_ID }}
+          AUTH_CLIENT_SECRET: ${{ secrets.AZURE_AUTH_CLIENT_SECRET }}
+          AUTH_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
         run: |
           # Upgrade to auth config v2 if needed
           az webapp auth config-version upgrade \
@@ -158,9 +162,9 @@ jobs:
           az webapp auth microsoft update \
             --name updatelens-api \
             --resource-group rg-updatelens-runtime \
-            --client-id "${{ secrets.AZURE_AUTH_CLIENT_ID }}" \
-            --client-secret "${{ secrets.AZURE_AUTH_CLIENT_SECRET }}" \
-            --issuer "https://login.microsoftonline.com/${{ secrets.AZURE_TENANT_ID }}/v2.0" \
+            --client-id "$AUTH_CLIENT_ID" \
+            --client-secret "$AUTH_CLIENT_SECRET" \
+            --issuer "https://login.microsoftonline.com/$AUTH_TENANT_ID/v2.0" \
             --yes
 
           # Enable authentication with redirect
