@@ -23,20 +23,33 @@ const addFolderToZip = async (zip, folderPath, basePath) => {
     }
 };
 export const buildReleaseZip = async () => {
-    try {
-        // Increase maxBuffer to 10MB to prevent crashes on large build outputs
-        await execAsync('npm run build:release', { cwd: repoRoot, maxBuffer: 10 * 1024 * 1024 });
-    }
-    catch (error) {
-        const stderr = error.stderr ? `\nSTDERR:\n${error.stderr}` : '';
-        const stdout = error.stdout ? `\nSTDOUT:\n${error.stdout}` : '';
-        throw new Error(`Build failed: ${error.message}${stderr}${stdout}`);
-    }
+    // Check if pre-built release folder exists (deployed from CI)
+    let releaseExists = false;
     try {
         await stat(releaseDir);
+        releaseExists = true;
     }
     catch {
-        throw new Error(`Release directory not found at: ${releaseDir}`);
+        releaseExists = false;
+    }
+    // Only run build if release folder doesn't exist (local dev or first run)
+    if (!releaseExists) {
+        try {
+            // Increase maxBuffer to 10MB to prevent crashes on large build outputs
+            await execAsync('npm run build:release', { cwd: repoRoot, maxBuffer: 10 * 1024 * 1024 });
+        }
+        catch (error) {
+            const stderr = error.stderr ? `\nSTDERR:\n${error.stderr}` : '';
+            const stdout = error.stdout ? `\nSTDOUT:\n${error.stdout}` : '';
+            throw new Error(`Build failed: ${error.message}${stderr}${stdout}`);
+        }
+        // Verify release folder was created
+        try {
+            await stat(releaseDir);
+        }
+        catch {
+            throw new Error(`Release directory not found at: ${releaseDir}`);
+        }
     }
     const zip = new JSZip();
     await addFolderToZip(zip, releaseDir, releaseDir);

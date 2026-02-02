@@ -84,4 +84,67 @@ export const initSchema = (db) => {
   `);
     ensureColumn(db, 'release_plan_items', 'release_plan_id', 'release_plan_id TEXT');
     ensureColumn(db, 'release_plan_items', 'learn_url', 'learn_url TEXT');
+    // Filter presets tables
+    db.exec(`
+    CREATE TABLE IF NOT EXISTS filter_presets (
+      preset_id TEXT PRIMARY KEY,
+      owner_tenant_id TEXT NOT NULL,
+      owner_object_id TEXT NOT NULL,
+      owner_email TEXT NOT NULL,
+      owner_name TEXT,
+      name TEXT NOT NULL,
+      description TEXT,
+      filters_json TEXT NOT NULL,
+      is_default INTEGER NOT NULL DEFAULT 0,
+      visibility_scope TEXT NOT NULL DEFAULT 'private',
+      schema_version INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE(owner_tenant_id, owner_object_id, name)
+    );
+
+    CREATE TABLE IF NOT EXISTS filter_preset_shares (
+      share_id TEXT PRIMARY KEY,
+      preset_id TEXT NOT NULL,
+      grantee_tenant_id TEXT,
+      grantee_object_id TEXT,
+      grantee_email TEXT NOT NULL,
+      permission TEXT NOT NULL DEFAULT 'view',
+      created_by_tenant_id TEXT NOT NULL,
+      created_by_object_id TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (preset_id) REFERENCES filter_presets(preset_id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_filter_presets_owner
+      ON filter_presets(owner_tenant_id, owner_object_id);
+    CREATE INDEX IF NOT EXISTS idx_filter_preset_shares_preset
+      ON filter_preset_shares(preset_id);
+    CREATE INDEX IF NOT EXISTS idx_filter_preset_shares_grantee_email
+      ON filter_preset_shares(grantee_email);
+    CREATE INDEX IF NOT EXISTS idx_filter_preset_shares_grantee
+      ON filter_preset_shares(grantee_tenant_id, grantee_object_id);
+
+    -- User management table for RBAC
+    CREATE TABLE IF NOT EXISTS sharing_users (
+      user_id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      object_id TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
+      name TEXT,
+      role TEXT NOT NULL DEFAULT 'viewer',
+      enabled INTEGER NOT NULL DEFAULT 1,
+      created_by_tenant_id TEXT,
+      created_by_object_id TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_sharing_users_tenant_object
+      ON sharing_users(tenant_id, object_id);
+    CREATE INDEX IF NOT EXISTS idx_sharing_users_email
+      ON sharing_users(email);
+    CREATE INDEX IF NOT EXISTS idx_sharing_users_role
+      ON sharing_users(role);
+  `);
 };

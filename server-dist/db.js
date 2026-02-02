@@ -3,7 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { initSchema } from "./schema.js";
 const resolveDbPath = () => {
-    const baseDir = path.resolve(process.cwd(), 'data');
+    // Use /home/data on Azure (persistent storage), ./data locally
+    const baseDir = process.env.DB_PATH || path.resolve(process.cwd(), 'data');
     if (!fs.existsSync(baseDir)) {
         fs.mkdirSync(baseDir, { recursive: true });
     }

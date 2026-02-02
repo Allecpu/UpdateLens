@@ -7,9 +7,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
-import { getIdentity, requireAuth, optionalAuth, isAllowedDomain, bindPendingShares, canManageUsers, type UserIdentity } from './auth.js';
+import { getIdentity, requireAuth, optionalAuth, isAllowedDomain, bindPendingShares, canManageUsers, requireWhitelistedUser, type UserIdentity } from './auth.js';
 import * as presets from './presets.js';
 import * as users from './users.js';
+import type { WhitelistCheckResult } from './users.js';
 
 const execAsync = promisify(exec);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -612,7 +613,7 @@ export const createApi = () => {
     return process.env.DB_PATH === '/home/data';
   };
 
-  // Auth: Get current user info
+  // Auth: Get current user info (includes whitelist check)
   app.get('/api/auth/me', (req, res) => {
     if (!isEasyAuthConfigured()) {
       return res.status(503).json({
@@ -629,12 +630,46 @@ export const createApi = () => {
       });
     }
 
+    // Try to bind identity if user exists by email only
+    users.bindUserIdentity(db, identity);
+
+    // Check whitelist status
+    const whitelistCheck = users.isUserWhitelisted(db, identity);
+
     // Bind any pending shares for this user
     const boundShares = bindPendingShares(db, identity);
+
+    // If not whitelisted or disabled, return access denied info
+    if (!whitelistCheck.found) {
+      return res.status(403).json({
+        authenticated: true,
+        authConfigured: true,
+        accessDenied: true,
+        accessDeniedReason: 'NOT_WHITELISTED',
+        user: {
+          email: identity.email,
+          name: identity.name
+        }
+      });
+    }
+
+    if (!whitelistCheck.enabled) {
+      return res.status(403).json({
+        authenticated: true,
+        authConfigured: true,
+        accessDenied: true,
+        accessDeniedReason: 'DISABLED',
+        user: {
+          email: identity.email,
+          name: identity.name
+        }
+      });
+    }
 
     res.json({
       authenticated: true,
       authConfigured: true,
+      accessDenied: false,
       user: {
         tenantId: identity.tid,
         objectId: identity.oid,
@@ -645,16 +680,12 @@ export const createApi = () => {
     });
   });
 
-  // Presets: List presets (own + optionally shared)
-  app.get('/api/presets', (req, res) => {
-    if (!isEasyAuthConfigured()) {
-      return res.status(503).json({ error: 'Autenticazione non configurata' });
-    }
+  // Middleware to check whitelist for protected endpoints
+  const whitelistMiddleware = requireWhitelistedUser(db);
 
-    const identity = getIdentity(req);
-    if (!identity) {
-      return res.status(401).json({ error: 'Non autenticato' });
-    }
+  // Presets: List presets (own + optionally shared)
+  app.get('/api/presets', whitelistMiddleware, (req, res) => {
+    const identity = req.user!;
 
     try {
       const includeShared = req.query.includeShared === 'true';
@@ -676,15 +707,8 @@ export const createApi = () => {
   });
 
   // Presets: Create new preset
-  app.post('/api/presets', (req, res) => {
-    if (!isEasyAuthConfigured()) {
-      return res.status(503).json({ error: 'Autenticazione non configurata' });
-    }
-
-    const identity = getIdentity(req);
-    if (!identity) {
-      return res.status(401).json({ error: 'Non autenticato' });
-    }
+  app.post('/api/presets', whitelistMiddleware, (req, res) => {
+    const identity = req.user!;
 
     try {
       const { name, description, filters, isDefault, visibilityScope } = req.body;
@@ -717,15 +741,8 @@ export const createApi = () => {
   });
 
   // Presets: Get single preset
-  app.get('/api/presets/:id', (req, res) => {
-    if (!isEasyAuthConfigured()) {
-      return res.status(503).json({ error: 'Autenticazione non configurata' });
-    }
-
-    const identity = getIdentity(req);
-    if (!identity) {
-      return res.status(401).json({ error: 'Non autenticato' });
-    }
+  app.get('/api/presets/:id', whitelistMiddleware, (req, res) => {
+    const identity = req.user!;
 
     try {
       const { id } = req.params;
@@ -763,15 +780,8 @@ export const createApi = () => {
   });
 
   // Presets: Update preset
-  app.put('/api/presets/:id', (req, res) => {
-    if (!isEasyAuthConfigured()) {
-      return res.status(503).json({ error: 'Autenticazione non configurata' });
-    }
-
-    const identity = getIdentity(req);
-    if (!identity) {
-      return res.status(401).json({ error: 'Non autenticato' });
-    }
+  app.put('/api/presets/:id', whitelistMiddleware, (req, res) => {
+    const identity = req.user!;
 
     try {
       const { id } = req.params;
@@ -805,15 +815,8 @@ export const createApi = () => {
   });
 
   // Presets: Delete preset
-  app.delete('/api/presets/:id', (req, res) => {
-    if (!isEasyAuthConfigured()) {
-      return res.status(503).json({ error: 'Autenticazione non configurata' });
-    }
-
-    const identity = getIdentity(req);
-    if (!identity) {
-      return res.status(401).json({ error: 'Non autenticato' });
-    }
+  app.delete('/api/presets/:id', whitelistMiddleware, (req, res) => {
+    const identity = req.user!;
 
     try {
       const { id } = req.params;
@@ -836,15 +839,8 @@ export const createApi = () => {
   });
 
   // Presets: Duplicate preset
-  app.post('/api/presets/:id/duplicate', (req, res) => {
-    if (!isEasyAuthConfigured()) {
-      return res.status(503).json({ error: 'Autenticazione non configurata' });
-    }
-
-    const identity = getIdentity(req);
-    if (!identity) {
-      return res.status(401).json({ error: 'Non autenticato' });
-    }
+  app.post('/api/presets/:id/duplicate', whitelistMiddleware, (req, res) => {
+    const identity = req.user!;
 
     try {
       const { id } = req.params;
@@ -875,15 +871,8 @@ export const createApi = () => {
   });
 
   // Sharing: Get sharing info for a preset
-  app.get('/api/presets/:id/sharing', (req, res) => {
-    if (!isEasyAuthConfigured()) {
-      return res.status(503).json({ error: 'Autenticazione non configurata' });
-    }
-
-    const identity = getIdentity(req);
-    if (!identity) {
-      return res.status(401).json({ error: 'Non autenticato' });
-    }
+  app.get('/api/presets/:id/sharing', whitelistMiddleware, (req, res) => {
+    const identity = req.user!;
 
     try {
       const { id } = req.params;
@@ -906,15 +895,8 @@ export const createApi = () => {
   });
 
   // Sharing: Update sharing settings for a preset
-  app.put('/api/presets/:id/sharing', (req, res) => {
-    if (!isEasyAuthConfigured()) {
-      return res.status(503).json({ error: 'Autenticazione non configurata' });
-    }
-
-    const identity = getIdentity(req);
-    if (!identity) {
-      return res.status(401).json({ error: 'Non autenticato' });
-    }
+  app.put('/api/presets/:id/sharing', whitelistMiddleware, (req, res) => {
+    const identity = req.user!;
 
     try {
       const { id } = req.params;
@@ -964,15 +946,8 @@ export const createApi = () => {
   });
 
   // Shares: Get presets I've shared with others (outgoing)
-  app.get('/api/shares/outgoing', (req, res) => {
-    if (!isEasyAuthConfigured()) {
-      return res.status(503).json({ error: 'Autenticazione non configurata' });
-    }
-
-    const identity = getIdentity(req);
-    if (!identity) {
-      return res.status(401).json({ error: 'Non autenticato' });
-    }
+  app.get('/api/shares/outgoing', whitelistMiddleware, (req, res) => {
+    const identity = req.user!;
 
     try {
       const outgoing = presets.getOutgoingShares(db, identity);
@@ -1016,16 +991,9 @@ export const createApi = () => {
     }
   });
 
-  // Users: Add a new user
-  app.post('/api/shares/users', (req, res) => {
-    if (!isEasyAuthConfigured()) {
-      return res.status(503).json({ error: 'Autenticazione non configurata' });
-    }
-
-    const identity = getIdentity(req);
-    if (!identity) {
-      return res.status(401).json({ error: 'Non autenticato' });
-    }
+  // Users: Add a new user (requires whitelist - only existing users can add new users)
+  app.post('/api/shares/users', whitelistMiddleware, (req, res) => {
+    const identity = req.user!;
 
     try {
       const currentUser = users.ensureUserExists(db, identity);
@@ -1060,16 +1028,9 @@ export const createApi = () => {
     }
   });
 
-  // Users: Update a user (role, enabled)
-  app.patch('/api/shares/users/:id', (req, res) => {
-    if (!isEasyAuthConfigured()) {
-      return res.status(503).json({ error: 'Autenticazione non configurata' });
-    }
-
-    const identity = getIdentity(req);
-    if (!identity) {
-      return res.status(401).json({ error: 'Non autenticato' });
-    }
+  // Users: Update a user (role, enabled) - requires whitelist
+  app.patch('/api/shares/users/:id', whitelistMiddleware, (req, res) => {
+    const identity = req.user!;
 
     try {
       const { id } = req.params;
@@ -1109,15 +1070,8 @@ export const createApi = () => {
   // ============================================
 
   // Shares: Get presets shared with me (incoming)
-  app.get('/api/shares/incoming', (req, res) => {
-    if (!isEasyAuthConfigured()) {
-      return res.status(503).json({ error: 'Autenticazione non configurata' });
-    }
-
-    const identity = getIdentity(req);
-    if (!identity) {
-      return res.status(401).json({ error: 'Non autenticato' });
-    }
+  app.get('/api/shares/incoming', whitelistMiddleware, (req, res) => {
+    const identity = req.user!;
 
     try {
       const incoming = presets.getIncomingShares(db, identity);
@@ -1129,15 +1083,8 @@ export const createApi = () => {
   });
 
   // Migration: Migrate presets from localStorage
-  app.post('/api/presets/migrate', (req, res) => {
-    if (!isEasyAuthConfigured()) {
-      return res.status(503).json({ error: 'Autenticazione non configurata' });
-    }
-
-    const identity = getIdentity(req);
-    if (!identity) {
-      return res.status(401).json({ error: 'Non autenticato' });
-    }
+  app.post('/api/presets/migrate', whitelistMiddleware, (req, res) => {
+    const identity = req.user!;
 
     try {
       const { presets: localPresets } = req.body;

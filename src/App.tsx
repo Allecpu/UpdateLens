@@ -8,9 +8,11 @@ import IssuesPage from './app/pages/IssuesPage';
 import SharesPage from './app/components/shares/SharesPage';
 import ChatPanel from './app/components/chat/ChatPanel';
 import UserMenu from './app/components/UserMenu';
+import AccessDenied from './app/components/AccessDenied';
 import { useCustomerGroupStore } from './app/store/useCustomerGroupStore';
 import { useCustomerStore } from './app/store/useCustomerStore';
 import { useFilterStore } from './app/store/useFilterStore';
+import { useAuthStore } from './app/store/useAuthStore';
 import { useBootstrapFilters } from './hooks/useBootstrapFilters';
 
 const isEntryActive = (entry: { isActive?: boolean }): boolean => entry.isActive !== false;
@@ -193,6 +195,14 @@ const App = () => {
   // Bootstrap global filters if needed
   useBootstrapFilters();
 
+  // Auth state
+  const { fetchCurrentUser, accessDenied, accessDeniedReason, userEmail, isLoading, hasFetched } = useAuthStore();
+
+  // Fetch current user on mount
+  useEffect(() => {
+    fetchCurrentUser();
+  }, [fetchCurrentUser]);
+
   const [isDark, setIsDark] = useState(() => {
     const stored = localStorage.getItem('updatelens.theme');
     if (stored === 'dark') {
@@ -210,6 +220,23 @@ const App = () => {
     document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
     localStorage.setItem('updatelens.theme', isDark ? 'dark' : 'light');
   }, [isDark]);
+
+  // Show loading state while checking auth
+  if (isLoading || !hasFetched) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <p className="text-muted-foreground">Caricamento...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show access denied page if user is not whitelisted or disabled
+  if (accessDenied && accessDeniedReason) {
+    return <AccessDenied reason={accessDeniedReason} email={userEmail || undefined} />;
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground">

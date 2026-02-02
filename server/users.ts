@@ -313,6 +313,42 @@ export const updateUser = (
 };
 
 /**
+ * Whitelist check result
+ */
+export interface WhitelistCheckResult {
+  found: boolean;
+  enabled: boolean;
+  user?: SharingUserRow;
+}
+
+/**
+ * Check if a user is in the whitelist.
+ * Searches by (tenant_id, object_id) first, then by email (case-insensitive).
+ */
+export const isUserWhitelisted = (
+  db: Database.Database,
+  identity: UserIdentity
+): WhitelistCheckResult => {
+  // First, try to find by tenant_id and object_id
+  let user = getUserByIdentity(db, identity);
+
+  // If not found, try by email
+  if (!user) {
+    user = getUserByEmail(db, identity.email);
+  }
+
+  if (!user) {
+    return { found: false, enabled: false };
+  }
+
+  return {
+    found: true,
+    enabled: user.enabled === 1,
+    user
+  };
+};
+
+/**
  * Bind user identity to an existing email-only user record.
  * Called when a user logs in and their email matches a pre-added user.
  */

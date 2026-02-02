@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import type Database from 'better-sqlite3';
+import { isUserWhitelisted, bindUserIdentity } from './users.js';
 
 // Azure Easy Auth identity structure
 export interface UserIdentity {
@@ -161,6 +162,49 @@ export const bindPendingShares = (db: Database.Database, identity: UserIdentity)
   }
 
   return result.changes;
+};
+
+/**
+ * Middleware that requires the user to be whitelisted.
+ * Returns 403 if user is not in the whitelist or is disabled.
+ */
+export const requireWhitelistedUser = (db: Database.Database) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const identity = getIdentity(req);
+
+    if (!identity) {
+      res.status(401).json({ error: 'Autenticazione richiesta' });
+      return;
+    }
+
+    // Try to bind identity if user exists by email only
+    bindUserIdentity(db, identity);
+
+    // Check whitelist
+    const result = isUserWhitelisted(db, identity);
+
+    if (!result.found) {
+      res.status(403).json({
+        error: 'Accesso non autorizzato',
+        code: 'NOT_WHITELISTED',
+        email: identity.email
+      });
+      return;
+    }
+
+    if (!result.enabled) {
+      res.status(403).json({
+        error: 'Account disabilitato',
+        code: 'DISABLED',
+        email: identity.email
+      });
+      return;
+    }
+
+    // Attach identity to request for downstream use
+    (req as Request & { user: UserIdentity }).user = identity;
+    next();
+  };
 };
 
 // Type augmentation for Express Request

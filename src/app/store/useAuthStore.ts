@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import type { UserInfo } from '../../models/Filters';
 import { presetService } from '../../services/PresetService';
 
+export type AccessDeniedReason = 'NOT_WHITELISTED' | 'DISABLED' | null;
+
 type AuthState = {
   // State
   isAuthenticated: boolean;
@@ -10,6 +12,9 @@ type AuthState = {
   currentUser: UserInfo | null;
   error: string | null;
   hasFetched: boolean;
+  accessDenied: boolean;
+  accessDeniedReason: AccessDeniedReason;
+  userEmail: string | null;
 
   // Actions
   fetchCurrentUser: () => Promise<void>;
@@ -24,6 +29,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   currentUser: null,
   error: null,
   hasFetched: false,
+  accessDenied: false,
+  accessDeniedReason: null,
+  userEmail: null,
 
   fetchCurrentUser: async () => {
     // Don't fetch if already loading or fetched
@@ -34,33 +42,70 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isLoading: true, error: null });
 
     try {
-      const response = await presetService.getCurrentUser();
+      const response = await fetch('/api/auth/me');
+      const data = await response.json();
 
+      // Handle 403 - access denied (not whitelisted or disabled)
+      if (response.status === 403 && data.accessDenied) {
+        set({
+          isAuthenticated: data.authenticated ?? false,
+          isAuthConfigured: data.authConfigured ?? true,
+          currentUser: null,
+          isLoading: false,
+          hasFetched: true,
+          accessDenied: true,
+          accessDeniedReason: data.accessDeniedReason || 'NOT_WHITELISTED',
+          userEmail: data.user?.email || null
+        });
+        return;
+      }
+
+      // Handle other errors
+      if (!response.ok) {
+        const isNotConfigured = response.status === 503;
+        set({
+          isAuthenticated: false,
+          isAuthConfigured: !isNotConfigured,
+          currentUser: null,
+          isLoading: false,
+          hasFetched: true,
+          accessDenied: false,
+          accessDeniedReason: null,
+          userEmail: null,
+          error: isNotConfigured ? null : (data.error || 'Errore durante il recupero utente')
+        });
+        return;
+      }
+
+      // Success - user is authenticated and whitelisted
       set({
-        isAuthenticated: response.authenticated,
-        isAuthConfigured: response.authConfigured,
-        currentUser: response.user || null,
+        isAuthenticated: data.authenticated,
+        isAuthConfigured: data.authConfigured,
+        currentUser: data.user || null,
         isLoading: false,
-        hasFetched: true
+        hasFetched: true,
+        accessDenied: false,
+        accessDeniedReason: null,
+        userEmail: data.user?.email || null
       });
 
       // Log bound shares if any
-      if (response.boundShares && response.boundShares > 0) {
-        console.log(`[Auth] Bound ${response.boundShares} pending share(s) to user`);
+      if (data.boundShares && data.boundShares > 0) {
+        console.log(`[Auth] Bound ${data.boundShares} pending share(s) to user`);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to fetch user';
 
-      // Check if error indicates auth not configured (503) vs not authenticated (401)
-      const isNotConfigured = message.includes('503') || message.includes('non configurata');
-
       set({
         isAuthenticated: false,
-        isAuthConfigured: !isNotConfigured,
+        isAuthConfigured: false,
         currentUser: null,
         isLoading: false,
         hasFetched: true,
-        error: isNotConfigured ? null : message // Don't show error if auth just isn't configured
+        accessDenied: false,
+        accessDeniedReason: null,
+        userEmail: null,
+        error: message
       });
     }
   },
@@ -76,7 +121,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       isLoading: false,
       currentUser: null,
       error: null,
-      hasFetched: false
+      hasFetched: false,
+      accessDenied: false,
+      accessDeniedReason: null,
+      userEmail: null
     });
   }
 }));
