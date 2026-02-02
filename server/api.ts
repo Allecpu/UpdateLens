@@ -7,6 +7,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
+import { getIdentity, requireAuth, optionalAuth, isAllowedDomain, bindPendingShares, type UserIdentity } from './auth.js';
+import * as presets from './presets.js';
 
 const execAsync = promisify(exec);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -598,6 +600,443 @@ export const createApi = () => {
       res.status(500).json({ error: 'Errore durante l\'upload dell\'immagine.' });
     }
   });
+
+  // ============================================
+  // Auth & Preset API Endpoints
+  // ============================================
+
+  // Check if Easy Auth is configured
+  const isEasyAuthConfigured = (): boolean => {
+    // Easy Auth is only available on Azure App Service
+    return process.env.DB_PATH === '/home/data';
+  };
+
+  // Auth: Get current user info
+  app.get('/api/auth/me', (req, res) => {
+    if (!isEasyAuthConfigured()) {
+      return res.status(503).json({
+        error: 'Autenticazione non configurata. Easy Auth disponibile solo su Azure.',
+        authConfigured: false
+      });
+    }
+
+    const identity = getIdentity(req);
+    if (!identity) {
+      return res.status(401).json({
+        error: 'Non autenticato',
+        authConfigured: true
+      });
+    }
+
+    // Bind any pending shares for this user
+    const boundShares = bindPendingShares(db, identity);
+
+    res.json({
+      authenticated: true,
+      authConfigured: true,
+      user: {
+        tenantId: identity.tid,
+        objectId: identity.oid,
+        email: identity.email,
+        name: identity.name
+      },
+      boundShares
+    });
+  });
+
+  // Presets: List presets (own + optionally shared)
+  app.get('/api/presets', (req, res) => {
+    if (!isEasyAuthConfigured()) {
+      return res.status(503).json({ error: 'Autenticazione non configurata' });
+    }
+
+    const identity = getIdentity(req);
+    if (!identity) {
+      return res.status(401).json({ error: 'Non autenticato' });
+    }
+
+    try {
+      const includeShared = req.query.includeShared === 'true';
+      const presetsResponse = presets.getPresetsForUser(db, identity, includeShared);
+
+      // Separate own and shared presets
+      const myPresets = presetsResponse.filter(p => p.isOwner);
+      const sharedPresets = presetsResponse.filter(p => !p.isOwner);
+
+      res.json({
+        myPresets,
+        sharedPresets: includeShared ? sharedPresets : [],
+        total: presetsResponse.length
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Errore durante il recupero dei preset';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  // Presets: Create new preset
+  app.post('/api/presets', (req, res) => {
+    if (!isEasyAuthConfigured()) {
+      return res.status(503).json({ error: 'Autenticazione non configurata' });
+    }
+
+    const identity = getIdentity(req);
+    if (!identity) {
+      return res.status(401).json({ error: 'Non autenticato' });
+    }
+
+    try {
+      const { name, description, filters, isDefault, visibilityScope } = req.body;
+
+      if (!name || typeof name !== 'string' || !name.trim()) {
+        return res.status(400).json({ error: 'Nome preset richiesto' });
+      }
+
+      if (!filters) {
+        return res.status(400).json({ error: 'Filtri richiesti' });
+      }
+
+      const preset = presets.createPreset(db, identity, {
+        name: name.trim(),
+        description: description?.trim(),
+        filters,
+        isDefault: !!isDefault,
+        visibilityScope: visibilityScope || 'private'
+      });
+
+      res.status(201).json(preset);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Errore durante la creazione del preset';
+      // Check for unique constraint violation
+      if (message.includes('UNIQUE constraint failed')) {
+        return res.status(409).json({ error: 'Esiste già un preset con questo nome' });
+      }
+      res.status(500).json({ error: message });
+    }
+  });
+
+  // Presets: Get single preset
+  app.get('/api/presets/:id', (req, res) => {
+    if (!isEasyAuthConfigured()) {
+      return res.status(503).json({ error: 'Autenticazione non configurata' });
+    }
+
+    const identity = getIdentity(req);
+    if (!identity) {
+      return res.status(401).json({ error: 'Non autenticato' });
+    }
+
+    try {
+      const { id } = req.params;
+      const preset = presets.getPresetById(db, id);
+
+      if (!preset) {
+        return res.status(404).json({ error: 'Preset non trovato' });
+      }
+
+      if (!presets.canAccessPreset(db, identity, preset)) {
+        return res.status(403).json({ error: 'Non autorizzato ad accedere a questo preset' });
+      }
+
+      const response: presets.PresetResponse = {
+        id: preset.preset_id,
+        name: preset.name,
+        description: preset.description,
+        filters: JSON.parse(preset.filters_json),
+        isDefault: preset.is_default === 1,
+        visibilityScope: preset.visibility_scope,
+        createdAt: preset.created_at,
+        updatedAt: preset.updated_at,
+        owner: {
+          email: preset.owner_email,
+          name: preset.owner_name
+        },
+        isOwner: preset.owner_tenant_id === identity.tid && preset.owner_object_id === identity.oid
+      };
+
+      res.json(response);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Errore durante il recupero del preset';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  // Presets: Update preset
+  app.put('/api/presets/:id', (req, res) => {
+    if (!isEasyAuthConfigured()) {
+      return res.status(503).json({ error: 'Autenticazione non configurata' });
+    }
+
+    const identity = getIdentity(req);
+    if (!identity) {
+      return res.status(401).json({ error: 'Non autenticato' });
+    }
+
+    try {
+      const { id } = req.params;
+      const preset = presets.getPresetById(db, id);
+
+      if (!preset) {
+        return res.status(404).json({ error: 'Preset non trovato' });
+      }
+
+      if (!presets.canModifyPreset(identity, preset)) {
+        return res.status(403).json({ error: 'Non autorizzato a modificare questo preset' });
+      }
+
+      const { name, description, filters, isDefault } = req.body;
+
+      const updated = presets.updatePreset(db, identity, id, {
+        name: name?.trim(),
+        description: description?.trim(),
+        filters,
+        isDefault
+      });
+
+      res.json(updated);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Errore durante l\'aggiornamento del preset';
+      if (message.includes('UNIQUE constraint failed')) {
+        return res.status(409).json({ error: 'Esiste già un preset con questo nome' });
+      }
+      res.status(500).json({ error: message });
+    }
+  });
+
+  // Presets: Delete preset
+  app.delete('/api/presets/:id', (req, res) => {
+    if (!isEasyAuthConfigured()) {
+      return res.status(503).json({ error: 'Autenticazione non configurata' });
+    }
+
+    const identity = getIdentity(req);
+    if (!identity) {
+      return res.status(401).json({ error: 'Non autenticato' });
+    }
+
+    try {
+      const { id } = req.params;
+      const preset = presets.getPresetById(db, id);
+
+      if (!preset) {
+        return res.status(404).json({ error: 'Preset non trovato' });
+      }
+
+      if (!presets.canModifyPreset(identity, preset)) {
+        return res.status(403).json({ error: 'Non autorizzato a eliminare questo preset' });
+      }
+
+      presets.deletePreset(db, id);
+      res.status(204).send();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Errore durante l\'eliminazione del preset';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  // Presets: Duplicate preset
+  app.post('/api/presets/:id/duplicate', (req, res) => {
+    if (!isEasyAuthConfigured()) {
+      return res.status(503).json({ error: 'Autenticazione non configurata' });
+    }
+
+    const identity = getIdentity(req);
+    if (!identity) {
+      return res.status(401).json({ error: 'Non autenticato' });
+    }
+
+    try {
+      const { id } = req.params;
+      const { newName } = req.body;
+
+      if (!newName || typeof newName !== 'string' || !newName.trim()) {
+        return res.status(400).json({ error: 'Nuovo nome richiesto' });
+      }
+
+      const preset = presets.getPresetById(db, id);
+      if (!preset) {
+        return res.status(404).json({ error: 'Preset non trovato' });
+      }
+
+      if (!presets.canAccessPreset(db, identity, preset)) {
+        return res.status(403).json({ error: 'Non autorizzato ad accedere a questo preset' });
+      }
+
+      const duplicated = presets.duplicatePreset(db, identity, id, newName.trim());
+      res.status(201).json(duplicated);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Errore durante la duplicazione del preset';
+      if (message.includes('UNIQUE constraint failed')) {
+        return res.status(409).json({ error: 'Esiste già un preset con questo nome' });
+      }
+      res.status(500).json({ error: message });
+    }
+  });
+
+  // Sharing: Get sharing info for a preset
+  app.get('/api/presets/:id/sharing', (req, res) => {
+    if (!isEasyAuthConfigured()) {
+      return res.status(503).json({ error: 'Autenticazione non configurata' });
+    }
+
+    const identity = getIdentity(req);
+    if (!identity) {
+      return res.status(401).json({ error: 'Non autenticato' });
+    }
+
+    try {
+      const { id } = req.params;
+      const preset = presets.getPresetById(db, id);
+
+      if (!preset) {
+        return res.status(404).json({ error: 'Preset non trovato' });
+      }
+
+      if (!presets.canModifyPreset(identity, preset)) {
+        return res.status(403).json({ error: 'Solo il proprietario può vedere le impostazioni di condivisione' });
+      }
+
+      const sharingInfo = presets.getSharingInfo(db, id);
+      res.json(sharingInfo);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Errore durante il recupero delle informazioni di condivisione';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  // Sharing: Update sharing settings for a preset
+  app.put('/api/presets/:id/sharing', (req, res) => {
+    if (!isEasyAuthConfigured()) {
+      return res.status(503).json({ error: 'Autenticazione non configurata' });
+    }
+
+    const identity = getIdentity(req);
+    if (!identity) {
+      return res.status(401).json({ error: 'Non autenticato' });
+    }
+
+    try {
+      const { id } = req.params;
+      const { visibilityScope, granteeEmails } = req.body;
+
+      if (!visibilityScope || !['private', 'all_users', 'specific_users'].includes(visibilityScope)) {
+        return res.status(400).json({ error: 'Scope di visibilità non valido' });
+      }
+
+      const preset = presets.getPresetById(db, id);
+      if (!preset) {
+        return res.status(404).json({ error: 'Preset non trovato' });
+      }
+
+      if (!presets.canModifyPreset(identity, preset)) {
+        return res.status(403).json({ error: 'Solo il proprietario può modificare le impostazioni di condivisione' });
+      }
+
+      // Validate emails if specific_users
+      if (visibilityScope === 'specific_users') {
+        if (!Array.isArray(granteeEmails) || granteeEmails.length === 0) {
+          return res.status(400).json({ error: 'Almeno un destinatario richiesto per condivisione specifica' });
+        }
+
+        // Validate all emails
+        for (const email of granteeEmails) {
+          if (typeof email !== 'string' || !email.includes('@')) {
+            return res.status(400).json({ error: `Email non valida: ${email}` });
+          }
+          if (!isAllowedDomain(email)) {
+            return res.status(400).json({ error: `Solo email @eos-solutions.it sono consentite: ${email}` });
+          }
+        }
+      }
+
+      presets.updateSharing(db, identity, id, {
+        visibilityScope,
+        granteeEmails: granteeEmails || []
+      });
+
+      const updatedSharingInfo = presets.getSharingInfo(db, id);
+      res.json(updatedSharingInfo);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Errore durante l\'aggiornamento delle impostazioni di condivisione';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  // Shares: Get presets I've shared with others (outgoing)
+  app.get('/api/shares/outgoing', (req, res) => {
+    if (!isEasyAuthConfigured()) {
+      return res.status(503).json({ error: 'Autenticazione non configurata' });
+    }
+
+    const identity = getIdentity(req);
+    if (!identity) {
+      return res.status(401).json({ error: 'Non autenticato' });
+    }
+
+    try {
+      const outgoing = presets.getOutgoingShares(db, identity);
+      res.json({ shares: outgoing });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Errore durante il recupero delle condivisioni in uscita';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  // Shares: Get presets shared with me (incoming)
+  app.get('/api/shares/incoming', (req, res) => {
+    if (!isEasyAuthConfigured()) {
+      return res.status(503).json({ error: 'Autenticazione non configurata' });
+    }
+
+    const identity = getIdentity(req);
+    if (!identity) {
+      return res.status(401).json({ error: 'Non autenticato' });
+    }
+
+    try {
+      const incoming = presets.getIncomingShares(db, identity);
+      res.json({ shares: incoming });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Errore durante il recupero delle condivisioni in entrata';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  // Migration: Migrate presets from localStorage
+  app.post('/api/presets/migrate', (req, res) => {
+    if (!isEasyAuthConfigured()) {
+      return res.status(503).json({ error: 'Autenticazione non configurata' });
+    }
+
+    const identity = getIdentity(req);
+    if (!identity) {
+      return res.status(401).json({ error: 'Non autenticato' });
+    }
+
+    try {
+      const { presets: localPresets } = req.body;
+
+      if (!Array.isArray(localPresets)) {
+        return res.status(400).json({ error: 'Array di preset richiesto' });
+      }
+
+      const result = presets.migratePresetsFromLocalStorage(db, identity, localPresets);
+
+      res.json({
+        success: true,
+        migrated: result.migrated,
+        skipped: result.skipped,
+        errors: result.errors
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Errore durante la migrazione dei preset';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  // ============================================
+  // End Auth & Preset API Endpoints
+  // ============================================
 
   // SPA fallback - serve index.html for non-API routes
   app.get('*', (req, res) => {

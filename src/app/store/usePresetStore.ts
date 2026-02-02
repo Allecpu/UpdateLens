@@ -1,27 +1,37 @@
 import { create } from 'zustand';
-import type { FilterState, FilterPreset } from '../../models/Filters';
+import type { FilterState, FilterPreset, FilterPresetWithSharing, VisibilityScope } from '../../models/Filters';
 import { useFilterStore } from './useFilterStore';
+import { useAuthStore } from './useAuthStore';
+import { presetService } from '../../services/PresetService';
 
 type PresetStoreState = {
-  presets: FilterPreset[];
+  // State
+  presets: FilterPresetWithSharing[];
+  sharedPresets: FilterPresetWithSharing[];
   activePresetId: string | null;
+  isLoading: boolean;
+  error: string | null;
+  hasMigrated: boolean;
 
   // Getters
-  getPreset: (id: string) => FilterPreset | undefined;
-  getDefaultPreset: () => FilterPreset | undefined;
-  getActivePreset: () => FilterPreset | undefined;
+  getPreset: (id: string) => FilterPresetWithSharing | undefined;
+  getDefaultPreset: () => FilterPresetWithSharing | undefined;
+  getActivePreset: () => FilterPresetWithSharing | undefined;
   isActivePresetDefault: () => boolean;
+  getAllPresets: () => FilterPresetWithSharing[]; // Own + shared
 
   // Actions
-  loadPresets: () => void;
-  createPreset: (name: string, filters: FilterState, description?: string) => FilterPreset;
-  updatePreset: (id: string, updates: Partial<Omit<FilterPreset, 'id' | 'createdAt'>>) => void;
-  renamePreset: (id: string, newName: string) => void;
-  duplicatePreset: (id: string, newName: string) => FilterPreset;
-  deletePreset: (id: string) => boolean;
-  setAsDefault: (id: string) => void;
+  loadPresets: () => Promise<void>;
+  createPreset: (name: string, filters: FilterState, description?: string) => Promise<FilterPresetWithSharing>;
+  updatePreset: (id: string, updates: Partial<Omit<FilterPreset, 'id' | 'createdAt'>>) => Promise<void>;
+  renamePreset: (id: string, newName: string) => Promise<void>;
+  duplicatePreset: (id: string, newName: string) => Promise<FilterPresetWithSharing>;
+  deletePreset: (id: string) => Promise<boolean>;
+  setAsDefault: (id: string) => Promise<void>;
   setActivePreset: (id: string) => void;
   applyPresetToFilters: (id: string) => void;
+  migrateLocalPresets: () => Promise<void>;
+  clearError: () => void;
 
   // Internal
   persist: () => void;
@@ -29,6 +39,7 @@ type PresetStoreState = {
 
 const PRESETS_KEY = 'updatelens.presets.v1';
 const ACTIVE_KEY = 'updatelens.presets.active';
+const MIGRATED_KEY = 'updatelens.presets.migrated';
 
 const readJson = <T,>(key: string, fallback: T): T => {
   const raw = localStorage.getItem(key);
@@ -51,12 +62,28 @@ const generatePresetId = (name: string): string => {
 };
 
 /**
+ * Convert local preset to preset with sharing (for localStorage mode)
+ */
+const localToSharing = (preset: FilterPreset): FilterPresetWithSharing => ({
+  ...preset,
+  visibilityScope: 'private' as VisibilityScope,
+  owner: { email: '', name: null },
+  isOwner: true
+});
+
+/**
  * Synchronously load presets from localStorage at store creation time.
  * This avoids FOUC by ensuring presets are available on first render.
  */
-const getInitialState = (): { presets: FilterPreset[]; activePresetId: string | null } => {
-  const presets = readJson<FilterPreset[]>(PRESETS_KEY, []);
+const getInitialState = (): {
+  presets: FilterPresetWithSharing[];
+  activePresetId: string | null;
+  hasMigrated: boolean
+} => {
+  const localPresets = readJson<FilterPreset[]>(PRESETS_KEY, []);
+  const presets = localPresets.map(localToSharing);
   let activePresetId = readJson<string | null>(ACTIVE_KEY, null);
+  const hasMigrated = readJson<boolean>(MIGRATED_KEY, false);
 
   // Auto-select an active preset if none is set but presets exist
   if (!activePresetId && presets.length > 0) {
@@ -64,7 +91,7 @@ const getInitialState = (): { presets: FilterPreset[]; activePresetId: string | 
     activePresetId = defaultPreset?.id ?? presets[0].id;
   }
 
-  return { presets, activePresetId };
+  return { presets, activePresetId, hasMigrated };
 };
 
 const initialState = getInitialState();
@@ -72,11 +99,16 @@ const initialState = getInitialState();
 export const usePresetStore = create<PresetStoreState>((set, get) => {
   return {
     presets: initialState.presets,
+    sharedPresets: [],
     activePresetId: initialState.activePresetId,
+    isLoading: false,
+    error: null,
+    hasMigrated: initialState.hasMigrated,
 
     // Getters
     getPreset: (id: string) => {
-      return get().presets.find((p) => p.id === id);
+      const { presets, sharedPresets } = get();
+      return presets.find((p) => p.id === id) || sharedPresets.find((p) => p.id === id);
     },
 
     getDefaultPreset: () => {
@@ -84,9 +116,9 @@ export const usePresetStore = create<PresetStoreState>((set, get) => {
     },
 
     getActivePreset: () => {
-      const { activePresetId, presets } = get();
+      const { activePresetId } = get();
       if (!activePresetId) return undefined;
-      return presets.find((p) => p.id === activePresetId);
+      return get().getPreset(activePresetId);
     },
 
     isActivePresetDefault: () => {
@@ -94,21 +126,62 @@ export const usePresetStore = create<PresetStoreState>((set, get) => {
       return activePreset?.isDefault === true;
     },
 
+    getAllPresets: () => {
+      const { presets, sharedPresets } = get();
+      return [...presets, ...sharedPresets];
+    },
+
     // Actions
-    loadPresets: () => {
-      const presets = readJson<FilterPreset[]>(PRESETS_KEY, []);
+    loadPresets: async () => {
+      const authStore = useAuthStore.getState();
+
+      // If authenticated, load from API
+      if (authStore.isAuthenticated) {
+        set({ isLoading: true, error: null });
+
+        try {
+          const response = await presetService.getPresets(true);
+          const activePresetId = get().activePresetId;
+
+          // Check if active preset still exists
+          const allPresets = [...response.myPresets, ...response.sharedPresets];
+          const activeExists = activePresetId && allPresets.some(p => p.id === activePresetId);
+
+          let newActiveId = activePresetId;
+          if (!activeExists && response.myPresets.length > 0) {
+            const defaultPreset = response.myPresets.find(p => p.isDefault);
+            newActiveId = defaultPreset?.id ?? response.myPresets[0].id;
+          }
+
+          set({
+            presets: response.myPresets,
+            sharedPresets: response.sharedPresets,
+            activePresetId: newActiveId,
+            isLoading: false
+          });
+
+          // Persist active preset ID to localStorage
+          localStorage.setItem(ACTIVE_KEY, JSON.stringify(newActiveId));
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Errore durante il caricamento dei preset';
+          set({ isLoading: false, error: message });
+        }
+        return;
+      }
+
+      // Not authenticated - load from localStorage
+      const localPresets = readJson<FilterPreset[]>(PRESETS_KEY, []);
       const activePresetId = readJson<string | null>(ACTIVE_KEY, null);
 
-      // Auto-cleanup: Remove duplicate presets by name, keeping the default one if present
+      // Auto-cleanup: Remove duplicate presets by name
       const uniquePresets: FilterPreset[] = [];
       const seenNames = new Set<string>();
 
-      presets.forEach((preset) => {
+      localPresets.forEach((preset) => {
         if (!seenNames.has(preset.name)) {
           seenNames.add(preset.name);
           uniquePresets.push(preset);
         } else if (preset.name === 'Default' && preset.isDefault) {
-          // Replace with the one marked as default
           const index = uniquePresets.findIndex((p) => p.name === 'Default');
           if (index >= 0) {
             uniquePresets[index] = preset;
@@ -116,25 +189,59 @@ export const usePresetStore = create<PresetStoreState>((set, get) => {
         }
       });
 
-      // If duplicates were found and removed, persist the cleaned version
-      if (uniquePresets.length < presets.length) {
-        console.log(`[Cleanup] Removed ${presets.length - uniquePresets.length} duplicate presets`);
+      if (uniquePresets.length < localPresets.length) {
+        console.log(`[Cleanup] Removed ${localPresets.length - uniquePresets.length} duplicate presets`);
         localStorage.setItem(PRESETS_KEY, JSON.stringify(uniquePresets));
       }
 
-      set({ presets: uniquePresets, activePresetId });
+      set({
+        presets: uniquePresets.map(localToSharing),
+        sharedPresets: [],
+        activePresetId
+      });
     },
 
-    createPreset: (name: string, filters: FilterState, description?: string) => {
+    createPreset: async (name: string, filters: FilterState, description?: string) => {
+      const authStore = useAuthStore.getState();
+
+      if (authStore.isAuthenticated) {
+        set({ isLoading: true, error: null });
+
+        try {
+          const newPreset = await presetService.createPreset({
+            name,
+            filters,
+            description,
+            isDefault: false,
+            visibilityScope: 'private'
+          });
+
+          set(state => ({
+            presets: [...state.presets, newPreset],
+            isLoading: false
+          }));
+
+          return newPreset;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Errore durante la creazione del preset';
+          set({ isLoading: false, error: message });
+          throw error;
+        }
+      }
+
+      // Not authenticated - create locally
       const now = new Date().toISOString();
-      const newPreset: FilterPreset = {
+      const newPreset: FilterPresetWithSharing = {
         id: generatePresetId(name),
         name,
         description,
         filters,
         isDefault: false,
         createdAt: now,
-        updatedAt: now
+        updatedAt: now,
+        visibilityScope: 'private',
+        owner: { email: '', name: null },
+        isOwner: true
       };
 
       const nextPresets = [...get().presets, newPreset];
@@ -144,11 +251,42 @@ export const usePresetStore = create<PresetStoreState>((set, get) => {
       return newPreset;
     },
 
-    updatePreset: (id: string, updates: Partial<Omit<FilterPreset, 'id' | 'createdAt'>>) => {
-      const nextPresets = get().presets.map((preset) => {
-        if (preset.id !== id) return preset;
+    updatePreset: async (id: string, updates: Partial<Omit<FilterPreset, 'id' | 'createdAt'>>) => {
+      const authStore = useAuthStore.getState();
+      const preset = get().getPreset(id);
+
+      if (!preset) {
+        throw new Error('Preset non trovato');
+      }
+
+      if (authStore.isAuthenticated) {
+        // Only owner can update
+        if (!preset.isOwner) {
+          throw new Error('Non autorizzato a modificare questo preset');
+        }
+
+        set({ isLoading: true, error: null });
+
+        try {
+          const updated = await presetService.updatePreset(id, updates);
+
+          set(state => ({
+            presets: state.presets.map(p => p.id === id ? updated : p),
+            isLoading: false
+          }));
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Errore durante l\'aggiornamento del preset';
+          set({ isLoading: false, error: message });
+          throw error;
+        }
+        return;
+      }
+
+      // Not authenticated - update locally
+      const nextPresets = get().presets.map((p) => {
+        if (p.id !== id) return p;
         return {
-          ...preset,
+          ...p,
           ...updates,
           updatedAt: new Date().toISOString()
         };
@@ -158,30 +296,89 @@ export const usePresetStore = create<PresetStoreState>((set, get) => {
       get().persist();
     },
 
-    renamePreset: (id: string, newName: string) => {
-      get().updatePreset(id, { name: newName });
+    renamePreset: async (id: string, newName: string) => {
+      await get().updatePreset(id, { name: newName });
     },
 
-    duplicatePreset: (id: string, newName: string) => {
+    duplicatePreset: async (id: string, newName: string) => {
+      const authStore = useAuthStore.getState();
       const original = get().getPreset(id);
+
       if (!original) {
         throw new Error(`Preset ${id} not found`);
       }
 
+      if (authStore.isAuthenticated) {
+        set({ isLoading: true, error: null });
+
+        try {
+          const duplicated = await presetService.duplicatePreset(id, newName);
+
+          set(state => ({
+            presets: [...state.presets, duplicated],
+            isLoading: false
+          }));
+
+          return duplicated;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Errore durante la duplicazione del preset';
+          set({ isLoading: false, error: message });
+          throw error;
+        }
+      }
+
+      // Not authenticated - duplicate locally
       return get().createPreset(newName, original.filters, original.description);
     },
 
-    deletePreset: (id: string) => {
-      const preset = get().presets.find((p) => p.id === id);
+    deletePreset: async (id: string) => {
+      const authStore = useAuthStore.getState();
+      const preset = get().getPreset(id);
+
       if (!preset) return false;
 
-      // BLOCCO 1: Non eliminare se è l'unico preset
+      // Block if it's the only preset
       if (get().presets.length === 1) {
         alert('Non puoi eliminare l\'unico preset rimanente.');
         return false;
       }
 
-      // BLOCCO 2: Se elimini il preset attivo, seleziona un altro
+      if (authStore.isAuthenticated) {
+        // Only owner can delete
+        if (!preset.isOwner) {
+          alert('Non autorizzato a eliminare questo preset');
+          return false;
+        }
+
+        set({ isLoading: true, error: null });
+
+        try {
+          await presetService.deletePreset(id);
+
+          // If deleting the active preset, select another
+          if (get().activePresetId === id) {
+            const nextPreset = get().presets.find((p) => p.id !== id);
+            if (nextPreset) {
+              set({ activePresetId: nextPreset.id });
+              get().applyPresetToFilters(nextPreset.id);
+              localStorage.setItem(ACTIVE_KEY, JSON.stringify(nextPreset.id));
+            }
+          }
+
+          set(state => ({
+            presets: state.presets.filter(p => p.id !== id),
+            isLoading: false
+          }));
+
+          return true;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Errore durante l\'eliminazione del preset';
+          set({ isLoading: false, error: message });
+          return false;
+        }
+      }
+
+      // Not authenticated - delete locally
       if (get().activePresetId === id) {
         const nextPreset = get().presets.find((p) => p.id !== id);
         if (nextPreset) {
@@ -190,15 +387,38 @@ export const usePresetStore = create<PresetStoreState>((set, get) => {
         }
       }
 
-      // Elimina
       const nextPresets = get().presets.filter((p) => p.id !== id);
       set({ presets: nextPresets });
       get().persist();
       return true;
     },
 
-    setAsDefault: (id: string) => {
-      // Rimuovi isDefault da tutti
+    setAsDefault: async (id: string) => {
+      const authStore = useAuthStore.getState();
+
+      if (authStore.isAuthenticated) {
+        set({ isLoading: true, error: null });
+
+        try {
+          const updated = await presetService.updatePreset(id, { isDefault: true });
+
+          // Update all presets - only one can be default
+          set(state => ({
+            presets: state.presets.map(p => ({
+              ...p,
+              isDefault: p.id === id ? true : false
+            })),
+            isLoading: false
+          }));
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Errore durante l\'impostazione del preset predefinito';
+          set({ isLoading: false, error: message });
+          throw error;
+        }
+        return;
+      }
+
+      // Not authenticated - set locally
       const nextPresets = get().presets.map((preset) => ({
         ...preset,
         isDefault: preset.id === id
@@ -220,16 +440,77 @@ export const usePresetStore = create<PresetStoreState>((set, get) => {
         return;
       }
 
-      // Apply to global filters (cssFilters) via useFilterStore
       const filterStore = useFilterStore.getState();
       filterStore.setCssFilters(preset.filters);
+    },
+
+    migrateLocalPresets: async () => {
+      const { hasMigrated, presets } = get();
+
+      // Skip if already migrated or no presets to migrate
+      if (hasMigrated || presets.length === 0) {
+        return;
+      }
+
+      const authStore = useAuthStore.getState();
+      if (!authStore.isAuthenticated) {
+        return;
+      }
+
+      console.log(`[PresetStore] Migrating ${presets.length} preset(s) from localStorage...`);
+
+      try {
+        // Convert to localStorage format for migration
+        const localPresets: FilterPreset[] = presets.map(p => ({
+          id: p.id,
+          name: p.name,
+          description: p.description,
+          filters: p.filters,
+          isDefault: p.isDefault,
+          createdAt: p.createdAt,
+          updatedAt: p.updatedAt
+        }));
+
+        const result = await presetService.migrateFromLocalStorage(localPresets);
+
+        console.log(`[PresetStore] Migration complete: ${result.migrated} migrated, ${result.skipped} skipped`);
+
+        if (result.errors.length > 0) {
+          console.warn('[PresetStore] Migration errors:', result.errors);
+        }
+
+        // Mark as migrated and clear localStorage
+        localStorage.setItem(MIGRATED_KEY, JSON.stringify(true));
+        localStorage.removeItem(PRESETS_KEY);
+        set({ hasMigrated: true });
+
+        // Reload presets from API
+        await get().loadPresets();
+      } catch (error) {
+        console.error('[PresetStore] Migration failed:', error);
+        // Don't mark as migrated so it can be retried
+      }
+    },
+
+    clearError: () => {
+      set({ error: null });
     },
 
     // Internal
     persist: () => {
       try {
         const { presets } = get();
-        localStorage.setItem(PRESETS_KEY, JSON.stringify(presets));
+        // Convert back to localStorage format (without sharing info)
+        const localPresets: FilterPreset[] = presets.map(p => ({
+          id: p.id,
+          name: p.name,
+          description: p.description,
+          filters: p.filters,
+          isDefault: p.isDefault,
+          createdAt: p.createdAt,
+          updatedAt: p.updatedAt
+        }));
+        localStorage.setItem(PRESETS_KEY, JSON.stringify(localPresets));
       } catch (error) {
         console.error('Failed to persist presets:', error);
       }

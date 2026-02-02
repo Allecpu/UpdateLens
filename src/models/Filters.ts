@@ -35,3 +35,65 @@ export type FilterPreset = {
   createdAt: string;
   updatedAt: string;
 };
+
+// Sharing types
+export type VisibilityScope = 'private' | 'all_users' | 'specific_users';
+
+export interface PresetOwner {
+  email: string;
+  name: string | null;
+}
+
+export interface FilterPresetWithSharing extends FilterPreset {
+  visibilityScope: VisibilityScope;
+  owner: PresetOwner;
+  isOwner: boolean;
+}
+
+export interface ShareInfo {
+  email: string;
+  name: string | null;
+  permission: string;
+  createdAt: string;
+}
+
+export interface SharingInfo {
+  visibilityScope: VisibilityScope;
+  shares: ShareInfo[];
+}
+
+export interface UserInfo {
+  tenantId: string;
+  objectId: string;
+  email: string;
+  name: string;
+}
+
+export interface AuthMeResponse {
+  authenticated: boolean;
+  authConfigured: boolean;
+  user?: UserInfo;
+  boundShares?: number;
+  error?: string;
+}
+
+export interface PresetsListResponse {
+  myPresets: FilterPresetWithSharing[];
+  sharedPresets: FilterPresetWithSharing[];
+  total: number;
+}
+
+export interface OutgoingShare extends FilterPresetWithSharing {
+  sharedWith: ShareInfo[];
+}
+
+export interface IncomingShare extends FilterPresetWithSharing {
+  sharedBy: PresetOwner;
+}
+
+export interface MigrationResult {
+  success: boolean;
+  migrated: number;
+  skipped: number;
+  errors: string[];
+}

@@ -24,7 +24,10 @@
       "Bash(taskkill:*)",
       "Bash(timeout:*)",
       "Bash(dir /b \"C:\\\\Github\\\\UpdateLens\\\\server\")",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(grep:*)",
+      "Bash(az webapp restart:*)",
+      "Bash(az webapp auth:*)"
     ]
   }
 }

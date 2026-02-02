@@ -146,6 +146,33 @@ jobs:
             --startup-file "node /home/site/wwwroot/server-dist/index.js" \
             --always-on true
 
+      - name: Configure Easy Auth (if secrets are set)
+        if: ${{ secrets.AZURE_AUTH_CLIENT_ID != '' }}
+        run: |
+          # Upgrade to auth config v2 if needed
+          az webapp auth config-version upgrade \
+            --name updatelens-api \
+            --resource-group rg-updatelens-runtime 2>/dev/null || echo "Already on auth v2"
+
+          # Configure Microsoft identity provider
+          az webapp auth microsoft update \
+            --name updatelens-api \
+            --resource-group rg-updatelens-runtime \
+            --client-id "${{ secrets.AZURE_AUTH_CLIENT_ID }}" \
+            --client-secret "${{ secrets.AZURE_AUTH_CLIENT_SECRET }}" \
+            --issuer "https://login.microsoftonline.com/${{ secrets.AZURE_TENANT_ID }}/v2.0" \
+            --yes
+
+          # Enable authentication with redirect
+          az webapp auth update \
+            --name updatelens-api \
+            --resource-group rg-updatelens-runtime \
+            --enabled true \
+            --action RedirectToLoginPage \
+            --unauthenticated-client-action RedirectToLoginPage
+
+          echo "Easy Auth configured successfully"
+
       - name: Restart App Service
         run: |
           az webapp restart \

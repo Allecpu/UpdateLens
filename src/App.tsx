@@ -5,7 +5,9 @@ import DashboardPage from './app/pages/DashboardPage';
 import GlobalFiltersPage from './app/pages/GlobalFiltersPage';
 import VersionPage from './app/pages/VersionPage';
 import IssuesPage from './app/pages/IssuesPage';
+import SharesPage from './app/components/shares/SharesPage';
 import ChatPanel from './app/components/chat/ChatPanel';
+import { useAuthStore } from './app/store/useAuthStore';
 import { useCustomerGroupStore } from './app/store/useCustomerGroupStore';
 import { useCustomerStore } from './app/store/useCustomerStore';
 import { useFilterStore } from './app/store/useFilterStore';
@@ -262,6 +264,15 @@ const App = () => {
               >
                 Issues
               </NavLink>
+              <NavLink
+                to="/condivisioni"
+                className={({ isActive }) =>
+                  `rounded-full px-3 py-1 ${isActive ? 'bg-accent text-accent-foreground' : ''
+                  }`
+                }
+              >
+                Condivisioni
+              </NavLink>
             </nav>
           </div>
           <div className="flex items-center gap-3">
@@ -311,6 +322,7 @@ const App = () => {
           <Route path="/filtri-globali" element={<GlobalFiltersPage />} />
           <Route path="/versione" element={<VersionPage />} />
           <Route path="/issues" element={<IssuesPage />} />
+          <Route path="/condivisioni" element={<SharesPage />} />
         </Routes>
       </div>
       <ChatPanel />
