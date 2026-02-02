@@ -7,7 +7,7 @@ import VersionPage from './app/pages/VersionPage';
 import IssuesPage from './app/pages/IssuesPage';
 import SharesPage from './app/components/shares/SharesPage';
 import ChatPanel from './app/components/chat/ChatPanel';
-import { useAuthStore } from './app/store/useAuthStore';
+import UserMenu from './app/components/UserMenu';
 import { useCustomerGroupStore } from './app/store/useCustomerGroupStore';
 import { useCustomerStore } from './app/store/useCustomerStore';
 import { useFilterStore } from './app/store/useFilterStore';
@@ -277,6 +277,8 @@ const App = () => {
           </div>
           <div className="flex items-center gap-3">
             <CustomerPicker />
+            <div className="h-6 w-px bg-border" aria-hidden="true" />
+            <UserMenu />
             <button
               className="ul-button ul-button-ghost"
               onClick={() => setIsDark((prev) => !prev)}
