@@ -9,7 +9,10 @@ import type {
   OutgoingShare,
   IncomingShare,
   MigrationResult,
-  UserInfo
+  UserInfo,
+  SharingUser,
+  UserRole,
+  UsersListResponse
 } from '../models/Filters';
 
 interface CreatePresetRequest {
@@ -200,6 +203,37 @@ export class PresetService {
     return this.fetch<MigrationResult>('/api/presets/migrate', {
       method: 'POST',
       body: JSON.stringify({ presets })
+    });
+  }
+
+  // ============================================
+  // User Management
+  // ============================================
+
+  /**
+   * Get all users and current user info
+   */
+  async getUsers(): Promise<UsersListResponse> {
+    return this.fetch<UsersListResponse>('/api/shares/users');
+  }
+
+  /**
+   * Add a new user
+   */
+  async addUser(data: { email: string; name?: string; role: UserRole }): Promise<SharingUser> {
+    return this.fetch<SharingUser>('/api/shares/users', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  /**
+   * Update a user (role, enabled status)
+   */
+  async updateUser(userId: string, data: { role?: UserRole; enabled?: boolean }): Promise<SharingUser> {
+    return this.fetch<SharingUser>(`/api/shares/users/${encodeURIComponent(userId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data)
     });
   }
 }

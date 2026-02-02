@@ -25,6 +25,37 @@ interface AzureClientPrincipal {
 // Allowed email domain for sharing
 const ALLOWED_DOMAIN = '@eos-solutions.it';
 
+// User roles for RBAC
+export type UserRole = 'admin' | 'sharing_manager' | 'viewer';
+
+// Role hierarchy for permission checks
+const ROLE_HIERARCHY: Record<UserRole, number> = {
+  admin: 3,
+  sharing_manager: 2,
+  viewer: 1
+};
+
+/**
+ * Check if a role has at least the given minimum role level.
+ */
+export const hasMinimumRole = (userRole: UserRole, minimumRole: UserRole): boolean => {
+  return ROLE_HIERARCHY[userRole] >= ROLE_HIERARCHY[minimumRole];
+};
+
+/**
+ * Check if user can manage other users (admin or sharing_manager).
+ */
+export const canManageUsers = (role: UserRole): boolean => {
+  return hasMinimumRole(role, 'sharing_manager');
+};
+
+/**
+ * Check if user can assign admin role (only admins can).
+ */
+export const canAssignAdminRole = (role: UserRole): boolean => {
+  return role === 'admin';
+};
+
 /**
  * Extract user identity from Azure Easy Auth headers.
  * Returns null if not authenticated or headers are missing.

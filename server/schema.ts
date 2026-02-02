@@ -134,5 +134,27 @@ export const initSchema = (db: Database.Database): void => {
       ON filter_preset_shares(grantee_email);
     CREATE INDEX IF NOT EXISTS idx_filter_preset_shares_grantee
       ON filter_preset_shares(grantee_tenant_id, grantee_object_id);
+
+    -- User management table for RBAC
+    CREATE TABLE IF NOT EXISTS sharing_users (
+      user_id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      object_id TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
+      name TEXT,
+      role TEXT NOT NULL DEFAULT 'viewer',
+      enabled INTEGER NOT NULL DEFAULT 1,
+      created_by_tenant_id TEXT,
+      created_by_object_id TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_sharing_users_tenant_object
+      ON sharing_users(tenant_id, object_id);
+    CREATE INDEX IF NOT EXISTS idx_sharing_users_email
+      ON sharing_users(email);
+    CREATE INDEX IF NOT EXISTS idx_sharing_users_role
+      ON sharing_users(role);
   `);
 };

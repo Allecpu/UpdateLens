@@ -97,3 +97,31 @@ export interface MigrationResult {
   skipped: number;
   errors: string[];
 }
+
+// User management types
+export type UserRole = 'admin' | 'sharing_manager' | 'viewer';
+
+export interface SharingUser {
+  userId: string;
+  tenantId: string;
+  objectId: string;
+  email: string;
+  name: string | null;
+  role: UserRole;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CurrentUserInfo {
+  tid: string;
+  oid: string;
+  email: string;
+  role: UserRole;
+  canManageUsers: boolean;
+}
+
+export interface UsersListResponse {
+  users: SharingUser[];
+  currentUser: CurrentUserInfo;
+}

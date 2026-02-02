@@ -7,8 +7,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
-import { getIdentity, requireAuth, optionalAuth, isAllowedDomain, bindPendingShares, type UserIdentity } from './auth.js';
+import { getIdentity, requireAuth, optionalAuth, isAllowedDomain, bindPendingShares, canManageUsers, type UserIdentity } from './auth.js';
 import * as presets from './presets.js';
+import * as users from './users.js';
 
 const execAsync = promisify(exec);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -981,6 +982,131 @@ export const createApi = () => {
       res.status(500).json({ error: message });
     }
   });
+
+  // ============================================
+  // User Management API Endpoints
+  // ============================================
+
+  // Users: Get all users + current user info
+  app.get('/api/shares/users', (req, res) => {
+    if (!isEasyAuthConfigured()) {
+      return res.status(503).json({ error: 'Autenticazione non configurata' });
+    }
+
+    const identity = getIdentity(req);
+    if (!identity) {
+      return res.status(401).json({ error: 'Non autenticato' });
+    }
+
+    try {
+      const response = users.getUsersForIdentity(db, identity);
+
+      // Only return users list if current user can manage users
+      if (!response.currentUser.canManageUsers) {
+        return res.json({
+          users: [],
+          currentUser: response.currentUser
+        });
+      }
+
+      res.json(response);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Errore durante il recupero degli utenti';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  // Users: Add a new user
+  app.post('/api/shares/users', (req, res) => {
+    if (!isEasyAuthConfigured()) {
+      return res.status(503).json({ error: 'Autenticazione non configurata' });
+    }
+
+    const identity = getIdentity(req);
+    if (!identity) {
+      return res.status(401).json({ error: 'Non autenticato' });
+    }
+
+    try {
+      const currentUser = users.ensureUserExists(db, identity);
+
+      if (!canManageUsers(currentUser.role)) {
+        return res.status(403).json({ error: 'Non autorizzato a gestire gli utenti' });
+      }
+
+      const { email, name, role } = req.body;
+
+      if (!email || typeof email !== 'string' || !email.includes('@')) {
+        return res.status(400).json({ error: 'Email valida richiesta' });
+      }
+
+      if (!role || !['admin', 'sharing_manager', 'viewer'].includes(role)) {
+        return res.status(400).json({ error: 'Ruolo non valido. Valori ammessi: admin, sharing_manager, viewer' });
+      }
+
+      const newUser = users.addUser(db, identity, currentUser.role, {
+        email: email.trim(),
+        name: name?.trim(),
+        role
+      });
+
+      res.status(201).json(newUser);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Errore durante l\'aggiunta dell\'utente';
+      if (message.includes('già esistente')) {
+        return res.status(409).json({ error: message });
+      }
+      res.status(400).json({ error: message });
+    }
+  });
+
+  // Users: Update a user (role, enabled)
+  app.patch('/api/shares/users/:id', (req, res) => {
+    if (!isEasyAuthConfigured()) {
+      return res.status(503).json({ error: 'Autenticazione non configurata' });
+    }
+
+    const identity = getIdentity(req);
+    if (!identity) {
+      return res.status(401).json({ error: 'Non autenticato' });
+    }
+
+    try {
+      const { id } = req.params;
+      const currentUser = users.ensureUserExists(db, identity);
+
+      if (!canManageUsers(currentUser.role)) {
+        return res.status(403).json({ error: 'Non autorizzato a gestire gli utenti' });
+      }
+
+      const { role, enabled } = req.body;
+
+      if (role !== undefined && !['admin', 'sharing_manager', 'viewer'].includes(role)) {
+        return res.status(400).json({ error: 'Ruolo non valido. Valori ammessi: admin, sharing_manager, viewer' });
+      }
+
+      if (enabled !== undefined && typeof enabled !== 'boolean') {
+        return res.status(400).json({ error: 'enabled deve essere un booleano' });
+      }
+
+      const updatedUser = users.updateUser(db, identity, currentUser.role, id, {
+        role,
+        enabled
+      });
+
+      res.json(updatedUser);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Errore durante l\'aggiornamento dell\'utente';
+      if (message.includes('non trovato')) {
+        return res.status(404).json({ error: message });
+      }
+      res.status(400).json({ error: message });
+    }
+  });
+
+  // ============================================
+  // End User Management API Endpoints
+  // ============================================
 
   // Shares: Get presets shared with me (incoming)
   app.get('/api/shares/incoming', (req, res) => {

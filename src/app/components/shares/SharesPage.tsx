@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
-import type { OutgoingShare, IncomingShare, VisibilityScope } from '../../../models/Filters';
+import type { OutgoingShare, IncomingShare, VisibilityScope, SharingUser, CurrentUserInfo, UserRole } from '../../../models/Filters';
 import { presetService } from '../../../services/PresetService';
 import { useAuthStore } from '../../store/useAuthStore';
 import { usePresetStore } from '../../store/usePresetStore';
+import AddUserModal from './AddUserModal';
+import UsersTable from './UsersTable';
 
-type Tab = 'outgoing' | 'incoming';
+type Tab = 'outgoing' | 'incoming' | 'users';
 
 const SharesPage = () => {
   const { isAuthenticated, isAuthConfigured, currentUser } = useAuthStore();
@@ -16,22 +18,32 @@ const SharesPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Load shares
+  // User management state
+  const [users, setUsers] = useState<SharingUser[]>([]);
+  const [rbacCurrentUser, setRbacCurrentUser] = useState<CurrentUserInfo | null>(null);
+  const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
+  const [usersError, setUsersError] = useState<string | null>(null);
+
+  // Load shares and users
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    const loadShares = async () => {
+    const loadData = async () => {
       setIsLoading(true);
       setError(null);
+      setUsersError(null);
 
       try {
-        const [outgoing, incoming] = await Promise.all([
+        const [outgoing, incoming, usersData] = await Promise.all([
           presetService.getOutgoingShares(),
-          presetService.getIncomingShares()
+          presetService.getIncomingShares(),
+          presetService.getUsers()
         ]);
 
         setOutgoingShares(outgoing.shares);
         setIncomingShares(incoming.shares);
+        setUsers(usersData.users);
+        setRbacCurrentUser(usersData.currentUser);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Errore durante il caricamento';
         setError(message);
@@ -40,8 +52,34 @@ const SharesPage = () => {
       }
     };
 
-    loadShares();
+    loadData();
   }, [isAuthenticated]);
+
+  const loadUsers = async () => {
+    try {
+      const usersData = await presetService.getUsers();
+      setUsers(usersData.users);
+      setRbacCurrentUser(usersData.currentUser);
+      setUsersError(null);
+    } catch (err) {
+      setUsersError(err instanceof Error ? err.message : 'Errore durante il caricamento utenti');
+    }
+  };
+
+  const handleAddUser = async (data: { email: string; name?: string; role: UserRole }) => {
+    await presetService.addUser(data);
+    await loadUsers();
+  };
+
+  const handleUpdateUser = async (userId: string, data: { role?: UserRole; enabled?: boolean }) => {
+    try {
+      await presetService.updateUser(userId, data);
+      await loadUsers();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Errore durante l\'aggiornamento';
+      alert(message);
+    }
+  };
 
   const handleRevokeSharing = async (presetId: string) => {
     if (!confirm('Sei sicuro di voler revocare tutte le condivisioni per questo preset?')) {
@@ -149,6 +187,18 @@ const SharesPage = () => {
           >
             Condivisi con me ({incomingShares.length})
           </button>
+          {rbacCurrentUser?.canManageUsers && (
+            <button
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'users'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+              onClick={() => setActiveTab('users')}
+            >
+              Gestione Utenti ({users.length})
+            </button>
+          )}
         </div>
 
         {error && (
@@ -276,8 +326,52 @@ const SharesPage = () => {
                 )}
               </div>
             )}
+
+            {/* Users Management Tab */}
+            {activeTab === 'users' && rbacCurrentUser?.canManageUsers && (
+              <div>
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <p className="text-sm text-muted-foreground">
+                      Gestisci gli utenti che possono amministrare la lista utenti.
+                      <br />
+                      <span className="text-xs">Nota: tutti gli utenti @eos-solutions.it possono comunque ricevere condivisioni.</span>
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setIsAddUserModalOpen(true)}
+                    className="ul-button ul-button-primary"
+                  >
+                    <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                    Aggiungi Utente
+                  </button>
+                </div>
+
+                {usersError && (
+                  <div className="mb-4 rounded-md bg-red-50 dark:bg-red-900/20 px-4 py-3 text-sm text-red-600 dark:text-red-400">
+                    {usersError}
+                  </div>
+                )}
+
+                <UsersTable
+                  users={users}
+                  currentUser={rbacCurrentUser}
+                  onUpdateUser={handleUpdateUser}
+                />
+              </div>
+            )}
           </>
         )}
+
+        {/* Add User Modal */}
+        <AddUserModal
+          isOpen={isAddUserModalOpen}
+          onClose={() => setIsAddUserModalOpen(false)}
+          onAdd={handleAddUser}
+          canAssignAdmin={rbacCurrentUser?.role === 'admin'}
+        />
       </div>
     </div>
   );
