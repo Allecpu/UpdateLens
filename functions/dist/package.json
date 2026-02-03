@@ -2,7 +2,7 @@
   "name": "updatelens-functions",
   "version": "1.0.0",
   "description": "Azure Functions for UpdateLens data refresh",
-  "main": "dist/functions/refreshAll/index.js",
+  "main": "dist/functions/refreshAll.js",
   "scripts": {
     "build": "tsc",
     "watch": "tsc -w",
