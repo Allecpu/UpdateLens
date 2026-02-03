@@ -57,15 +57,6 @@ const UserMenu = () => {
     return emailName?.substring(0, 2).toUpperCase() || '?';
   };
 
-  // Get display name (name or email fallback)
-  const getDisplayName = (): string => {
-    if (!currentUser) return '';
-    if (currentUser.name && currentUser.name !== 'Unknown') {
-      return currentUser.name;
-    }
-    return currentUser.email;
-  };
-
   // Loading state
   if (isLoading) {
     return (
@@ -110,14 +101,13 @@ const UserMenu = () => {
   }
 
   const initials = getInitials(currentUser.name, currentUser.email);
-  const displayName = getDisplayName();
 
   return (
     <div className="relative" ref={menuRef}>
       {/* Avatar button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 rounded-lg px-2 py-1 transition-colors hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         aria-expanded={isOpen}
         aria-haspopup="true"
         aria-label="Menu utente"
@@ -126,21 +116,6 @@ const UserMenu = () => {
         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-semibold">
           {initials}
         </div>
-        {/* Display name (hidden on small screens) */}
-        <span className="hidden max-w-[120px] truncate text-sm font-medium lg:inline">
-          {displayName}
-        </span>
-        {/* Chevron indicator */}
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 24 24"
-          className={`hidden h-4 w-4 text-muted-foreground transition-transform sm:block ${isOpen ? 'rotate-180' : ''}`}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-        >
-          <path d="m6 9 6 6 6-6" />
-        </svg>
       </button>
 
       {/* Dropdown menu */}

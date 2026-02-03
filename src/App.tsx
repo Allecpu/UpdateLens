@@ -16,6 +16,27 @@ import { useAuthStore } from './app/store/useAuthStore';
 import { useBootstrapFilters } from './hooks/useBootstrapFilters';
 
 const isEntryActive = (entry: { isActive?: boolean }): boolean => entry.isActive !== false;
+type NavItem = {
+  to: string;
+  label: string;
+  end?: boolean;
+};
+
+const NAV_ITEMS: NavItem[] = [
+  { to: '/', label: 'Dashboard', end: true },
+  { to: '/clienti', label: 'Clienti' },
+  { to: '/filtri-globali', label: 'Filtri globali' },
+  { to: '/versione', label: 'Versione' },
+  { to: '/issues', label: 'Segnalazioni' },
+  { to: '/condivisioni', label: 'Condivisioni' }
+];
+
+const getNavLinkClassName = (isActive: boolean): string =>
+  `inline-flex h-11 items-center border-b-2 px-1 text-[1rem] font-medium transition-[color,border-color,transform] duration-180 ease-out will-change-transform motion-reduce:transform-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/45 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+    isActive
+      ? 'border-primary text-foreground'
+      : 'border-transparent text-muted-foreground hover:-translate-y-0.5 hover:border-border/80 hover:text-foreground'
+  }`;
 
 const CustomerPicker = () => {
   const { index, activeCustomerId, setActiveCustomer } = useCustomerStore();
@@ -155,9 +176,9 @@ const CustomerPicker = () => {
   }, [hasCustomerFilters, setActiveCustomer]);
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row">
       <input
-        className="ul-input max-w-[220px]"
+        className="ul-input h-10 w-full sm:w-[210px]"
         value={customerQuery}
         onChange={(event) => setCustomerQuery(event.target.value)}
         onKeyDown={(event) => {
@@ -169,7 +190,7 @@ const CustomerPicker = () => {
         aria-label="Cerca cliente"
       />
       <select
-        className="ul-input max-w-[220px]"
+        className="ul-input h-10 w-full sm:w-[210px]"
         value={activeCustomerId ?? ''}
         onChange={(event) =>
           setActiveCustomer(event.target.value || null)
@@ -240,111 +261,74 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <header className="border-b border-border bg-card/70">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-4">
-          <div className="flex items-center gap-4">
-            <div className="text-lg font-semibold">UpdateLens</div>
-            <nav className="flex items-center gap-3 text-sm text-muted-foreground">
-              <NavLink
-                to="/"
-                end
-                className={({ isActive }) =>
-                  `rounded-full px-3 py-1 ${isActive ? 'bg-accent text-accent-foreground' : ''
-                  }`
-                }
-              >
-                Dashboard
-              </NavLink>
-              <NavLink
-                to="/clienti"
-                className={({ isActive }) =>
-                  `rounded-full px-3 py-1 ${isActive ? 'bg-accent text-accent-foreground' : ''
-                  }`
-                }
-              >
-                Clienti
-              </NavLink>
-              <NavLink
-                to="/filtri-globali"
-                className={({ isActive }) =>
-                  `rounded-full px-3 py-1 ${isActive ? 'bg-accent text-accent-foreground' : ''
-                  }`
-                }
-              >
-                Filtri globali
-              </NavLink>
-              <NavLink
-                to="/versione"
-                className={({ isActive }) =>
-                  `rounded-full px-3 py-1 ${isActive ? 'bg-accent text-accent-foreground' : ''
-                  }`
-                }
-              >
-                Versione
-              </NavLink>
-              <NavLink
-                to="/issues"
-                className={({ isActive }) =>
-                  `rounded-full px-3 py-1 ${isActive ? 'bg-accent text-accent-foreground' : ''
-                  }`
-                }
-              >
-                Issues
-              </NavLink>
-              <NavLink
-                to="/condivisioni"
-                className={({ isActive }) =>
-                  `rounded-full px-3 py-1 ${isActive ? 'bg-accent text-accent-foreground' : ''
-                  }`
-                }
-              >
-                Condivisioni
-              </NavLink>
+      <header className="border-b border-border/80 bg-card">
+        <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6">
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="text-[1.95rem] font-semibold leading-none tracking-tight">UpdateLens</div>
+              <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between lg:w-auto lg:justify-end">
+                <div className="order-1 flex h-9 w-fit items-center gap-1 self-end rounded-full border border-border bg-background px-1 sm:order-2 sm:self-auto">
+                  <UserMenu />
+                  <div className="h-4 w-px bg-border/80" aria-hidden="true" />
+                  <button
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent/80 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/45 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    onClick={() => setIsDark((prev) => !prev)}
+                    aria-label={isDark ? 'Attiva tema chiaro' : 'Attiva tema scuro'}
+                    title={isDark ? 'Attiva tema chiaro' : 'Attiva tema scuro'}
+                  >
+                    {isDark ? (
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 24 24"
+                        className="h-4 w-4"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <circle cx="12" cy="12" r="4" />
+                        <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+                      </svg>
+                    ) : (
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 24 24"
+                        className="h-4 w-4"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+                <div className="order-2 w-full sm:order-1 sm:w-auto">
+                  <CustomerPicker />
+                </div>
+              </div>
+            </div>
+            <nav aria-label="Navigazione principale" className="overflow-x-auto">
+              <div className="flex min-w-max items-center gap-7 border-b border-border/70 px-1">
+                {NAV_ITEMS.map((item) => (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    end={item.end}
+                    className={({ isActive }) => getNavLinkClassName(isActive)}
+                  >
+                    {item.label}
+                  </NavLink>
+                ))}
+              </div>
             </nav>
-          </div>
-          <div className="flex items-center gap-3">
-            <CustomerPicker />
-            <div className="h-6 w-px bg-border" aria-hidden="true" />
-            <UserMenu />
-            <button
-              className="ul-button ul-button-ghost"
-              onClick={() => setIsDark((prev) => !prev)}
-              aria-label={isDark ? 'Attiva tema chiaro' : 'Attiva tema scuro'}
-              title={isDark ? 'Attiva tema chiaro' : 'Attiva tema scuro'}
-            >
-              {isDark ? (
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  className="h-5 w-5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <circle cx="12" cy="12" r="4" />
-                  <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
-                </svg>
-              ) : (
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  className="h-5 w-5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
-                </svg>
-              )}
-            </button>
           </div>
         </div>
       </header>
-      <div className="mx-auto max-w-6xl px-6 py-8">
+      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
         <Routes>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/clienti" element={<ClientsPage />} />
