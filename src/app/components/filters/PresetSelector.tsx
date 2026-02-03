@@ -38,7 +38,7 @@ const PresetSelector = ({ currentFilters, onPresetChange, disabled, loading, ope
     clearError
   } = usePresetStore();
 
-  const { isAuthenticated, isAuthConfigured, fetchCurrentUser, hasFetched: authFetched } = useAuthStore();
+  const { isAuthenticated, fetchCurrentUser, hasFetched: authFetched } = useAuthStore();
 
   const [showRenameModal, setShowRenameModal] = useState(false);
   const [showNewPresetModal, setShowNewPresetModal] = useState(false);

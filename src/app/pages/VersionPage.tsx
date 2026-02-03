@@ -37,7 +37,7 @@ type ToastInfo = {
 type SourceStatus = 'ok' | 'failed' | 'missing' | 'running';
 
 type SourceUpdateResult = {
-  source: 'microsoft' | 'eos' | 'fabric';
+  source: 'microsoft' | 'eos' | 'fabric' | 'm365roadmap';
   status: SourceStatus;
   itemCount: number | null;
   duration: number;
@@ -56,7 +56,18 @@ type UpdateAllInfo = {
 const REFRESH_STORAGE_KEY = 'updatelens.refresh.status';
 const COUNTS_STORAGE_KEY = 'updatelens.refresh.counts';
 const MAX_PRODUCTS_VISIBLE = 4;
-const UPDATE_SOURCES: Array<SourceUpdateResult['source']> = ['microsoft', 'eos', 'fabric'];
+const UPDATE_SOURCES: Array<SourceUpdateResult['source']> = [
+  'microsoft',
+  'eos',
+  'fabric',
+  'm365roadmap'
+];
+const SOURCE_LABELS: Record<SourceUpdateResult['source'], string> = {
+  microsoft: 'Microsoft',
+  eos: 'EOS',
+  fabric: 'Fabric',
+  m365roadmap: 'M365 Roadmap'
+};
 
 const loadRefreshInfo = (): RefreshInfo => {
   if (typeof window === 'undefined') {
@@ -289,15 +300,17 @@ const VersionPage = () => {
     }
 
     const startedAt = new Date().toISOString();
+    const runningResults: SourceUpdateResult[] = UPDATE_SOURCES.map((source) => ({
+      source,
+      status: 'running',
+      itemCount: null,
+      duration: 0,
+      timestamp: startedAt
+    }));
+
     setUpdateAllInfo({
       state: 'running',
-      results: UPDATE_SOURCES.map((source) => ({
-        source,
-        status: 'running',
-        itemCount: null,
-        duration: 0,
-        timestamp: startedAt
-      })),
+      results: runningResults,
       completedAt: null
     });
 
@@ -317,12 +330,52 @@ const VersionPage = () => {
         throw new Error(errorMessage);
       }
 
-      const data = await response.json();
+      const data = await response.json().catch(() => null);
+
+      const hasResults = Array.isArray(data?.results);
+      const hasSummary =
+        typeof data?.summary?.successful === 'number' &&
+        typeof data?.summary?.total === 'number';
+
+      if (!hasResults || !hasSummary) {
+        const completedAt = new Date().toISOString();
+        setUpdateAllInfo({
+          state: 'completed',
+          results: runningResults.map((result) => ({
+            ...result,
+            status: 'missing',
+            timestamp: completedAt,
+            error: 'Stato non restituito dal server'
+          })),
+          completedAt
+        });
+        triggerToast({
+          type: 'error',
+          message: 'Aggiornamento avviato ma il server non ha restituito i risultati.'
+        });
+        return;
+      }
+
+      const responseResults = data.results as SourceUpdateResult[];
+      const mergedResults: SourceUpdateResult[] = UPDATE_SOURCES.map((source) => {
+        const fromApi = responseResults.find((result) => result.source === source);
+        if (fromApi) {
+          return fromApi;
+        }
+        return {
+          source,
+          status: 'missing',
+          itemCount: null,
+          duration: 0,
+          timestamp: data.completedAt ?? new Date().toISOString(),
+          error: 'Fonte non restituita dalla risposta API'
+        };
+      });
 
       setUpdateAllInfo({
         state: 'completed',
-        results: data.results,
-        completedAt: data.completedAt
+        results: mergedResults,
+        completedAt: data.completedAt ?? new Date().toISOString()
       });
       await refreshCounts();
 
@@ -342,10 +395,16 @@ const VersionPage = () => {
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Errore inatteso.';
+      const completedAt = new Date().toISOString();
       setUpdateAllInfo({
-        state: 'idle',
-        results: null,
-        completedAt: null
+        state: 'completed',
+        results: runningResults.map((result) => ({
+          ...result,
+          status: 'failed',
+          timestamp: completedAt,
+          error: message
+        })),
+        completedAt
       });
       triggerToast({ type: 'error', message });
     }
@@ -528,7 +587,7 @@ const VersionPage = () => {
           <div>
             <h2 className="text-lg font-semibold">Aggiorna tutte le fonti</h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              Esegue l'aggiornamento di Microsoft, EOS e Fabric in parallelo.
+              Esegue l'aggiornamento di Microsoft, EOS, Fabric e M365 Roadmap in parallelo.
             </p>
           </div>
           {!isFileProtocol && (
@@ -574,7 +633,9 @@ const VersionPage = () => {
                   <div className="flex flex-wrap items-center justify-between gap-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold capitalize">{result.source}</span>
+                        <span className="font-semibold">
+                          {SOURCE_LABELS[result.source] ?? result.source}
+                        </span>
                         <span
                           className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${result.status === 'ok'
                               ? 'bg-emerald-500/20 text-emerald-500'

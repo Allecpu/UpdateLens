@@ -400,7 +400,7 @@ export const usePresetStore = create<PresetStoreState>((set, get) => {
         set({ isLoading: true, error: null });
 
         try {
-          const updated = await presetService.updatePreset(id, { isDefault: true });
+          await presetService.updatePreset(id, { isDefault: true });
 
           // Update all presets - only one can be default
           set(state => ({

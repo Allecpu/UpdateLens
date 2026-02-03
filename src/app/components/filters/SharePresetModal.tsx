@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { VisibilityScope, SharingInfo } from '../../../models/Filters';
+import type { VisibilityScope } from '../../../models/Filters';
 import { presetService } from '../../../services/PresetService';
 
 type SharePresetModalProps = {

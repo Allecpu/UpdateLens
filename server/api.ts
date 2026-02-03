@@ -17,7 +17,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '..');
 
 type SourceUpdateResult = {
-  source: 'microsoft' | 'eos' | 'fabric';
+  source: 'microsoft' | 'eos' | 'fabric' | 'm365roadmap';
   status: 'ok' | 'failed' | 'missing';
   itemCount: number | null;
   duration: number;
@@ -47,7 +47,7 @@ const buildCacheKey = (query: Record<string, string | undefined>) => {
 };
 
 const runSingleRefresh = async (
-  source: 'microsoft' | 'eos' | 'fabric'
+  source: 'microsoft' | 'eos' | 'fabric' | 'm365roadmap'
 ): Promise<SourceUpdateResult> => {
   const startTime = Date.now();
 
@@ -402,11 +402,7 @@ export const createApi = () => {
           });
         }
 
-        return res.status(202).json({
-          ok: true,
-          message: 'Refresh avviato via Azure Functions',
-          details: data
-        });
+        return res.status(response.status).json(data);
       } catch (error) {
         return res.status(500).json({
           error: 'Errore durante la chiamata ad Azure Functions: ' + (error instanceof Error ? error.message : String(error))
@@ -416,7 +412,12 @@ export const createApi = () => {
 
     // Local execution (development)
     try {
-      const sources: Array<'microsoft' | 'eos' | 'fabric'> = ['microsoft', 'eos', 'fabric'];
+      const sources: Array<'microsoft' | 'eos' | 'fabric' | 'm365roadmap'> = [
+        'microsoft',
+        'eos',
+        'fabric',
+        'm365roadmap'
+      ];
 
       // Run all refreshes in parallel with Promise.allSettled for resilience
       const settledResults = await Promise.allSettled(
