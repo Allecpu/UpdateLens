@@ -34,7 +34,7 @@ type ToastInfo = {
   message: string;
 };
 
-type SourceStatus = 'ok' | 'failed' | 'missing';
+type SourceStatus = 'ok' | 'failed' | 'missing' | 'running';
 
 type SourceUpdateResult = {
   source: 'microsoft' | 'eos' | 'fabric';
@@ -56,6 +56,7 @@ type UpdateAllInfo = {
 const REFRESH_STORAGE_KEY = 'updatelens.refresh.status';
 const COUNTS_STORAGE_KEY = 'updatelens.refresh.counts';
 const MAX_PRODUCTS_VISIBLE = 4;
+const UPDATE_SOURCES: Array<SourceUpdateResult['source']> = ['microsoft', 'eos', 'fabric'];
 
 const loadRefreshInfo = (): RefreshInfo => {
   if (typeof window === 'undefined') {
@@ -287,9 +288,16 @@ const VersionPage = () => {
       return;
     }
 
+    const startedAt = new Date().toISOString();
     setUpdateAllInfo({
       state: 'running',
-      results: null,
+      results: UPDATE_SOURCES.map((source) => ({
+        source,
+        status: 'running',
+        itemCount: null,
+        duration: 0,
+        timestamp: startedAt
+      })),
       completedAt: null
     });
 
@@ -550,7 +558,7 @@ const VersionPage = () => {
         {updateAllInfo.results && (
           <div className="mt-6">
             <h3 className="text-sm font-semibold uppercase text-muted-foreground mb-3">
-              Risultati aggiornamento
+              {updateAllInfo.state === 'running' ? 'Stato aggiornamento' : 'Risultati aggiornamento'}
             </h3>
             <div className="space-y-3">
               {updateAllInfo.results.map((result) => (
@@ -575,13 +583,25 @@ const VersionPage = () => {
                                 : 'bg-amber-400/20 text-amber-400'
                             }`}
                         >
-                          {result.status === 'ok' ? 'Successo' : result.status === 'failed' ? 'Errore' : 'Non disponibile'}
+                          {result.status === 'ok'
+                            ? 'Successo'
+                            : result.status === 'failed'
+                              ? 'Errore'
+                              : result.status === 'running'
+                                ? 'In aggiornamento'
+                                : 'Non disponibile'}
                         </span>
                       </div>
                       <div className="mt-2 text-sm text-muted-foreground">
-                        {result.itemCount !== null ? `${result.itemCount} elementi` : 'N/D'}
-                        {' · '}
-                        {(result.duration / 1000).toFixed(1)}s
+                        {result.status === 'running' ? (
+                          'Aggiornamento in corso...'
+                        ) : (
+                          <>
+                            {result.itemCount !== null ? `${result.itemCount} elementi` : 'N/D'}
+                            {' - '}
+                            {(result.duration / 1000).toFixed(1)}s
+                          </>
+                        )}
                       </div>
                       {result.error && (
                         <div className="mt-2 text-xs text-rose-500">
@@ -590,7 +610,14 @@ const VersionPage = () => {
                       )}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {new Date(result.timestamp).toLocaleString('it-IT')}
+                      {result.status === 'running' ? (
+                        <span className="inline-flex items-center gap-2">
+                          <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                          In corso
+                        </span>
+                      ) : (
+                        new Date(result.timestamp).toLocaleString('it-IT')
+                      )}
                     </div>
                   </div>
                 </div>
