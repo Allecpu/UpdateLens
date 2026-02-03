@@ -265,7 +265,9 @@ const App = () => {
         <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6">
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div className="text-[1.95rem] font-semibold leading-none tracking-tight">UpdateLens</div>
+              <div className="text-[1.95rem] font-semibold leading-none tracking-tight">
+                <span className="text-orange-500">EOS</span>{' '}UpdateLens
+              </div>
               <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between lg:w-auto lg:justify-end">
                 <div className="order-1 flex h-9 w-fit items-center gap-1 self-end rounded-full border border-border bg-background px-1 sm:order-2 sm:self-auto">
                   <UserMenu />
