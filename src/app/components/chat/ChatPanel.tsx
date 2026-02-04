@@ -44,8 +44,9 @@ const DEFAULT_FILTERS: FilterState = {
 
 const ChatPanel = () => {
   const env = (import.meta as ImportMeta & { env?: Record<string, string> }).env;
-  const chatBackendEnabled = env?.VITE_CHAT_BACKEND_ENABLED === 'true';
-  const chatAzureEnabled = env?.VITE_CHAT_AZURE_LLM_ENABLED === 'true';
+  // Default ON in web deployments; allow explicit opt-out via env = "false".
+  const chatBackendEnabled = env?.VITE_CHAT_BACKEND_ENABLED !== 'false';
+  const chatAzureEnabled = env?.VITE_CHAT_AZURE_LLM_ENABLED !== 'false';
   const navigate = useNavigate();
   const {
     isOpen,
