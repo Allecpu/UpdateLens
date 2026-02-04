@@ -11,6 +11,8 @@ import { getIdentity, requireAuth, optionalAuth, isAllowedDomain, bindPendingSha
 import * as presets from './presets.js';
 import * as users from './users.js';
 import type { WhitelistCheckResult } from './users.js';
+import { handleChatQuery } from './chat/ChatController.js';
+import { getAzureServicesStatus } from './chat/AzureServices.js';
 
 const execAsync = promisify(exec);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -114,6 +116,15 @@ export const createApi = () => {
 
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok' });
+  });
+
+  app.post('/api/chat/query', handleChatQuery);
+  app.get('/api/chat/health', (_req, res) => {
+    const status = getAzureServicesStatus();
+    res.json({
+      ok: true,
+      ...status
+    });
   });
 
   // GitHub Proxy for Web Mode

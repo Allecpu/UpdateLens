@@ -10,6 +10,8 @@ import { promisify } from 'node:util';
 import { getIdentity, isAllowedDomain, bindPendingShares, canManageUsers, requireWhitelistedUser } from './auth.js';
 import * as presets from './presets.js';
 import * as users from './users.js';
+import { handleChatQuery } from './chat/ChatController.js';
+import { getAzureServicesStatus } from './chat/AzureServices.js';
 const execAsync = promisify(exec);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '..');
@@ -78,6 +80,14 @@ export const createApi = () => {
     app.use(express.static(distPath));
     app.get('/health', (_req, res) => {
         res.json({ status: 'ok' });
+    });
+    app.post('/api/chat/query', handleChatQuery);
+    app.get('/api/chat/health', (_req, res) => {
+        const status = getAzureServicesStatus();
+        res.json({
+            ok: true,
+            ...status
+        });
     });
     // GitHub Proxy for Web Mode
     app.all('/api/github/*', async (req, res) => {
@@ -309,11 +319,7 @@ export const createApi = () => {
                         details: data
                     });
                 }
-                return res.status(202).json({
-                    ok: true,
-                    message: 'Refresh avviato via Azure Functions',
-                    details: data
-                });
+                return res.status(response.status).json(data);
             }
             catch (error) {
                 return res.status(500).json({
@@ -323,7 +329,12 @@ export const createApi = () => {
         }
         // Local execution (development)
         try {
-            const sources = ['microsoft', 'eos', 'fabric'];
+            const sources = [
+                'microsoft',
+                'eos',
+                'fabric',
+                'm365roadmap'
+            ];
             // Run all refreshes in parallel with Promise.allSettled for resilience
             const settledResults = await Promise.allSettled(sources.map(source => runSingleRefresh(source)));
             // Extract results from settled promises

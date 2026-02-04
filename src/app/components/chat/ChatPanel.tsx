@@ -9,6 +9,8 @@ import { buildFilterMetadata, type FilterMetadata } from '../../../services/Filt
 import { filterReleaseItems } from '../../../services/FilterService';
 import { parseIntent } from '../../../services/ChatIntentService';
 import { generateResponse, getWelcomeMessage } from '../../../services/ChatResponseService';
+import { queryChatBackend } from '../../../services/ChatBackendService';
+import { trackChatMetric } from '../../../services/ChatTelemetryService';
 import ChatToggleButton from './ChatToggleButton';
 import ChatWindow from './ChatWindow';
 
@@ -41,6 +43,9 @@ const DEFAULT_FILTERS: FilterState = {
 };
 
 const ChatPanel = () => {
+  const env = (import.meta as ImportMeta & { env?: Record<string, string> }).env;
+  const chatBackendEnabled = env?.VITE_CHAT_BACKEND_ENABLED === 'true';
+  const chatAzureEnabled = env?.VITE_CHAT_AZURE_LLM_ENABLED === 'true';
   const navigate = useNavigate();
   const {
     isOpen,
@@ -91,47 +96,76 @@ const ChatPanel = () => {
 
   const handleSend = useCallback(
     (text: string) => {
-      if (!metadata || isProcessing) return;
+      if (isProcessing) return;
+      if (!chatBackendEnabled && !metadata) return;
 
-      // Add user message and save to history immediately
       addMessage({
         type: 'user',
         text
       });
       addToHistory(text);
-
-      // Show processing state
+      trackChatMetric('query_submitted', {
+        length: text.length,
+        searchScope
+      });
       setIsProcessing(true);
 
-      // Defer heavy operations to next tick to allow UI to update
       setTimeout(() => {
-        try {
-          // Parse intent (NLP processing)
-          const intent = parseIntent(text, metadata);
+        const run = async () => {
+          const baseFilters =
+            searchScope === 'all' ? DEFAULT_FILTERS : (cssFilters ?? DEFAULT_FILTERS);
 
-          // Get base filters based on search scope
-          const baseFilters = searchScope === 'all'
-            ? DEFAULT_FILTERS
-            : (cssFilters ?? DEFAULT_FILTERS);
-
-          // Apply filter patch
-          let appliedFilters: FilterState;
-          if (intent.type === 'RESET_FILTERS') {
-            appliedFilters = DEFAULT_FILTERS;
-          } else {
-            appliedFilters = {
-              ...baseFilters,
-              ...intent.filterPatch
-            };
+          if (chatBackendEnabled) {
+            try {
+              const backendResponse = await queryChatBackend({
+                message: text,
+                searchScope,
+                baseFilters,
+                preferAzure: chatAzureEnabled,
+                topK: 5
+              });
+              addMessage({
+                type: 'bot',
+                text: backendResponse.message,
+                items: backendResponse.items,
+                showPreview: backendResponse.showPreview,
+                canApplyFilters: backendResponse.canApplyFilters,
+                filterPatch: backendResponse.filterPatch
+              });
+              trackChatMetric('response_received', {
+                engine: backendResponse.engine,
+                fallbackUsed: backendResponse.fallbackUsed,
+                hasItems: backendResponse.items.length > 0
+              });
+              return;
+            } catch (error) {
+              trackChatMetric('response_error', {
+                stage: 'backend',
+                message: error instanceof Error ? error.message : String(error)
+              });
+              console.warn('[Chat] Backend non disponibile, uso fallback locale.', error);
+            }
           }
 
-          // Filter items (O(n) operation)
-          const filtered = filterReleaseItems(items, appliedFilters);
+          if (!metadata) {
+            addMessage({
+              type: 'bot',
+              text: 'Dati chat in caricamento, riprova tra qualche secondo.'
+            });
+            return;
+          }
 
-          // Generate response
+          const intent = parseIntent(text, metadata);
+          const appliedFilters: FilterState =
+            intent.type === 'RESET_FILTERS'
+              ? DEFAULT_FILTERS
+              : {
+                  ...baseFilters,
+                  ...intent.filterPatch
+                };
+          const filtered = filterReleaseItems(items, appliedFilters);
           const response = generateResponse(intent, filtered, items.length);
 
-          // Add bot message
           addMessage({
             type: 'bot',
             text: response.message,
@@ -140,12 +174,29 @@ const ChatPanel = () => {
             canApplyFilters: response.canApplyFilters,
             filterPatch: intent.filterPatch
           });
-        } finally {
+          trackChatMetric('response_received', {
+            engine: 'local',
+            hasItems: response.items.length > 0,
+            intentType: intent.type
+          });
+        };
+
+        void run().finally(() => {
           setIsProcessing(false);
-        }
+        });
       }, 0);
     },
-    [metadata, items, cssFilters, searchScope, addMessage, addToHistory, isProcessing]
+    [
+      metadata,
+      items,
+      cssFilters,
+      searchScope,
+      addMessage,
+      addToHistory,
+      isProcessing,
+      chatBackendEnabled,
+      chatAzureEnabled
+    ]
   );
 
   // Calculate number of active filters
@@ -190,6 +241,10 @@ const ChatPanel = () => {
         // Set chat filters as temporary overlay (does NOT modify global filters)
         setChatFilters(filterPatch);
       }
+      trackChatMetric('filters_applied', {
+        isReset,
+        filterKeys: Object.keys(filterPatch)
+      });
 
       closeChat();
       navigate('/');

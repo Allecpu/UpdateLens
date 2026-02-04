@@ -18,7 +18,11 @@
         "start:server": "node server-dist/index.js",
         "preview": "vite preview",
         "typecheck": "tsc -b --pretty false",
-        "refresh:fabric": "tsx tools/refreshFabric.ts"
+        "refresh:fabric": "tsx tools/refreshFabric.ts",
+        "test:chat-api": "tsx tools/testChatApi.ts",
+        "test:chat-intent": "tsx tools/testChatIntent.ts",
+        "test:chat-response": "tsx tools/testChatResponse.ts",
+        "test:chat-unit": "npm run test:chat-intent && npm run test:chat-response"
     },
     "dependencies": {
         "better-sqlite3": "^9.6.0",
