@@ -138,6 +138,50 @@ jobs:
               WEBSITE_NODE_DEFAULT_VERSION="~20" \
               DB_PATH="/home/data"
 
+      - name: Configure Chatbot Azure settings (optional)
+        env:
+          CHAT_ENGINE: ${{ vars.CHAT_ENGINE }}
+          CHAT_AZURE_MIN_CONFIDENCE: ${{ vars.CHAT_AZURE_MIN_CONFIDENCE }}
+          AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+          AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+          AZURE_OPENAI_DEPLOYMENT: ${{ vars.AZURE_OPENAI_DEPLOYMENT }}
+          AZURE_OPENAI_API_VERSION: ${{ vars.AZURE_OPENAI_API_VERSION }}
+          APPLICATIONINSIGHTS_CONNECTION_STRING: ${{ secrets.APPLICATIONINSIGHTS_CONNECTION_STRING }}
+        run: |
+          SETTINGS=()
+
+          if [ -n "$CHAT_ENGINE" ]; then
+            SETTINGS+=("CHAT_ENGINE=$CHAT_ENGINE")
+          fi
+          if [ -n "$CHAT_AZURE_MIN_CONFIDENCE" ]; then
+            SETTINGS+=("CHAT_AZURE_MIN_CONFIDENCE=$CHAT_AZURE_MIN_CONFIDENCE")
+          fi
+          if [ -n "$AZURE_OPENAI_ENDPOINT" ]; then
+            SETTINGS+=("AZURE_OPENAI_ENDPOINT=$AZURE_OPENAI_ENDPOINT")
+          fi
+          if [ -n "$AZURE_OPENAI_API_KEY" ]; then
+            SETTINGS+=("AZURE_OPENAI_API_KEY=$AZURE_OPENAI_API_KEY")
+          fi
+          if [ -n "$AZURE_OPENAI_DEPLOYMENT" ]; then
+            SETTINGS+=("AZURE_OPENAI_DEPLOYMENT=$AZURE_OPENAI_DEPLOYMENT")
+          fi
+          if [ -n "$AZURE_OPENAI_API_VERSION" ]; then
+            SETTINGS+=("AZURE_OPENAI_API_VERSION=$AZURE_OPENAI_API_VERSION")
+          fi
+          if [ -n "$APPLICATIONINSIGHTS_CONNECTION_STRING" ]; then
+            SETTINGS+=("APPLICATIONINSIGHTS_CONNECTION_STRING=$APPLICATIONINSIGHTS_CONNECTION_STRING")
+          fi
+
+          if [ ${#SETTINGS[@]} -eq 0 ]; then
+            echo "No chatbot Azure settings provided; skipping."
+            exit 0
+          fi
+
+          az webapp config appsettings set \
+            --name updatelens-api \
+            --resource-group rg-updatelens-runtime \
+            --settings "${SETTINGS[@]}"
+
       - name: Set startup command and Always On
         run: |
           az webapp config set \

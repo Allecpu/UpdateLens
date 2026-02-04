@@ -1,0 +1,7 @@
+CHAT_ENGINE=azure
+CHAT_AZURE_MIN_CONFIDENCE=0.6
+AZURE_OPENAI_ENDPOINT=@Microsoft.KeyVault(SecretUri=https://kv-updatelens-prod.vault.azure.net/secrets/AZUREOPENAIENDPOINT/)
+AZURE_OPENAI_API_KEY=@Microsoft.KeyVault(SecretUri=https://kv-updatelens-prod.vault.azure.net/secrets/AZUREOPENAIAPIKEY/)
+AZURE_OPENAI_DEPLOYMENT=gpt-4o-mini
+AZURE_OPENAI_API_VERSION=2024-10-21
+APPLICATIONINSIGHTS_CONNECTION_STRING=@Microsoft.KeyVault(SecretUri=https://kv-updatelens-prod.vault.azure.net/secrets/APPINSIGHTSCONNSTRING/)
