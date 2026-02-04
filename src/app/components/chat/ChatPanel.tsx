@@ -9,7 +9,7 @@ import { loadAllSnapshots } from '../../../services/DataLoader';
 import { buildFilterMetadata, type FilterMetadata } from '../../../services/FilterMetadata';
 import { filterReleaseItems } from '../../../services/FilterService';
 import { parseIntent } from '../../../services/ChatIntentService';
-import { generateResponse, getWelcomeMessage } from '../../../services/ChatResponseService';
+import { generateResponse } from '../../../services/ChatResponseService';
 import { queryChatBackend } from '../../../services/ChatBackendService';
 import { trackChatMetric } from '../../../services/ChatTelemetryService';
 import ChatToggleButton from './ChatToggleButton';
@@ -87,16 +87,6 @@ const ChatPanel = () => {
         });
     }
   }, [isOpen, items.length, isLoading]);
-
-  // Add welcome message on first open
-  useEffect(() => {
-    if (isOpen && messages.length === 0) {
-      addMessage({
-        type: 'bot',
-        text: getWelcomeMessage()
-      });
-    }
-  }, [isOpen, messages.length, addMessage]);
 
   const handleSend = useCallback(
     (text: string) => {

@@ -198,12 +198,15 @@ const ChatWindow = ({
             ))}
             {/* Typing indicator */}
             {isProcessing && (
-              <div className="flex justify-start">
-                <div className="rounded-2xl rounded-bl-md bg-muted px-4 py-3">
-                  <div className="flex items-center gap-1">
-                    <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/60" style={{ animationDelay: '0ms' }} />
-                    <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/60" style={{ animationDelay: '150ms' }} />
-                    <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/60" style={{ animationDelay: '300ms' }} />
+              <div className="flex justify-start" role="status" aria-live="polite" aria-label="Assistente in elaborazione">
+                <div className="min-w-[120px] rounded-2xl rounded-bl-md border border-border/70 bg-muted px-4 py-3">
+                  <div className="mb-1 text-[11px] font-medium text-muted-foreground">
+                    Assistente sta elaborando...
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 animate-bounce rounded-full bg-primary/80" style={{ animationDelay: '0ms' }} />
+                    <span className="h-2.5 w-2.5 animate-bounce rounded-full bg-primary/70" style={{ animationDelay: '150ms' }} />
+                    <span className="h-2.5 w-2.5 animate-bounce rounded-full bg-primary/60" style={{ animationDelay: '300ms' }} />
                   </div>
                 </div>
               </div>

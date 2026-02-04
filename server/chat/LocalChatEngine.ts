@@ -23,6 +23,9 @@ type ChatContextBookmark = {
   bookmarkedIds?: unknown;
 };
 
+const FAVORITES_PATTERN = /\b(preferit[oi]|segnalibr[io]|bookmark(?:s)?|favorites?)\b/i;
+const FAVORITES_COUNT_PATTERN = /\b(quanti|quante|numero|count|how many)\b/i;
+
 const SOURCE_MAP: Array<{ pattern: RegExp; value: 'Microsoft' | 'EOS' | 'Fabric' | 'MICROSOFT 365' }> = [
   { pattern: /\bmicrosoft 365\b|\bm365\b|\boffice 365\b/i, value: 'MICROSOFT 365' },
   { pattern: /\bfabric\b/i, value: 'Fabric' },
@@ -119,6 +122,15 @@ export const runLocalChatEngine = async (
   const traceId = crypto.randomUUID();
   const text = req.message.trim();
   const normalized = text.toLowerCase();
+  const chatContext = (req.chatContext ?? {}) as ChatContextBookmark;
+  const showBookmarksOnly = chatContext.showBookmarksOnly === true;
+  const bookmarkedIdsSet = new Set(
+    Array.isArray(chatContext.bookmarkedIds)
+      ? chatContext.bookmarkedIds.filter(
+          (value): value is string => typeof value === 'string' && value.length > 0
+        )
+      : []
+  );
 
   if (/^(mostra tutto|reset|resetta|azzera|pulisci filtri?)$/i.test(normalized)) {
     return {
@@ -133,9 +145,62 @@ export const runLocalChatEngine = async (
     };
   }
 
+  const detectedSources = detectSource(text);
+  const allItems = await loadLatestItems();
+
+  if (FAVORITES_PATTERN.test(normalized)) {
+    if (bookmarkedIdsSet.size === 0) {
+      return {
+        message: 'Non ci sono elementi preferiti al momento.',
+        items: [],
+        showPreview: false,
+        canApplyFilters: false,
+        filterPatch: {},
+        engine: 'local',
+        fallbackUsed: false,
+        traceId
+      };
+    }
+
+    const favoriteItems = allItems.filter(
+      (item) => item.id && bookmarkedIdsSet.has(item.id)
+    );
+    const sourceFilteredFavorites =
+      detectedSources.length > 0
+        ? favoriteItems.filter(
+            (item) => item.source && detectedSources.includes(item.source as never)
+          )
+        : favoriteItems;
+    const preview = sourceFilteredFavorites.slice(0, req.topK).map(toPreviewItem);
+    const sourceLabel = detectedSources.length > 0 ? ` per ${detectedSources.join(', ')}` : '';
+
+    if (FAVORITES_COUNT_PATTERN.test(normalized)) {
+      return {
+        message: `Hai ${sourceFilteredFavorites.length} preferiti${sourceLabel}.`,
+        items: [],
+        showPreview: false,
+        canApplyFilters: false,
+        filterPatch: {},
+        engine: 'local',
+        fallbackUsed: false,
+        traceId
+      };
+    }
+
+    return {
+      message: `Hai ${sourceFilteredFavorites.length} preferiti${sourceLabel}.`,
+      items: preview,
+      showPreview: preview.length > 0,
+      canApplyFilters: false,
+      filterPatch: {},
+      engine: 'local',
+      fallbackUsed: false,
+      traceId
+    };
+  }
+
   const filterPatch: ChatQueryResponse['filterPatch'] = {};
 
-  const detectedSources = detectSource(text);
   if (detectedSources.length > 0) {
     filterPatch.sources = detectedSources;
   }
@@ -155,18 +220,9 @@ export const runLocalChatEngine = async (
     filterPatch.query = text;
   }
 
-  const allItems = await loadLatestItems();
   const quickQuery = filterPatch.query ? normalizeText(filterPatch.query) : '';
   const queryTokens = tokenizeQuery(filterPatch.query ?? '');
   const sourceFilter = filterPatch.sources;
-  const chatContext = (req.chatContext ?? {}) as ChatContextBookmark;
-  const showBookmarksOnly = chatContext.showBookmarksOnly === true;
-  const bookmarkedIdsSet = new Set(
-    Array.isArray(chatContext.bookmarkedIds)
-      ? chatContext.bookmarkedIds
-          .filter((value): value is string => typeof value === 'string' && value.length > 0)
-      : []
-  );
 
   const filtered = allItems.filter((item) => {
     if (showBookmarksOnly && (!item.id || !bookmarkedIdsSet.has(item.id))) {
