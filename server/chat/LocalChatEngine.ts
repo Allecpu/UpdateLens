@@ -25,6 +25,39 @@ const SOURCE_MAP: Array<{ pattern: RegExp; value: 'Microsoft' | 'EOS' | 'Fabric'
   { pattern: /\bmicrosoft\b|\brelease plans?\b|\bms\b/i, value: 'Microsoft' }
 ];
 
+const STOP_WORDS = new Set([
+  'the', 'a', 'an', 'of', 'for', 'to', 'in', 'on', 'with', 'and',
+  'il', 'lo', 'la', 'i', 'gli', 'le', 'di', 'del', 'della', 'delle', 'dei',
+  'su', 'con', 'per', 'e', 'da', 'al', 'ai', 'alle', 'agli',
+  'release', 'notes', 'novita', 'novità'
+]);
+
+const normalizeText = (value: string): string => {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .replace(/\bd365\b/g, 'dynamics 365')
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+const tokenizeQuery = (value: string): string[] => {
+  const normalized = normalizeText(value);
+  if (!normalized) {
+    return [];
+  }
+  return Array.from(
+    new Set(
+      normalized
+        .split(' ')
+        .map((token) => token.trim())
+        .filter((token) => token.length >= 2 && !STOP_WORDS.has(token))
+    )
+  );
+};
+
 const loadLatestItems = async (): Promise<SnapshotItem[]> => {
   const latestPath = path.resolve(repoRoot, 'public', 'data', 'latest.json');
   const latestRaw = await readFile(latestPath, 'utf-8');
@@ -109,25 +142,33 @@ export const runLocalChatEngine = async (
   }
 
   const allItems = await loadLatestItems();
-  const quickQuery = filterPatch.query?.toLowerCase();
+  const quickQuery = filterPatch.query ? normalizeText(filterPatch.query) : '';
+  const queryTokens = tokenizeQuery(filterPatch.query ?? '');
   const sourceFilter = filterPatch.sources;
   const filtered = allItems.filter((item) => {
     if (sourceFilter?.length && (!item.source || !sourceFilter.includes(item.source as never))) {
       return false;
     }
-    if (quickQuery) {
-      const haystack = [
+    if (quickQuery || queryTokens.length > 0) {
+      const haystack = normalizeText(
+        [
         item.title,
         item.summary,
         item.description,
         item.product,
         item.productName,
         item.source
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-      return haystack.includes(quickQuery);
+        ]
+          .filter(Boolean)
+          .join(' ')
+      );
+      if (quickQuery && haystack.includes(quickQuery)) {
+        return true;
+      }
+      if (queryTokens.length > 0) {
+        return queryTokens.every((token) => haystack.includes(token));
+      }
+      return false;
     }
     return true;
   });
