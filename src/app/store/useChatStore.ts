@@ -18,11 +18,13 @@ export type ChatMessage = {
   showPreview?: boolean;
   canApplyFilters?: boolean;
   filterPatch?: Partial<FilterState>;
+  applyScope?: SearchScope;
 };
 
 type ChatState = {
   isOpen: boolean;
   messages: ChatMessage[];
+  animatedBotMessageIds: string[];
   queryHistory: string[];
   activeTab: ChatTab;
   searchScope: SearchScope;
@@ -30,6 +32,7 @@ type ChatState = {
   closeChat: () => void;
   clearMessages: () => void;
   addMessage: (message: Omit<ChatMessage, 'id'>) => void;
+  markBotMessageAnimated: (messageId: string) => void;
   addToHistory: (query: string) => void;
   deleteFromHistory: (query: string) => void;
   clearHistory: () => void;
@@ -62,16 +65,26 @@ const saveHistory = (history: string[]): void => {
 export const useChatStore = create<ChatState>((set, get) => ({
   isOpen: false,
   messages: [],
+  animatedBotMessageIds: [],
   queryHistory: loadHistory(),
   activeTab: 'chat',
   searchScope: 'all',
   toggleChat: () => set((state) => ({ isOpen: !state.isOpen })),
   closeChat: () => set({ isOpen: false, activeTab: 'chat', searchScope: 'all' }),
-  clearMessages: () => set({ messages: [] }),
+  clearMessages: () => set({ messages: [], animatedBotMessageIds: [] }),
   addMessage: (message) =>
     set((state) => ({
       messages: [...state.messages, { ...message, id: createMessageId() }]
     })),
+  markBotMessageAnimated: (messageId) =>
+    set((state) => {
+      if (state.animatedBotMessageIds.includes(messageId)) {
+        return state;
+      }
+      return {
+        animatedBotMessageIds: [...state.animatedBotMessageIds, messageId]
+      };
+    }),
   addToHistory: (query) => {
     const normalized = query.trim().toLowerCase();
     if (!normalized || normalized.length < 3) return;

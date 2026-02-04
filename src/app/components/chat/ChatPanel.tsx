@@ -5,6 +5,7 @@ import { useFilterStore } from '../../store/useFilterStore';
 import { useBookmarkStore } from '../../store/useBookmarkStore';
 import type { FilterState } from '../../../models/Filters';
 import type { ReleaseItem } from '../../../models/ReleaseItem';
+import type { ChatMessage as ChatMessageData } from '../../store/useChatStore';
 import { loadAllSnapshots } from '../../../services/DataLoader';
 import { buildFilterMetadata, type FilterMetadata } from '../../../services/FilterMetadata';
 import { filterReleaseItems } from '../../../services/FilterService';
@@ -52,6 +53,7 @@ const ChatPanel = () => {
   const {
     isOpen,
     messages,
+    animatedBotMessageIds,
     queryHistory,
     activeTab,
     searchScope,
@@ -59,6 +61,7 @@ const ChatPanel = () => {
     closeChat,
     clearMessages,
     addMessage,
+    markBotMessageAnimated,
     addToHistory,
     deleteFromHistory,
     clearHistory,
@@ -128,7 +131,8 @@ const ChatPanel = () => {
                 items: backendResponse.items,
                 showPreview: backendResponse.showPreview,
                 canApplyFilters: backendResponse.canApplyFilters,
-                filterPatch: backendResponse.filterPatch
+                filterPatch: backendResponse.filterPatch,
+                applyScope: searchScope
               });
               trackChatMetric('response_received', {
                 engine: backendResponse.engine,
@@ -170,7 +174,8 @@ const ChatPanel = () => {
             items: response.items,
             showPreview: response.showPreview,
             canApplyFilters: response.canApplyFilters,
-            filterPatch: intent.filterPatch
+            filterPatch: intent.filterPatch,
+            applyScope: searchScope
           });
           trackChatMetric('response_received', {
             engine: 'local',
@@ -230,7 +235,8 @@ const ChatPanel = () => {
   }, [cssFilters]);
 
   const handleApplyFilters = useCallback(
-    (filterPatch: Partial<FilterState>) => {
+    (message: ChatMessageData) => {
+      const filterPatch = message.filterPatch ?? {};
       // Check if this is a reset
       const isReset = Object.keys(filterPatch).length === 0;
 
@@ -238,18 +244,24 @@ const ChatPanel = () => {
         // Clear chat filters - dashboard will show base filters
         clearChatFilters();
       } else {
-        // Set chat filters as temporary overlay (does NOT modify global filters)
-        setChatFilters(filterPatch);
+        // If query ran on "all", apply on top of defaults to avoid hidden carry-over filters.
+        // If query ran on "current", keep overlay behavior on current dashboard filters.
+        const scopeAwareFilters =
+          message.applyScope === 'all'
+            ? { ...DEFAULT_FILTERS, ...filterPatch }
+            : filterPatch;
+        setChatFilters(scopeAwareFilters);
       }
       trackChatMetric('filters_applied', {
         isReset,
-        filterKeys: Object.keys(filterPatch)
+        filterKeys: Object.keys(filterPatch),
+        applyScope: message.applyScope ?? searchScope
       });
 
       closeChat();
       navigate('/');
     },
-    [setChatFilters, clearChatFilters, closeChat, navigate]
+    [setChatFilters, clearChatFilters, closeChat, navigate, searchScope]
   );
 
   return (
@@ -258,6 +270,7 @@ const ChatPanel = () => {
         <div className="mb-4">
           <ChatWindow
             messages={messages}
+            animatedBotMessageIds={animatedBotMessageIds}
             queryHistory={queryHistory}
             activeTab={activeTab}
             searchScope={searchScope}
@@ -271,6 +284,7 @@ const ChatPanel = () => {
             onSetSearchScope={setSearchScope}
             onDeleteFromHistory={deleteFromHistory}
             onClearHistory={clearHistory}
+            onMarkBotMessageAnimated={markBotMessageAnimated}
           />
         </div>
       )}

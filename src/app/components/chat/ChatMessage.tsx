@@ -4,21 +4,28 @@ import ChatResultPreview from './ChatResultPreview';
 
 type ChatMessageProps = {
   message: ChatMessageData;
+  shouldAnimate?: boolean;
+  onAnimationComplete?: () => void;
   onApplyFilters?: () => void;
 };
 
-const ChatMessage = ({ message, onApplyFilters }: ChatMessageProps) => {
+const ChatMessage = ({
+  message,
+  shouldAnimate: shouldAnimateMessage = false,
+  onAnimationComplete,
+  onApplyFilters
+}: ChatMessageProps) => {
   const isUser = message.type === 'user';
   const [visibleLength, setVisibleLength] = useState(isUser ? message.text.length : 0);
 
-  const shouldAnimate = useMemo(() => {
+  const canAnimate = useMemo(() => {
     if (isUser) return false;
     if (typeof window === 'undefined') return true;
     return !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   }, [isUser]);
 
   useEffect(() => {
-    if (!shouldAnimate) {
+    if (!shouldAnimateMessage || !canAnimate) {
       setVisibleLength(message.text.length);
       return;
     }
@@ -28,6 +35,7 @@ const ChatMessage = ({ message, onApplyFilters }: ChatMessageProps) => {
       setVisibleLength((current) => {
         if (current >= message.text.length) {
           window.clearInterval(intervalId);
+          onAnimationComplete?.();
           return current;
         }
         return current + 2;
@@ -35,7 +43,7 @@ const ChatMessage = ({ message, onApplyFilters }: ChatMessageProps) => {
     }, 16);
 
     return () => window.clearInterval(intervalId);
-  }, [message.text, shouldAnimate]);
+  }, [message.text, shouldAnimateMessage, canAnimate, onAnimationComplete]);
 
   const displayedText = isUser ? message.text : message.text.slice(0, visibleLength);
   const isTyping = !isUser && visibleLength < message.text.length;

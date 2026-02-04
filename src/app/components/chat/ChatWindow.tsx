@@ -27,6 +27,7 @@ const truncate = (text: string, maxLen: number): string => {
 
 type ChatWindowProps = {
   messages: ChatMessageData[];
+  animatedBotMessageIds: string[];
   queryHistory: string[];
   activeTab: ChatTab;
   searchScope: SearchScope;
@@ -35,11 +36,12 @@ type ChatWindowProps = {
   onClose: () => void;
   onClearChat: () => void;
   onSend: (text: string) => void;
-  onApplyFilters: (filterPatch: Partial<Record<string, unknown>>) => void;
+  onApplyFilters: (message: ChatMessageData) => void;
   onSetActiveTab: (tab: ChatTab) => void;
   onSetSearchScope: (scope: SearchScope) => void;
   onDeleteFromHistory: (query: string) => void;
   onClearHistory: () => void;
+  onMarkBotMessageAnimated: (messageId: string) => void;
 };
 
 const TAB_LABELS: Record<ChatTab, { icon: string; label: string }> = {
@@ -50,6 +52,7 @@ const TAB_LABELS: Record<ChatTab, { icon: string; label: string }> = {
 
 const ChatWindow = ({
   messages,
+  animatedBotMessageIds,
   queryHistory,
   activeTab,
   searchScope,
@@ -62,15 +65,36 @@ const ChatWindow = ({
   onSetActiveTab,
   onSetSearchScope,
   onDeleteFromHistory,
-  onClearHistory
+  onClearHistory,
+  onMarkBotMessageAnimated
 }: ChatWindowProps) => {
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<ChatInputHandle>(null);
   const isProcessingRef = useRef(false);
 
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    container.scrollTo({
+      top: container.scrollHeight,
+      behavior
+    });
+  }, []);
+
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    if (activeTab !== 'chat') return;
+    scrollToBottom('smooth');
+  }, [messages, isProcessing, activeTab, scrollToBottom]);
+
+  // Ensure chat always reopens at the latest message.
+  useEffect(() => {
+    if (activeTab !== 'chat') return;
+    scrollToBottom('auto');
+    const timer = window.setTimeout(() => {
+      scrollToBottom('auto');
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [activeTab, scrollToBottom]);
 
   // Handle selecting a query from history or help examples
   // Automatically switches to chat tab and sends the message
@@ -96,8 +120,8 @@ const ChatWindow = ({
   }, [onSetActiveTab, onSend]);
 
   const handleApplyFilters = (message: ChatMessageData) => {
-    if (message.filterPatch) {
-      onApplyFilters(message.filterPatch);
+    if (message.filterPatch && Object.keys(message.filterPatch).length > 0) {
+      onApplyFilters(message);
     }
   };
 
@@ -116,6 +140,11 @@ const ChatWindow = ({
 
     return [...historyReplies, ...filteredDefaults];
   }, [queryHistory]);
+
+  const animatedBotMessageIdsSet = useMemo(
+    () => new Set(animatedBotMessageIds),
+    [animatedBotMessageIds]
+  );
 
   return (
     <div className="flex h-[500px] w-[380px] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-xl">
@@ -188,30 +217,37 @@ const ChatWindow = ({
       {activeTab === 'chat' && (
         <>
           {/* Messages */}
-          <div className="flex-1 space-y-3 overflow-y-auto p-4">
+          <div ref={messagesContainerRef} className="flex-1 space-y-3 overflow-y-auto p-4">
             {messages.map((message) => (
               <ChatMessage
                 key={message.id}
                 message={message}
+                shouldAnimate={message.type === 'bot' && !animatedBotMessageIdsSet.has(message.id)}
+                onAnimationComplete={() => {
+                  if (message.type === 'bot') {
+                    onMarkBotMessageAnimated(message.id);
+                  }
+                }}
                 onApplyFilters={() => handleApplyFilters(message)}
               />
             ))}
             {/* Typing indicator */}
             {isProcessing && (
               <div className="flex justify-start" role="status" aria-live="polite" aria-label="Assistente in elaborazione">
-                <div className="min-w-[120px] rounded-2xl rounded-bl-md border border-border/70 bg-muted px-4 py-3">
-                  <div className="mb-1 text-[11px] font-medium text-muted-foreground">
+                <div className="ul-chat-thinking min-w-[180px] rounded-2xl rounded-bl-md border border-border/70 px-4 py-3">
+                  <div className="mb-1.5 flex items-center gap-2 text-[11px] font-medium text-muted-foreground">
+                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary/25 border-t-primary" />
                     Assistente sta elaborando...
                   </div>
+                  <div className="ul-chat-thinking-bar mb-2" />
                   <div className="flex items-center gap-1.5">
-                    <span className="h-2.5 w-2.5 animate-bounce rounded-full bg-primary/80" style={{ animationDelay: '0ms' }} />
-                    <span className="h-2.5 w-2.5 animate-bounce rounded-full bg-primary/70" style={{ animationDelay: '150ms' }} />
-                    <span className="h-2.5 w-2.5 animate-bounce rounded-full bg-primary/60" style={{ animationDelay: '300ms' }} />
+                    <span className="ul-chat-thinking-dot h-2 w-2 rounded-full bg-primary/80" style={{ animationDelay: '0ms' }} />
+                    <span className="ul-chat-thinking-dot h-2 w-2 rounded-full bg-primary/70" style={{ animationDelay: '140ms' }} />
+                    <span className="ul-chat-thinking-dot h-2 w-2 rounded-full bg-primary/60" style={{ animationDelay: '280ms' }} />
                   </div>
                 </div>
               </div>
             )}
-            <div ref={messagesEndRef} />
           </div>
 
           {/* Quick Replies */}

@@ -4,6 +4,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '..', '..');
+const FAVORITES_PATTERN = /\b(preferit[oi]|segnalibr[io]|bookmark(?:s)?|favorites?)\b/i;
+const FAVORITES_COUNT_PATTERN = /\b(quanti|quante|numero|count|how many)\b/i;
 const SOURCE_MAP = [
     { pattern: /\bmicrosoft 365\b|\bm365\b|\boffice 365\b/i, value: 'MICROSOFT 365' },
     { pattern: /\bfabric\b/i, value: 'Fabric' },
@@ -75,10 +77,89 @@ const toPreviewItem = (item) => {
         description: item.description ?? item.summary ?? ''
     };
 };
+const toStringArray = (value) => {
+    if (!Array.isArray(value))
+        return [];
+    return value.filter((v) => typeof v === 'string' && v.trim().length > 0);
+};
+const parseIsoDate = (value) => {
+    if (typeof value !== 'string' || value.trim().length === 0)
+        return null;
+    const ts = Date.parse(value);
+    return Number.isFinite(ts) ? ts : null;
+};
+const applyBaseFilters = (items, baseFiltersRaw) => {
+    const baseFilters = (baseFiltersRaw ?? {});
+    const sourceSet = new Set(toStringArray(baseFilters.sources).map(normalizeText));
+    const productSet = new Set(toStringArray(baseFilters.products).map(normalizeText));
+    const statusSet = new Set(toStringArray(baseFilters.statuses).map(normalizeText));
+    const categorySet = new Set(toStringArray(baseFilters.categories).map(normalizeText));
+    const waveSet = new Set(toStringArray(baseFilters.waves).map(normalizeText));
+    const availabilitySet = new Set(toStringArray(baseFilters.availabilityTypes).map(normalizeText));
+    const periodNewDays = typeof baseFilters.periodNewDays === 'number' && Number.isFinite(baseFilters.periodNewDays)
+        ? Math.max(0, baseFilters.periodNewDays)
+        : 0;
+    const periodSince = periodNewDays > 0 ? Date.now() - periodNewDays * 24 * 60 * 60 * 1000 : null;
+    const releaseFrom = parseIsoDate(baseFilters.releaseDateFrom);
+    const releaseTo = parseIsoDate(baseFilters.releaseDateTo);
+    const baseQuery = typeof baseFilters.query === 'string' ? normalizeText(baseFilters.query) : '';
+    return items.filter((item) => {
+        if (sourceSet.size > 0) {
+            const source = normalizeText(item.source ?? '');
+            if (!sourceSet.has(source))
+                return false;
+        }
+        if (productSet.size > 0) {
+            const product = normalizeText(item.productName ?? item.product ?? '');
+            if (!productSet.has(product))
+                return false;
+        }
+        if (statusSet.size > 0) {
+            const status = normalizeText(item.status ?? '');
+            if (!statusSet.has(status))
+                return false;
+        }
+        if (categorySet.size > 0) {
+            const category = normalizeText(item.category ?? '');
+            if (!categorySet.has(category))
+                return false;
+        }
+        if (waveSet.size > 0) {
+            const wave = normalizeText(item.wave ?? '');
+            if (!waveSet.has(wave))
+                return false;
+        }
+        if (availabilitySet.size > 0) {
+            const itemAvailability = (item.availabilityTypes ?? []).map(normalizeText);
+            if (!itemAvailability.some((value) => availabilitySet.has(value)))
+                return false;
+        }
+        const releaseTs = parseIsoDate(item.releaseDate);
+        if (periodSince && releaseTs !== null && releaseTs < periodSince)
+            return false;
+        if (releaseFrom !== null && releaseTs !== null && releaseTs < releaseFrom)
+            return false;
+        if (releaseTo !== null && releaseTs !== null && releaseTs > releaseTo)
+            return false;
+        if (baseQuery) {
+            const haystack = normalizeText([item.title, item.summary, item.description, item.product, item.productName, item.source]
+                .filter(Boolean)
+                .join(' '));
+            if (!haystack.includes(baseQuery))
+                return false;
+        }
+        return true;
+    });
+};
 export const runLocalChatEngine = async (req) => {
     const traceId = crypto.randomUUID();
     const text = req.message.trim();
     const normalized = text.toLowerCase();
+    const chatContext = (req.chatContext ?? {});
+    const showBookmarksOnly = chatContext.showBookmarksOnly === true;
+    const bookmarkedIdsSet = new Set(Array.isArray(chatContext.bookmarkedIds)
+        ? chatContext.bookmarkedIds.filter((value) => typeof value === 'string' && value.length > 0)
+        : []);
     if (/^(mostra tutto|reset|resetta|azzera|pulisci filtri?)$/i.test(normalized)) {
         return {
             message: 'Filtri azzerati. Mostro tutti gli elementi disponibili.',
@@ -91,8 +172,52 @@ export const runLocalChatEngine = async (req) => {
             traceId
         };
     }
-    const filterPatch = {};
     const detectedSources = detectSource(text);
+    const allItems = await loadLatestItems();
+    const scopedItems = req.searchScope === 'current' ? applyBaseFilters(allItems, req.baseFilters) : allItems;
+    if (FAVORITES_PATTERN.test(normalized)) {
+        if (bookmarkedIdsSet.size === 0) {
+            return {
+                message: 'Non ci sono elementi preferiti al momento.',
+                items: [],
+                showPreview: false,
+                canApplyFilters: false,
+                filterPatch: {},
+                engine: 'local',
+                fallbackUsed: false,
+                traceId
+            };
+        }
+        const favoriteItems = scopedItems.filter((item) => item.id && bookmarkedIdsSet.has(item.id));
+        const sourceFilteredFavorites = detectedSources.length > 0
+            ? favoriteItems.filter((item) => item.source && detectedSources.includes(item.source))
+            : favoriteItems;
+        const preview = sourceFilteredFavorites.slice(0, req.topK).map(toPreviewItem);
+        const sourceLabel = detectedSources.length > 0 ? ` per ${detectedSources.join(', ')}` : '';
+        if (FAVORITES_COUNT_PATTERN.test(normalized)) {
+            return {
+                message: `Hai ${sourceFilteredFavorites.length} preferiti${sourceLabel}.`,
+                items: [],
+                showPreview: false,
+                canApplyFilters: false,
+                filterPatch: {},
+                engine: 'local',
+                fallbackUsed: false,
+                traceId
+            };
+        }
+        return {
+            message: `Hai ${sourceFilteredFavorites.length} preferiti${sourceLabel}.`,
+            items: preview,
+            showPreview: preview.length > 0,
+            canApplyFilters: false,
+            filterPatch: {},
+            engine: 'local',
+            fallbackUsed: false,
+            traceId
+        };
+    }
+    const filterPatch = {};
     if (detectedSources.length > 0) {
         filterPatch.sources = detectedSources;
     }
@@ -109,17 +234,10 @@ export const runLocalChatEngine = async (req) => {
     if (Object.keys(filterPatch).length === 0 && text.length >= 3) {
         filterPatch.query = text;
     }
-    const allItems = await loadLatestItems();
     const quickQuery = filterPatch.query ? normalizeText(filterPatch.query) : '';
     const queryTokens = tokenizeQuery(filterPatch.query ?? '');
     const sourceFilter = filterPatch.sources;
-    const chatContext = (req.chatContext ?? {});
-    const showBookmarksOnly = chatContext.showBookmarksOnly === true;
-    const bookmarkedIdsSet = new Set(Array.isArray(chatContext.bookmarkedIds)
-        ? chatContext.bookmarkedIds
-            .filter((value) => typeof value === 'string' && value.length > 0)
-        : []);
-    const filtered = allItems.filter((item) => {
+    const filtered = scopedItems.filter((item) => {
         if (showBookmarksOnly && (!item.id || !bookmarkedIdsSet.has(item.id))) {
             return false;
         }
