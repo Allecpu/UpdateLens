@@ -6,6 +6,57 @@ type TelemetryEvent = {
   measurements?: Record<string, number>;
 };
 
+const SAFE_PROPERTY_KEYS = new Set([
+  'engine',
+  'fallbackUsed',
+  'fallbackReason',
+  'model',
+  'errorCode',
+  'status'
+]);
+
+const SAFE_MEASUREMENT_KEYS = new Set([
+  'latencyMs',
+  'confidence',
+  'promptTokens',
+  'completionTokens',
+  'totalTokens',
+  'resultCount',
+  'httpStatus'
+]);
+
+const sanitizeProperties = (input?: Record<string, string>): Record<string, string> => {
+  if (!input) {
+    return {};
+  }
+  const sanitized: Record<string, string> = {};
+  for (const [key, value] of Object.entries(input)) {
+    if (!SAFE_PROPERTY_KEYS.has(key)) {
+      continue;
+    }
+    const trimmed = value.trim();
+    if (!trimmed) {
+      continue;
+    }
+    sanitized[key] = trimmed.slice(0, 120);
+  }
+  return sanitized;
+};
+
+const sanitizeMeasurements = (input?: Record<string, number>): Record<string, number> => {
+  if (!input) {
+    return {};
+  }
+  const sanitized: Record<string, number> = {};
+  for (const [key, value] of Object.entries(input)) {
+    if (!SAFE_MEASUREMENT_KEYS.has(key) || !Number.isFinite(value)) {
+      continue;
+    }
+    sanitized[key] = value;
+  }
+  return sanitized;
+};
+
 export const trackServerChatEvent = async (event: TelemetryEvent) => {
   const config = getAppInsightsConfig();
   if (!config) {
@@ -23,8 +74,9 @@ export const trackServerChatEvent = async (event: TelemetryEvent) => {
       baseType: 'EventData',
       baseData: {
         name: event.name,
-        properties: event.properties ?? {},
-        measurements: event.measurements ?? {}
+        // Do not send raw prompts/completions or full payloads to telemetry.
+        properties: sanitizeProperties(event.properties),
+        measurements: sanitizeMeasurements(event.measurements)
       }
     }
   };

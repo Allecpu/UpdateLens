@@ -54,9 +54,8 @@ const run = async () => {
 
     const healthRes = await fetch(`${baseUrl}/api/chat/health`);
     assert.equal(healthRes.status, 200, 'chat health status must be 200');
-    const healthBody = (await healthRes.json()) as { ok?: boolean; chatEngine?: string };
+    const healthBody = (await healthRes.json()) as { ok?: boolean };
     assert.equal(healthBody.ok, true);
-    assert.equal(typeof healthBody.chatEngine, 'string');
 
     const fabric = await postChatQuery(baseUrl, 'Fabric ultimi 30 giorni in GA');
     assert.equal(fabric.status, 200, 'fabric status must be 200');

@@ -11,12 +11,84 @@ import { getIdentity, isAllowedDomain, bindPendingShares, canManageUsers, requir
 import * as presets from './presets.js';
 import * as users from './users.js';
 import { handleChatQuery } from './chat/ChatController.js';
-import { getAzureServicesStatus } from './chat/AzureServices.js';
 const execAsync = promisify(exec);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '..');
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
+const CHAT_RATE_LIMIT_WINDOW_MS = Math.max(1000, Number(process.env.CHAT_RATE_LIMIT_WINDOW_MS ?? 60_000));
+const CHAT_RATE_LIMIT_MAX_REQUESTS = Math.max(1, Number(process.env.CHAT_RATE_LIMIT_MAX_REQUESTS ?? 30));
+const CHAT_RATE_LIMIT_BURST_WINDOW_MS = Math.max(1000, Number(process.env.CHAT_RATE_LIMIT_BURST_WINDOW_MS ?? 10_000));
+const CHAT_RATE_LIMIT_BURST_MAX_REQUESTS = Math.max(1, Number(process.env.CHAT_RATE_LIMIT_BURST_MAX_REQUESTS ?? 8));
+const CHAT_RATE_LIMIT_MAX_KEYS = Math.max(100, Number(process.env.CHAT_RATE_LIMIT_MAX_KEYS ?? 10_000));
+const chatRateLimitWindows = new Map();
+const chatRateLimitBurstWindows = new Map();
+const normalizeClientIp = (value) => {
+    const trimmed = value.trim();
+    if (!trimmed) {
+        return '';
+    }
+    const withoutPort = trimmed.replace(/:\d+$/, '');
+    return withoutPort.startsWith('::ffff:') ? withoutPort.slice(7) : withoutPort;
+};
+const getChatRateLimitKey = (req) => {
+    const rawClientId = typeof req.headers['x-client-id'] === 'string' ? req.headers['x-client-id'] : '';
+    const clientId = rawClientId.trim();
+    if (clientId) {
+        return `client:${clientId.slice(0, 120)}`;
+    }
+    const forwardedRaw = typeof req.headers['x-forwarded-for'] === 'string' ? req.headers['x-forwarded-for'] : '';
+    const forwardedIp = forwardedRaw.split(',')[0] ?? '';
+    const ip = normalizeClientIp(forwardedIp) ||
+        normalizeClientIp(req.socket.remoteAddress ?? '') ||
+        'unknown';
+    return `ip:${ip}`;
+};
+const touchRateWindow = (store, key, maxRequests, windowMs, now) => {
+    const existing = store.get(key);
+    if (!existing || now - existing.startedAt >= windowMs) {
+        store.set(key, { startedAt: now, count: 1 });
+        return { allowed: true, remaining: maxRequests - 1, retryAfterSeconds: 0 };
+    }
+    if (existing.count >= maxRequests) {
+        const retryAfterSeconds = Math.max(1, Math.ceil((windowMs - (now - existing.startedAt)) / 1000));
+        return { allowed: false, remaining: 0, retryAfterSeconds };
+    }
+    existing.count += 1;
+    return { allowed: true, remaining: Math.max(0, maxRequests - existing.count), retryAfterSeconds: 0 };
+};
+const cleanupRateWindow = (store, now, maxWindowMs) => {
+    if (store.size <= CHAT_RATE_LIMIT_MAX_KEYS) {
+        return;
+    }
+    for (const [key, value] of store.entries()) {
+        if (now - value.startedAt > maxWindowMs) {
+            store.delete(key);
+        }
+        if (store.size <= CHAT_RATE_LIMIT_MAX_KEYS) {
+            break;
+        }
+    }
+};
+const chatQueryRateLimitMiddleware = (req, res, next) => {
+    const now = Date.now();
+    const key = getChatRateLimitKey(req);
+    cleanupRateWindow(chatRateLimitWindows, now, CHAT_RATE_LIMIT_WINDOW_MS);
+    cleanupRateWindow(chatRateLimitBurstWindows, now, CHAT_RATE_LIMIT_BURST_WINDOW_MS);
+    const sustained = touchRateWindow(chatRateLimitWindows, key, CHAT_RATE_LIMIT_MAX_REQUESTS, CHAT_RATE_LIMIT_WINDOW_MS, now);
+    const burst = touchRateWindow(chatRateLimitBurstWindows, key, CHAT_RATE_LIMIT_BURST_MAX_REQUESTS, CHAT_RATE_LIMIT_BURST_WINDOW_MS, now);
+    if (!sustained.allowed || !burst.allowed) {
+        const retryAfter = Math.max(sustained.retryAfterSeconds, burst.retryAfterSeconds);
+        res.setHeader('Retry-After', String(retryAfter));
+        return res.status(429).json({
+            error: 'Troppe richieste chat. Riprova tra pochi secondi.'
+        });
+    }
+    res.setHeader('X-RateLimit-Limit', String(CHAT_RATE_LIMIT_MAX_REQUESTS));
+    res.setHeader('X-RateLimit-Remaining', String(sustained.remaining));
+    res.setHeader('X-RateLimit-Window-Seconds', String(Math.ceil(CHAT_RATE_LIMIT_WINDOW_MS / 1000)));
+    return next();
+};
 const buildCacheKey = (query) => {
     return Object.entries(query)
         .filter(([, value]) => value !== undefined && value !== '')
@@ -81,13 +153,9 @@ export const createApi = () => {
     app.get('/health', (_req, res) => {
         res.json({ status: 'ok' });
     });
-    app.post('/api/chat/query', handleChatQuery);
+    app.post('/api/chat/query', chatQueryRateLimitMiddleware, handleChatQuery);
     app.get('/api/chat/health', (_req, res) => {
-        const status = getAzureServicesStatus();
-        res.json({
-            ok: true,
-            ...status
-        });
+        res.status(200).json({ ok: true });
     });
     // GitHub Proxy for Web Mode
     app.all('/api/github/*', async (req, res) => {

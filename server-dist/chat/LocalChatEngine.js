@@ -10,6 +10,40 @@ const SOURCE_MAP = [
     { pattern: /\beos\b/i, value: 'EOS' },
     { pattern: /\bmicrosoft\b|\brelease plans?\b|\bms\b/i, value: 'Microsoft' }
 ];
+const STOP_WORDS = new Set([
+    'the', 'a', 'an', 'of', 'for', 'to', 'in', 'on', 'with', 'and',
+    'il', 'lo', 'la', 'i', 'gli', 'le', 'di', 'del', 'della', 'delle', 'dei',
+    'su', 'con', 'per', 'e', 'da', 'al', 'ai', 'alle', 'agli',
+    'release', 'notes', 'novita', 'novità',
+    'che', 'ci', 'sono', 'cosa', 'quale', 'quali', 'mi', 'puoi', 'puo', 'può'
+]);
+const normalizeText = (value) => {
+    return value
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/\p{Diacritic}/gu, '')
+        .replace(/\bd365\b/g, 'dynamics 365')
+        .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+};
+const tokenizeQuery = (value) => {
+    const normalized = normalizeText(value);
+    if (!normalized) {
+        return [];
+    }
+    return Array.from(new Set(normalized
+        .split(' ')
+        .map((token) => token.trim())
+        .filter((token) => token.length >= 2 && !STOP_WORDS.has(token))));
+};
+const tokenizeHaystack = (value) => {
+    const normalized = normalizeText(value);
+    if (!normalized) {
+        return new Set();
+    }
+    return new Set(normalized.split(' ').filter(Boolean));
+};
 const loadLatestItems = async () => {
     const latestPath = path.resolve(repoRoot, 'public', 'data', 'latest.json');
     const latestRaw = await readFile(latestPath, 'utf-8');
@@ -76,14 +110,24 @@ export const runLocalChatEngine = async (req) => {
         filterPatch.query = text;
     }
     const allItems = await loadLatestItems();
-    const quickQuery = filterPatch.query?.toLowerCase();
+    const quickQuery = filterPatch.query ? normalizeText(filterPatch.query) : '';
+    const queryTokens = tokenizeQuery(filterPatch.query ?? '');
     const sourceFilter = filterPatch.sources;
+    const chatContext = (req.chatContext ?? {});
+    const showBookmarksOnly = chatContext.showBookmarksOnly === true;
+    const bookmarkedIdsSet = new Set(Array.isArray(chatContext.bookmarkedIds)
+        ? chatContext.bookmarkedIds
+            .filter((value) => typeof value === 'string' && value.length > 0)
+        : []);
     const filtered = allItems.filter((item) => {
+        if (showBookmarksOnly && (!item.id || !bookmarkedIdsSet.has(item.id))) {
+            return false;
+        }
         if (sourceFilter?.length && (!item.source || !sourceFilter.includes(item.source))) {
             return false;
         }
-        if (quickQuery) {
-            const haystack = [
+        if (quickQuery || queryTokens.length > 0) {
+            const haystackRaw = [
                 item.title,
                 item.summary,
                 item.description,
@@ -92,9 +136,16 @@ export const runLocalChatEngine = async (req) => {
                 item.source
             ]
                 .filter(Boolean)
-                .join(' ')
-                .toLowerCase();
-            return haystack.includes(quickQuery);
+                .join(' ');
+            const haystack = normalizeText(haystackRaw);
+            const haystackTokens = tokenizeHaystack(haystackRaw);
+            if (quickQuery && haystack.includes(quickQuery)) {
+                return true;
+            }
+            if (queryTokens.length > 0) {
+                return queryTokens.every((token) => haystackTokens.has(token));
+            }
+            return false;
         }
         return true;
     });

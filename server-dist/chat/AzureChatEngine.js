@@ -1,12 +1,18 @@
 import { getAzureOpenAIConfig } from './AzureServices.js';
+const buildCompletionsUrl = (config) => {
+    if (!config) {
+        throw new Error('Azure OpenAI non configurato');
+    }
+    const base = config.endpoint.replace(/\/$/, '');
+    return (`${base}/openai/deployments/${encodeURIComponent(config.deployment)}` +
+        `/chat/completions?api-version=${encodeURIComponent(config.apiVersion)}`);
+};
 export const runAzureChatEngine = async (input) => {
     const config = getAzureOpenAIConfig();
     if (!config) {
         throw new Error('Azure OpenAI non configurato');
     }
-    const base = config.endpoint.replace(/\/$/, '');
-    const url = `${base}/openai/deployments/${encodeURIComponent(config.deployment)}` +
-        `/chat/completions?api-version=${encodeURIComponent(config.apiVersion)}`;
+    const url = buildCompletionsUrl(config);
     const promptPayload = {
         userMessage: input.request.message,
         localMessage: input.localResponse.message,
@@ -68,4 +74,68 @@ export const runAzureChatEngine = async (input) => {
         confidence,
         model: raw.model ?? config.deployment
     };
+};
+export const runAzureQueryRefiner = async (userMessage) => {
+    const config = getAzureOpenAIConfig();
+    if (!config) {
+        throw new Error('Azure OpenAI non configurato');
+    }
+    const url = buildCompletionsUrl(config);
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'api-key': config.apiKey
+        },
+        body: JSON.stringify({
+            temperature: 0,
+            max_tokens: 120,
+            messages: [
+                {
+                    role: 'system',
+                    content: 'Converti la richiesta utente in una query di ricerca breve per dataset release notes. ' +
+                        'Rispondi solo JSON: {"refinedQuery": string|null, "confidence": number}. ' +
+                        'Metti null se non puoi migliorare.'
+                },
+                {
+                    role: 'user',
+                    content: userMessage
+                }
+            ]
+        })
+    });
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Azure OpenAI error ${response.status}: ${text.slice(0, 250)}`);
+    }
+    const raw = (await response.json());
+    const content = raw.choices?.[0]?.message?.content?.trim() ?? '';
+    if (!content) {
+        return {
+            refinedQuery: null,
+            confidence: 0,
+            model: raw.model ?? config.deployment
+        };
+    }
+    try {
+        const parsed = JSON.parse(content);
+        const refinedQuery = typeof parsed.refinedQuery === 'string' && parsed.refinedQuery.trim().length > 0
+            ? parsed.refinedQuery.trim()
+            : null;
+        const confidence = typeof parsed.confidence === 'number' && Number.isFinite(parsed.confidence)
+            ? Math.max(0, Math.min(1, parsed.confidence))
+            : 0.5;
+        return {
+            refinedQuery,
+            confidence,
+            model: raw.model ?? config.deployment
+        };
+    }
+    catch {
+        return {
+            refinedQuery: null,
+            confidence: 0,
+            model: raw.model ?? config.deployment
+        };
+    }
 };

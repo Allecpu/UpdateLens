@@ -46,8 +46,6 @@ jobs:
           cp host.json dist/
           cp package-lock.json dist/
           node -e "const fs=require('fs');const p=require('./package.json');p.main='functions/refreshAll.js';delete p.devDependencies;delete p.scripts;fs.writeFileSync('dist/package.json', JSON.stringify(p,null,2));"
-          cd dist
-          npm ci --omit=dev
 
       - name: Login to Azure
         uses: azure/login@v2
@@ -61,3 +59,5 @@ jobs:
         with:
           app-name: ${{ env.AZURE_FUNCTIONAPP_NAME }}
           package: '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/dist'
+          scm-do-build-during-deployment: true
+          enable-oryx-build: true

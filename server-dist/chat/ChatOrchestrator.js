@@ -1,4 +1,4 @@
-import { runAzureChatEngine } from './AzureChatEngine.js';
+import { runAzureChatEngine, runAzureQueryRefiner } from './AzureChatEngine.js';
 import { runLocalChatEngine } from './LocalChatEngine.js';
 import { trackServerChatEvent } from './AzureTelemetry.js';
 const shouldUseAzure = (request) => {
@@ -14,9 +14,45 @@ const getConfidenceThreshold = () => {
     }
     return Math.max(0, Math.min(1, raw));
 };
+const appendFollowUpSuggestions = (response) => {
+    const firstItem = response.items[0];
+    const productName = typeof firstItem?.productName === 'string' && firstItem.productName.trim().length > 0
+        ? firstItem.productName.trim()
+        : null;
+    const suggestions = productName
+        ? [
+            `novita su ${productName} negli ultimi 90 giorni`,
+            `solo aggiornamenti GA per ${productName}`,
+            `confronta ${productName} con le altre fonti`
+        ]
+        : [
+            'mostrami solo le novita in GA negli ultimi 30 giorni',
+            'quali sono le novita piu recenti per Microsoft 365',
+            'confronta Microsoft, EOS e Fabric negli ultimi 3 mesi'
+        ];
+    const followUpBlock = '\n\nPuoi anche chiedermi:\n' + suggestions.map((s) => `- "${s}"`).join('\n');
+    if (response.message.includes('Puoi anche chiedermi:')) {
+        return response;
+    }
+    return {
+        ...response,
+        message: `${response.message}${followUpBlock}`
+    };
+};
+const deriveErrorCode = (error) => {
+    if (!(error instanceof Error)) {
+        return 'unknown_error';
+    }
+    const statusMatch = error.message.match(/Azure OpenAI error (\d{3})/i);
+    if (statusMatch) {
+        return `azure_openai_http_${statusMatch[1]}`;
+    }
+    return error.name ? error.name.toLowerCase().slice(0, 60) : 'runtime_error';
+};
 export const runChatOrchestrator = async (request) => {
     const startedAt = Date.now();
-    const localResponse = await runLocalChatEngine(request);
+    let effectiveRequest = request;
+    let localResponse = await runLocalChatEngine(effectiveRequest);
     if (!shouldUseAzure(request)) {
         void trackServerChatEvent({
             name: 'chat_query_completed',
@@ -25,14 +61,28 @@ export const runChatOrchestrator = async (request) => {
                 fallbackUsed: 'false'
             },
             measurements: {
-                latencyMs: Date.now() - startedAt
+                latencyMs: Date.now() - startedAt,
+                resultCount: localResponse.items.length
             }
         });
-        return localResponse;
+        return appendFollowUpSuggestions(localResponse);
     }
     try {
+        // If local retrieval fails, ask Azure to normalize/refine the query and retry once.
+        if (localResponse.items.length === 0 && localResponse.filterPatch.query) {
+            const refined = await runAzureQueryRefiner(request.message);
+            if (refined.confidence >= 0.6 &&
+                refined.refinedQuery &&
+                refined.refinedQuery.toLowerCase() !== request.message.trim().toLowerCase()) {
+                effectiveRequest = {
+                    ...request,
+                    message: refined.refinedQuery
+                };
+                localResponse = await runLocalChatEngine(effectiveRequest);
+            }
+        }
         const azure = await runAzureChatEngine({
-            request,
+            request: effectiveRequest,
             localResponse
         });
         if (azure.confidence < getConfidenceThreshold()) {
@@ -45,7 +95,8 @@ export const runChatOrchestrator = async (request) => {
                 },
                 measurements: {
                     latencyMs: Date.now() - startedAt,
-                    confidence: azure.confidence
+                    confidence: azure.confidence,
+                    resultCount: localResponse.items.length
                 }
             });
             return {
@@ -70,26 +121,29 @@ export const runChatOrchestrator = async (request) => {
             },
             measurements: {
                 latencyMs: Date.now() - startedAt,
-                confidence: azure.confidence
+                confidence: azure.confidence,
+                resultCount: localResponse.items.length
             }
         });
-        return response;
+        return appendFollowUpSuggestions(response);
     }
-    catch {
+    catch (error) {
         void trackServerChatEvent({
             name: 'chat_query_completed',
             properties: {
                 engine: 'local',
                 fallbackUsed: 'true',
-                fallbackReason: 'azure_error'
+                fallbackReason: 'azure_error',
+                errorCode: deriveErrorCode(error)
             },
             measurements: {
-                latencyMs: Date.now() - startedAt
+                latencyMs: Date.now() - startedAt,
+                resultCount: localResponse.items.length
             }
         });
-        return {
+        return appendFollowUpSuggestions({
             ...localResponse,
             fallbackUsed: true
-        };
+        });
     }
 };

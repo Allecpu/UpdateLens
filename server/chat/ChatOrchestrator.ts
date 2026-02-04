@@ -50,6 +50,17 @@ const appendFollowUpSuggestions = (response: ChatQueryResponse): ChatQueryRespon
   };
 };
 
+const deriveErrorCode = (error: unknown): string => {
+  if (!(error instanceof Error)) {
+    return 'unknown_error';
+  }
+  const statusMatch = error.message.match(/Azure OpenAI error (\d{3})/i);
+  if (statusMatch) {
+    return `azure_openai_http_${statusMatch[1]}`;
+  }
+  return error.name ? error.name.toLowerCase().slice(0, 60) : 'runtime_error';
+};
+
 export const runChatOrchestrator = async (
   request: ChatQueryRequest
 ): Promise<ChatQueryResponse> => {
@@ -65,7 +76,8 @@ export const runChatOrchestrator = async (
         fallbackUsed: 'false'
       },
       measurements: {
-        latencyMs: Date.now() - startedAt
+        latencyMs: Date.now() - startedAt,
+        resultCount: localResponse.items.length
       }
     });
     return appendFollowUpSuggestions(localResponse);
@@ -103,7 +115,8 @@ export const runChatOrchestrator = async (
         },
         measurements: {
           latencyMs: Date.now() - startedAt,
-          confidence: azure.confidence
+          confidence: azure.confidence,
+          resultCount: localResponse.items.length
         }
       });
       return {
@@ -129,20 +142,23 @@ export const runChatOrchestrator = async (
       },
       measurements: {
         latencyMs: Date.now() - startedAt,
-        confidence: azure.confidence
+        confidence: azure.confidence,
+        resultCount: localResponse.items.length
       }
     });
     return appendFollowUpSuggestions(response);
-  } catch {
+  } catch (error) {
     void trackServerChatEvent({
       name: 'chat_query_completed',
       properties: {
         engine: 'local',
         fallbackUsed: 'true',
-        fallbackReason: 'azure_error'
+        fallbackReason: 'azure_error',
+        errorCode: deriveErrorCode(error)
       },
       measurements: {
-        latencyMs: Date.now() - startedAt
+        latencyMs: Date.now() - startedAt,
+        resultCount: localResponse.items.length
       }
     });
     return appendFollowUpSuggestions({
