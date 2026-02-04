@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useChatStore } from '../../store/useChatStore';
 import { useFilterStore } from '../../store/useFilterStore';
+import { useBookmarkStore } from '../../store/useBookmarkStore';
 import type { FilterState } from '../../../models/Filters';
 import type { ReleaseItem } from '../../../models/ReleaseItem';
 import { loadAllSnapshots } from '../../../services/DataLoader';
@@ -56,6 +57,7 @@ const ChatPanel = () => {
     searchScope,
     toggleChat,
     closeChat,
+    clearMessages,
     addMessage,
     addToHistory,
     deleteFromHistory,
@@ -64,6 +66,7 @@ const ChatPanel = () => {
     setSearchScope
   } = useChatStore();
   const { cssFilters, setChatFilters, clearChatFilters } = useFilterStore();
+  const { bookmarkedIds, showBookmarksOnly } = useBookmarkStore();
 
   const [items, setItems] = useState<ReleaseItem[]>([]);
   const [metadata, setMetadata] = useState<FilterMetadata | null>(null);
@@ -122,6 +125,10 @@ const ChatPanel = () => {
                 message: text,
                 searchScope,
                 baseFilters,
+                chatContext: {
+                  showBookmarksOnly,
+                  bookmarkedIds
+                },
                 preferAzure: chatAzureEnabled,
                 topK: 5
               });
@@ -196,7 +203,9 @@ const ChatPanel = () => {
       addToHistory,
       isProcessing,
       chatBackendEnabled,
-      chatAzureEnabled
+      chatAzureEnabled,
+      bookmarkedIds,
+      showBookmarksOnly
     ]
   );
 
@@ -265,6 +274,7 @@ const ChatPanel = () => {
             activeFilterCount={activeFilterCount}
             isProcessing={isProcessing}
             onClose={closeChat}
+            onClearChat={clearMessages}
             onSend={handleSend}
             onApplyFilters={handleApplyFilters}
             onSetActiveTab={setActiveTab}

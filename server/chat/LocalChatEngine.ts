@@ -18,6 +18,11 @@ type SnapshotItem = {
   status?: string;
 };
 
+type ChatContextBookmark = {
+  showBookmarksOnly?: unknown;
+  bookmarkedIds?: unknown;
+};
+
 const SOURCE_MAP: Array<{ pattern: RegExp; value: 'Microsoft' | 'EOS' | 'Fabric' | 'MICROSOFT 365' }> = [
   { pattern: /\bmicrosoft 365\b|\bm365\b|\boffice 365\b/i, value: 'MICROSOFT 365' },
   { pattern: /\bfabric\b/i, value: 'Fabric' },
@@ -29,7 +34,8 @@ const STOP_WORDS = new Set([
   'the', 'a', 'an', 'of', 'for', 'to', 'in', 'on', 'with', 'and',
   'il', 'lo', 'la', 'i', 'gli', 'le', 'di', 'del', 'della', 'delle', 'dei',
   'su', 'con', 'per', 'e', 'da', 'al', 'ai', 'alle', 'agli',
-  'release', 'notes', 'novita', 'novità'
+  'release', 'notes', 'novita', 'novità',
+  'che', 'ci', 'sono', 'cosa', 'quale', 'quali', 'mi', 'puoi', 'puo', 'può'
 ]);
 
 const normalizeText = (value: string): string => {
@@ -56,6 +62,14 @@ const tokenizeQuery = (value: string): string[] => {
         .filter((token) => token.length >= 2 && !STOP_WORDS.has(token))
     )
   );
+};
+
+const tokenizeHaystack = (value: string): Set<string> => {
+  const normalized = normalizeText(value);
+  if (!normalized) {
+    return new Set();
+  }
+  return new Set(normalized.split(' ').filter(Boolean));
 };
 
 const loadLatestItems = async (): Promise<SnapshotItem[]> => {
@@ -145,12 +159,24 @@ export const runLocalChatEngine = async (
   const quickQuery = filterPatch.query ? normalizeText(filterPatch.query) : '';
   const queryTokens = tokenizeQuery(filterPatch.query ?? '');
   const sourceFilter = filterPatch.sources;
+  const chatContext = (req.chatContext ?? {}) as ChatContextBookmark;
+  const showBookmarksOnly = chatContext.showBookmarksOnly === true;
+  const bookmarkedIdsSet = new Set(
+    Array.isArray(chatContext.bookmarkedIds)
+      ? chatContext.bookmarkedIds
+          .filter((value): value is string => typeof value === 'string' && value.length > 0)
+      : []
+  );
+
   const filtered = allItems.filter((item) => {
+    if (showBookmarksOnly && (!item.id || !bookmarkedIdsSet.has(item.id))) {
+      return false;
+    }
     if (sourceFilter?.length && (!item.source || !sourceFilter.includes(item.source as never))) {
       return false;
     }
     if (quickQuery || queryTokens.length > 0) {
-      const haystack = normalizeText(
+      const haystackRaw =
         [
         item.title,
         item.summary,
@@ -160,13 +186,14 @@ export const runLocalChatEngine = async (
         item.source
         ]
           .filter(Boolean)
-          .join(' ')
-      );
+          .join(' ');
+      const haystack = normalizeText(haystackRaw);
+      const haystackTokens = tokenizeHaystack(haystackRaw);
       if (quickQuery && haystack.includes(quickQuery)) {
         return true;
       }
       if (queryTokens.length > 0) {
-        return queryTokens.every((token) => haystack.includes(token));
+        return queryTokens.every((token) => haystackTokens.has(token));
       }
       return false;
     }

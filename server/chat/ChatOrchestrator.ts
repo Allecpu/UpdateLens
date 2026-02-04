@@ -18,6 +18,38 @@ const getConfidenceThreshold = (): number => {
   return Math.max(0, Math.min(1, raw));
 };
 
+const appendFollowUpSuggestions = (response: ChatQueryResponse): ChatQueryResponse => {
+  const firstItem = response.items[0] as { productName?: unknown } | undefined;
+  const productName =
+    typeof firstItem?.productName === 'string' && firstItem.productName.trim().length > 0
+      ? firstItem.productName.trim()
+      : null;
+
+  const suggestions = productName
+    ? [
+        `novita su ${productName} negli ultimi 90 giorni`,
+        `solo aggiornamenti GA per ${productName}`,
+        `confronta ${productName} con le altre fonti`
+      ]
+    : [
+        'mostrami solo le novita in GA negli ultimi 30 giorni',
+        'quali sono le novita piu recenti per Microsoft 365',
+        'confronta Microsoft, EOS e Fabric negli ultimi 3 mesi'
+      ];
+
+  const followUpBlock =
+    '\n\nPuoi anche chiedermi:\n' + suggestions.map((s) => `- "${s}"`).join('\n');
+
+  if (response.message.includes('Puoi anche chiedermi:')) {
+    return response;
+  }
+
+  return {
+    ...response,
+    message: `${response.message}${followUpBlock}`
+  };
+};
+
 export const runChatOrchestrator = async (
   request: ChatQueryRequest
 ): Promise<ChatQueryResponse> => {
@@ -36,7 +68,7 @@ export const runChatOrchestrator = async (
         latencyMs: Date.now() - startedAt
       }
     });
-    return localResponse;
+    return appendFollowUpSuggestions(localResponse);
   }
 
   try {
@@ -100,7 +132,7 @@ export const runChatOrchestrator = async (
         confidence: azure.confidence
       }
     });
-    return response;
+    return appendFollowUpSuggestions(response);
   } catch {
     void trackServerChatEvent({
       name: 'chat_query_completed',
@@ -113,9 +145,9 @@ export const runChatOrchestrator = async (
         latencyMs: Date.now() - startedAt
       }
     });
-    return {
+    return appendFollowUpSuggestions({
       ...localResponse,
       fallbackUsed: true
-    };
+    });
   }
 };

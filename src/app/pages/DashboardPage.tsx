@@ -250,7 +250,7 @@ const DashboardPage = () => {
   const rulesConfig = loadRulesConfig();
   const { index, activeCustomerId, customers } = useCustomerStore();
   const { groups } = useCustomerGroupStore();
-  const { bookmarkedIds } = useBookmarkStore();
+  const { bookmarkedIds, showBookmarksOnly, setShowBookmarksOnly } = useBookmarkStore();
   const {
     cssFilters,
     customerFilters,
@@ -291,7 +291,6 @@ const DashboardPage = () => {
   // =====================================================================
   const [drillSource, setDrillSource] = useState<DrillSource>(null);
   const [drillProduct, setDrillProduct] = useState<string | null>(null);
-  const [showBookmarksOnly, setShowBookmarksOnly] = useState(false);
 
   // Pagination state
   const [visibleCount, setVisibleCount] = useState(50);
@@ -901,7 +900,7 @@ const DashboardPage = () => {
           <div className="flex items-center gap-3">
             <button
               className={`ul-button ${showBookmarksOnly ? 'ul-button-primary' : 'ul-button-secondary'}`}
-              onClick={() => setShowBookmarksOnly((prev) => !prev)}
+              onClick={() => setShowBookmarksOnly(!showBookmarksOnly)}
               disabled={!hasBookmarks && !showBookmarksOnly}
               title={hasBookmarks ? 'Filtra solo i segnalibri' : 'Nessun segnalibro salvato'}
             >

@@ -28,6 +28,7 @@ type ChatState = {
   searchScope: SearchScope;
   toggleChat: () => void;
   closeChat: () => void;
+  clearMessages: () => void;
   addMessage: (message: Omit<ChatMessage, 'id'>) => void;
   addToHistory: (query: string) => void;
   deleteFromHistory: (query: string) => void;
@@ -66,6 +67,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   searchScope: 'all',
   toggleChat: () => set((state) => ({ isOpen: !state.isOpen })),
   closeChat: () => set({ isOpen: false, activeTab: 'chat', searchScope: 'all' }),
+  clearMessages: () => set({ messages: [] }),
   addMessage: (message) =>
     set((state) => ({
       messages: [...state.messages, { ...message, id: createMessageId() }]

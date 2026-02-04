@@ -33,6 +33,7 @@ type ChatWindowProps = {
   activeFilterCount: number;
   isProcessing?: boolean;
   onClose: () => void;
+  onClearChat: () => void;
   onSend: (text: string) => void;
   onApplyFilters: (filterPatch: Partial<Record<string, unknown>>) => void;
   onSetActiveTab: (tab: ChatTab) => void;
@@ -55,6 +56,7 @@ const ChatWindow = ({
   activeFilterCount,
   isProcessing = false,
   onClose,
+  onClearChat,
   onSend,
   onApplyFilters,
   onSetActiveTab,
@@ -133,25 +135,35 @@ const ChatWindow = ({
           </svg>
           <span className="font-semibold">Assistente UpdateLens</span>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-          aria-label="Chiudi chat"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            className="h-5 w-5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onClearChat}
+            className="rounded-lg px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+            aria-label="Azzera chat"
           >
-            <path d="M18 6 6 18" />
-            <path d="m6 6 12 12" />
-          </svg>
-        </button>
+            Azzera chat
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+            aria-label="Chiudi chat"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M18 6 6 18" />
+              <path d="m6 6 12 12" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* Tab Navigation */}
