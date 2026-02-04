@@ -1,4 +1,4 @@
-import { runAzureChatEngine } from './AzureChatEngine.js';
+import { runAzureChatEngine, runAzureQueryRefiner } from './AzureChatEngine.js';
 import { runLocalChatEngine } from './LocalChatEngine.js';
 import { trackServerChatEvent } from './AzureTelemetry.js';
 import type { ChatQueryRequest, ChatQueryResponse } from './ChatSchemas.js';
@@ -22,7 +22,8 @@ export const runChatOrchestrator = async (
   request: ChatQueryRequest
 ): Promise<ChatQueryResponse> => {
   const startedAt = Date.now();
-  const localResponse = await runLocalChatEngine(request);
+  let effectiveRequest = request;
+  let localResponse = await runLocalChatEngine(effectiveRequest);
 
   if (!shouldUseAzure(request)) {
     void trackServerChatEvent({
@@ -39,8 +40,24 @@ export const runChatOrchestrator = async (
   }
 
   try {
+    // If local retrieval fails, ask Azure to normalize/refine the query and retry once.
+    if (localResponse.items.length === 0 && localResponse.filterPatch.query) {
+      const refined = await runAzureQueryRefiner(request.message);
+      if (
+        refined.confidence >= 0.6 &&
+        refined.refinedQuery &&
+        refined.refinedQuery.toLowerCase() !== request.message.trim().toLowerCase()
+      ) {
+        effectiveRequest = {
+          ...request,
+          message: refined.refinedQuery
+        };
+        localResponse = await runLocalChatEngine(effectiveRequest);
+      }
+    }
+
     const azure = await runAzureChatEngine({
-      request,
+      request: effectiveRequest,
       localResponse
     });
 
