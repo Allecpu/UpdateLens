@@ -46,6 +46,39 @@ const withinLastDays = (date: Date | null, days: number, now: Date): boolean => 
   return date >= cutoff && date <= now;
 };
 
+const QUERY_STOP_WORDS = new Set([
+  'the', 'a', 'an', 'of', 'for', 'to', 'in', 'on', 'with', 'and',
+  'il', 'lo', 'la', 'i', 'gli', 'le', 'di', 'del', 'della', 'delle', 'dei',
+  'su', 'con', 'per', 'e', 'da', 'al', 'ai', 'alle', 'agli',
+  'che', 'ci', 'sono', 'cosa', 'quale', 'quali', 'mi', 'puoi', 'puo', 'puoi',
+  'dammi', 'mostra', 'notizie', 'novita', 'novita'
+]);
+
+const normalizeSearchText = (value: string): string => {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+const tokenizeSearchText = (value: string): string[] => {
+  const normalized = normalizeSearchText(value);
+  if (!normalized) {
+    return [];
+  }
+  return Array.from(
+    new Set(
+      normalized
+        .split(' ')
+        .map((token) => token.trim())
+        .filter((token) => token.length >= 2 && !QUERY_STOP_WORDS.has(token))
+    )
+  );
+};
+
 export const filterReleaseItems = (
   items: ReleaseItem[],
   filters: FilterState
@@ -78,7 +111,8 @@ export const filterReleaseItems = (
   const availabilityTypesSet = new Set(normalizedAvailabilityTypes);
 
   // Pre-compute query
-  const query = filters.query.trim().toLowerCase();
+  const query = normalizeSearchText(filters.query.trim());
+  const queryTokens = tokenizeSearchText(filters.query);
 
   // Pre-compute date ranges
   const releaseDateFrom = parseDateAny(filters.releaseDateFrom);
@@ -294,10 +328,18 @@ export const filterReleaseItems = (
 
     // 19. Query filter (text search)
     if (hasQuery && isFilterSupported(item.source, 'query')) {
-      const haystack =
-        `${item.title} ${item.description} ${item.productName}`.toLowerCase();
+      const haystack = normalizeSearchText(
+        `${item.title} ${item.description} ${item.productName} ${item.source}`
+      );
       if (!haystack.includes(query)) {
-        continue;
+        if (queryTokens.length === 0) {
+          continue;
+        }
+        const haystackSet = new Set(haystack.split(' ').filter(Boolean));
+        const allTokensFound = queryTokens.every((token) => haystackSet.has(token));
+        if (!allTokensFound) {
+          continue;
+        }
       }
     }
 

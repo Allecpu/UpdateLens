@@ -19,23 +19,37 @@ const getConfidenceThreshold = (): number => {
 };
 
 const appendFollowUpSuggestions = (response: ChatQueryResponse): ChatQueryResponse => {
+  const query =
+    typeof response.filterPatch.query === 'string' && response.filterPatch.query.trim().length > 0
+      ? response.filterPatch.query.trim()
+      : null;
+  const sourceLabel =
+    Array.isArray(response.filterPatch.sources) && response.filterPatch.sources.length > 0
+      ? response.filterPatch.sources.join(', ')
+      : null;
   const firstItem = response.items[0] as { productName?: unknown } | undefined;
   const productName =
     typeof firstItem?.productName === 'string' && firstItem.productName.trim().length > 0
       ? firstItem.productName.trim()
       : null;
 
-  const suggestions = productName
+  const suggestions = query
     ? [
-        `novita su ${productName} negli ultimi 90 giorni`,
-        `solo aggiornamenti GA per ${productName}`,
-        `confronta ${productName} con le altre fonti`
+        `solo risultati "${query}" in GA`,
+        `solo risultati "${query}" negli ultimi 90 giorni`,
+        `mostra solo "${query}" da ${sourceLabel ?? 'Microsoft'}`
       ]
-    : [
-        'mostrami solo le novita in GA negli ultimi 30 giorni',
-        'quali sono le novita piu recenti per Microsoft 365',
-        'confronta Microsoft, EOS e Fabric negli ultimi 3 mesi'
-      ];
+    : productName
+      ? [
+          `novita su ${productName} negli ultimi 90 giorni`,
+          `solo aggiornamenti GA per ${productName}`,
+          `confronta ${productName} con le altre fonti`
+        ]
+      : [
+          'mostrami solo le novita in GA negli ultimi 30 giorni',
+          'quali sono le novita piu recenti per Microsoft 365',
+          'confronta Microsoft, EOS e Fabric negli ultimi 3 mesi'
+        ];
 
   const followUpBlock =
     '\n\nPuoi anche chiedermi:\n' + suggestions.map((s) => `- "${s}"`).join('\n');
