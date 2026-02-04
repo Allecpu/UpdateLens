@@ -29,6 +29,9 @@ jobs:
         run: npm ci
 
       - name: Build frontend (Vite)
+        env:
+          VITE_CHAT_BACKEND_ENABLED: "true"
+          VITE_CHAT_AZURE_LLM_ENABLED: "true"
         run: npm run build
 
       - name: Build server (TypeScript)
