@@ -3,6 +3,7 @@ import { NavLink, Route, Routes } from 'react-router-dom';
 import ClientsPage from './app/pages/ClientsPage';
 import DashboardPage from './app/pages/DashboardPage';
 import GlobalFiltersPage from './app/pages/GlobalFiltersPage';
+import LearnPage from './app/pages/LearnPage';
 import VersionPage from './app/pages/VersionPage';
 import IssuesPage from './app/pages/IssuesPage';
 import SharesPage from './app/components/shares/SharesPage';
@@ -26,6 +27,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Dashboard', end: true },
   { to: '/clienti', label: 'Clienti' },
   { to: '/filtri-globali', label: 'Filtri globali' },
+  { to: '/learn', label: 'Learn' },
   { to: '/versione', label: 'Versione' },
   { to: '/issues', label: 'Segnalazioni' },
   { to: '/condivisioni', label: 'Condivisioni' }
@@ -335,6 +337,8 @@ const App = () => {
           <Route path="/" element={<DashboardPage />} />
           <Route path="/clienti" element={<ClientsPage />} />
           <Route path="/filtri-globali" element={<GlobalFiltersPage />} />
+          <Route path="/learn" element={<LearnPage />} />
+          <Route path="/learn/:productKey" element={<LearnPage />} />
           <Route path="/versione" element={<VersionPage />} />
           <Route path="/issues" element={<IssuesPage />} />
           <Route path="/condivisioni" element={<SharesPage />} />

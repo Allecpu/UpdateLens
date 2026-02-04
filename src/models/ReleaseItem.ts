@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { LEARN_TYPES } from '../utils/learn';
 
 export const ReleaseSourceSchema = z.enum(['Microsoft', 'EOS', 'Fabric', 'MICROSOFT 365']);
 export const ReleaseStatusSchema = z.enum([
@@ -39,6 +40,18 @@ export const ReleaseItemSchema = z.object({
   minBcVersion: z.number().nullable(),
   sourceUrl: z.string().url().nullable().optional(),
   learnUrl: z.string().url().nullable().optional(),
+  docsUrl: z.string().url().nullable().optional(),
+  learnMeta: z
+    .object({
+      title: z.string(),
+      type: z.enum(LEARN_TYPES),
+      level: z.string().optional(),
+      uid: z.string().optional(),
+      productKey: z.string().optional(),
+      score: z.number().optional()
+    })
+    .nullable()
+    .optional(),
   url: z.string().url().nullable().optional()
 });
 

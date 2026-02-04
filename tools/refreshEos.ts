@@ -1,6 +1,8 @@
 import * as cheerio from 'cheerio';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
+import type { LearnMeta } from '../src/utils/learn';
+import { enrichReleaseItemsWithLearn } from './learnEnrichment';
 
 const SOURCE_URL =
   'https://docs.eos-solutions.it/it/docs/apps-func/whats-new-eos-apps.html';
@@ -18,6 +20,8 @@ type ReleaseItem = {
   lastUpdatedDate?: string;
   minBcVersion?: number | null;
   sourceUrl?: string | null;
+  docsUrl?: string | null;
+  learnMeta?: LearnMeta | null;
   url: string;
 };
 
@@ -138,6 +142,7 @@ const extractItems = (html: string): ReleaseItem[] => {
       lastUpdatedDate: fullDate ?? undefined,
       minBcVersion: Number.isFinite(minBcVersion) ? minBcVersion : null,
       sourceUrl: resolvedUrl,
+      docsUrl: null,
       url: resolvedUrl
     });
   });
@@ -177,10 +182,11 @@ const run = async (): Promise<void> => {
   }
   const html = await response.text();
   const items = extractItems(html);
+  const enrichment = await enrichReleaseItemsWithLearn(items);
 
   const payload = {
     version: 1,
-    items
+    items: enrichment.items
   };
 
   const filename = `eos_whatsnew_${todayStamp()}.json`;
@@ -195,7 +201,10 @@ const run = async (): Promise<void> => {
   await writeManifest(path.resolve('src', 'data', 'snapshots', 'latest.json'), {
     eos: filename
   });
-  console.log(`Snapshot EOS salvata: ${outputPath} (${items.length} items)`);
+  console.log(`Snapshot EOS salvata: ${outputPath} (${enrichment.items.length} items)`);
+  console.log(
+    `[LearnEnrichment] matched=${enrichment.stats.matched}, skipped=${enrichment.stats.skippedWithLearnUrl}, missingMapping=${enrichment.stats.noProductMapping}`
+  );
 };
 
 run().catch((error) => {

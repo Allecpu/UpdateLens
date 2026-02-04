@@ -1,5 +1,7 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
+import type { LearnMeta } from '../src/utils/learn';
+import { enrichReleaseItemsWithLearn } from './learnEnrichment';
 
 const SOURCE_URL = 'https://www.microsoft.com/releasecommunications/api/v1/m365';
 const MAX_RETRIES = 3;
@@ -48,6 +50,8 @@ type ReleaseItem = {
   lastUpdatedDate?: string;
   sourceUrl: string;
   learnUrl?: string;
+  docsUrl?: string | null;
+  learnMeta?: LearnMeta | null;
   url: string;
 };
 
@@ -293,10 +297,11 @@ const buildReleaseItem = (
     firstAvailableDate: parseDateFull(raw.created),
     lastUpdatedDate: parseDateFull(raw.modified),
     sourceUrl: `https://www.microsoft.com/microsoft-365/roadmap?featureid=${featureId}&searchterms=${featureId}`,
-    learnUrl:
+    learnUrl: undefined,
+    docsUrl:
       raw.moreInfoLink && isValidHttpUrl(raw.moreInfoLink)
         ? raw.moreInfoLink
-        : undefined,
+        : null,
     url: `https://www.microsoft.com/microsoft-365/roadmap?featureid=${featureId}&searchterms=${featureId}`
   };
 };
@@ -391,15 +396,16 @@ async function run(): Promise<void> {
 
     // 2. Transform and extract items
     const items = extractItems(rawItems);
+    const enrichment = await enrichReleaseItemsWithLearn(items);
 
-    if (items.length === 0) {
+    if (enrichment.items.length === 0) {
       throw new Error('No valid items extracted from M365 Release Communications API');
     }
 
     // 3. Create snapshot
     const snapshot = {
       version: 1,
-      items
+      items: enrichment.items
     };
 
     const filename = `m365roadmap_data_${todayStamp()}.json`;
@@ -426,12 +432,15 @@ async function run(): Promise<void> {
 
     // 6. Success log
     console.log(`[RefreshM365Roadmap] ✓ Snapshot saved: ${snapshotsPath}`);
-    console.log(`[RefreshM365Roadmap] ✓ Total items: ${items.length}`);
+    console.log(`[RefreshM365Roadmap] ✓ Total items: ${enrichment.items.length}`);
     console.log(`[RefreshM365Roadmap] ✓ Raw items fetched: ${rawItems.length}`);
     console.log(
-      `[RefreshM365Roadmap] ✓ Duplication factor: ${(items.length / rawItems.length).toFixed(2)}x`
+      `[RefreshM365Roadmap] ✓ Duplication factor: ${(enrichment.items.length / rawItems.length).toFixed(2)}x`
     );
     console.log(`[RefreshM365Roadmap] ✓ Manifest updated`);
+    console.log(
+      `[LearnEnrichment] matched=${enrichment.stats.matched}, skipped=${enrichment.stats.skippedWithLearnUrl}, missingMapping=${enrichment.stats.noProductMapping}`
+    );
   } catch (error) {
     console.error(
       '[RefreshM365Roadmap] ✗ Error:',

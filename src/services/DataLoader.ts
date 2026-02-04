@@ -35,8 +35,6 @@ const EOS_TITLE_REGEX = /^(.*)\s+\(([^)]+)\)\s*$/;
 const EOS_ID_DATE_REGEX = /-(\d{2})-(\d{2})-(\d{2})$/;
 const DATA_BASE_URL = 'data';
 const LATEST_MANIFEST_URL = `${DATA_BASE_URL}/latest.json`;
-const isFileProtocol =
-  typeof window !== 'undefined' && window.location.protocol === 'file:';
 
 const toIsoDateFromMonth = (value?: string | null): string | null => {
   if (!value) {
@@ -165,6 +163,10 @@ const parseSnapshot = (payload: SnapshotPayload): ReleaseItem[] => {
       return {
         ...parsed,
         sourceUrl: resolveSourceUrl(parsed),
+        docsUrl:
+          parsed.docsUrl && isValidHttpUrl(parsed.docsUrl)
+            ? parsed.docsUrl
+            : null,
         learnUrl:
           parsed.learnUrl && isValidHttpUrl(parsed.learnUrl)
             ? parsed.learnUrl
@@ -188,6 +190,10 @@ const parseSnapshot = (payload: SnapshotPayload): ReleaseItem[] => {
       return {
         ...parsed,
         sourceUrl: resolveSourceUrl(parsed),
+        docsUrl:
+          parsed.docsUrl && isValidHttpUrl(parsed.docsUrl)
+            ? parsed.docsUrl
+            : null,
         learnUrl:
           parsed.learnUrl && isValidHttpUrl(parsed.learnUrl)
             ? parsed.learnUrl
@@ -211,6 +217,10 @@ const parseSnapshot = (payload: SnapshotPayload): ReleaseItem[] => {
       return {
         ...parsed,
         sourceUrl: resolveSourceUrl(parsed),
+        docsUrl:
+          parsed.docsUrl && isValidHttpUrl(parsed.docsUrl)
+            ? parsed.docsUrl
+            : null,
         learnUrl:
           parsed.learnUrl && isValidHttpUrl(parsed.learnUrl)
             ? parsed.learnUrl
@@ -230,38 +240,12 @@ const parseSnapshot = (payload: SnapshotPayload): ReleaseItem[] => {
     return {
       ...parsed,
       sourceUrl: resolveSourceUrl(parsed),
+      docsUrl:
+        parsed.docsUrl && isValidHttpUrl(parsed.docsUrl) ? parsed.docsUrl : null,
       learnUrl:
         parsed.learnUrl && isValidHttpUrl(parsed.learnUrl) ? parsed.learnUrl : null
     };
   });
-};
-
-type SnapshotModule = {
-  default: SnapshotPayload;
-};
-
-// Use { eager: true } to inline all snapshot data into the main bundle.
-// This avoids dynamic import issues on file:// protocol (CORS blocks separate chunk requests).
-const snapshotModules = import.meta.glob<SnapshotModule>(
-  '../data/snapshots/*.json',
-  { eager: true }
-);
-
-const selectLatest = async (prefix: string): Promise<SnapshotPayload | null> => {
-  const entries = Object.entries(snapshotModules)
-    .filter(([path]) => path.includes(prefix))
-    .sort(([a], [b]) => a.localeCompare(b));
-
-  if (entries.length === 0) {
-    return null;
-  }
-  // With eager: true, modules are already loaded (not promises)
-  const latestModule = entries[entries.length - 1][1];
-  try {
-    return latestModule.default ?? null;
-  } catch {
-    return null;
-  }
 };
 
 const fetchJson = async <T,>(url: string): Promise<T> => {
@@ -278,27 +262,16 @@ const loadSnapshotFromUrl = async (filename: string): Promise<SnapshotPayload> =
 
 const loadSnapshotWithFallback = async (
   label: string,
-  filename: string | undefined,
-  fallbackPrefix: string
+  filename: string | undefined
 ): Promise<{ items: ReleaseItem[]; error?: string }> => {
-  let payload: SnapshotPayload | null = null;
-  if (filename) {
-    try {
-      payload = await loadSnapshotFromUrl(filename);
-    } catch {
-      payload = null;
-    }
-  }
-  if (!payload) {
-    payload = await selectLatest(fallbackPrefix);
-  }
-  if (!payload) {
+  if (!filename) {
     return {
       items: [],
       error: `Snapshot ${label} non disponibile.`
     };
   }
   try {
+    const payload = await loadSnapshotFromUrl(filename);
     return { items: parseSnapshot(payload) };
   } catch {
     return { items: [], error: `Snapshot ${label} non valida.` };
@@ -307,33 +280,27 @@ const loadSnapshotWithFallback = async (
 
 export const loadAllSnapshots = async (): Promise<SnapshotLoadResult> => {
   let manifest: LatestSnapshots | null = null;
-  if (!isFileProtocol) {
-    try {
-      manifest = await fetchJson<LatestSnapshots>(LATEST_MANIFEST_URL);
-    } catch {
-      manifest = null;
-    }
+  try {
+    manifest = await fetchJson<LatestSnapshots>(LATEST_MANIFEST_URL);
+  } catch {
+    manifest = null;
   }
 
   const microsoft = await loadSnapshotWithFallback(
     'Microsoft',
-    isFileProtocol ? undefined : manifest?.microsoft,
-    'microsoft_releaseplans_'
+    manifest?.microsoft
   );
   const eos = await loadSnapshotWithFallback(
     'EOS',
-    isFileProtocol ? undefined : manifest?.eos,
-    'eos_whatsnew_'
+    manifest?.eos
   );
   const fabric = await loadSnapshotWithFallback(
     'Fabric',
-    isFileProtocol ? undefined : manifest?.fabric,
-    'fabric_roadmap_'
+    manifest?.fabric
   );
   const m365roadmap = await loadSnapshotWithFallback(
     'MICROSOFT 365',
-    isFileProtocol ? undefined : manifest?.m365roadmap,
-    'm365roadmap_data_'
+    manifest?.m365roadmap
   );
   const items: ReleaseItem[] = [
     ...microsoft.items,

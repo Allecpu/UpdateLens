@@ -1,5 +1,7 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
+import type { LearnMeta } from '../src/utils/learn';
+import { enrichReleaseItemsWithLearn } from './learnEnrichment';
 
 const SOURCE_URL = 'https://fabric-gps.com/api/releases';
 const PAGE_SIZE = 100;
@@ -51,6 +53,8 @@ type ReleaseItem = {
   lastUpdatedDate?: string;
   sourceUrl: string;
   learnUrl?: string | null;
+  docsUrl?: string | null;
+  learnMeta?: LearnMeta | null;
   url: string;
 };
 
@@ -236,6 +240,7 @@ function extractItems(rawItems: RawFabricItem[]): ReleaseItem[] {
         lastUpdatedDate: parseDateFull(raw.last_modified),
         sourceUrl: releasePage,
         learnUrl: null,
+        docsUrl: null,
         url: blogUrl ?? releasePage
       };
 
@@ -283,14 +288,15 @@ async function run(): Promise<void> {
     const rawItems = await fetchAllReleases();
 
     const items = extractItems(rawItems);
+    const enrichment = await enrichReleaseItemsWithLearn(items);
 
-    if (items.length === 0) {
+    if (enrichment.items.length === 0) {
       throw new Error('No valid items extracted from Fabric GPS API');
     }
 
     const snapshot = {
       version: 1,
-      items
+      items: enrichment.items
     };
 
     const filename = `fabric_roadmap_${todayStamp()}.json`;
@@ -314,7 +320,10 @@ async function run(): Promise<void> {
     );
 
     console.log(`[RefreshFabric] ✓ Snapshot saved: ${snapshotsPath}`);
-    console.log(`[RefreshFabric] ✓ Total items: ${items.length}`);
+    console.log(`[RefreshFabric] ✓ Total items: ${enrichment.items.length}`);
+    console.log(
+      `[LearnEnrichment] matched=${enrichment.stats.matched}, skipped=${enrichment.stats.skippedWithLearnUrl}, missingMapping=${enrichment.stats.noProductMapping}`
+    );
     console.log(`[RefreshFabric] ✓ Manifest updated`);
   } catch (error) {
     console.error(

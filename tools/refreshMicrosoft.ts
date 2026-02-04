@@ -8,6 +8,8 @@ import {
   isValidGuid,
   resolveAppNameFromProduct
 } from '../src/utils/releaseplans';
+import type { LearnMeta } from '../src/utils/learn';
+import { enrichReleaseItemsWithLearn } from './learnEnrichment';
 
 const SOURCE_URL = 'https://releaseplans.microsoft.com/it-it/allreleaseplans/';
 const SNAPSHOT_URL =
@@ -55,6 +57,8 @@ type ReleaseItem = {
   sourceAppName?: string | null;
   sourceUrl?: string | null;
   learnUrl?: string | null;
+  docsUrl?: string | null;
+  learnMeta?: LearnMeta | null;
   url: string;
 };
 
@@ -333,7 +337,7 @@ const extractItems = (
       );
     }
     const sourcePlanId = snapshotId ?? releasePlanId;
-    const learnUrl = snapshotEntry?.learnUrl ?? null;
+    const docsUrl = snapshotEntry?.learnUrl ?? null;
     const sourceAppName = resolveAppName(product);
     const sourceUrl = buildSourceUrl(product, sourcePlanId ?? undefined);
     items.push({
@@ -358,7 +362,8 @@ const extractItems = (
       firstAvailableDate,
       lastUpdatedDate: lastUpdated,
       sourceUrl,
-      learnUrl,
+      learnUrl: null,
+      docsUrl,
       url: sourceUrl ?? buildPublicUrl(product)
     });
   });
@@ -379,10 +384,11 @@ const run = async (): Promise<void> => {
   const payload = JSON.parse(rawText) as RawMicrosoftResponse;
   const snapshotIndex = await fetchSnapshotIndex();
   const items = extractItems(payload, snapshotIndex);
+  const enrichment = await enrichReleaseItemsWithLearn(items);
 
   const snapshot = {
     version: 1,
-    items
+    items: enrichment.items
   };
 
   const filename = `microsoft_releaseplans_${todayStamp()}.json`;
@@ -397,7 +403,12 @@ const run = async (): Promise<void> => {
   await writeManifest(path.resolve('src', 'data', 'snapshots', 'latest.json'), {
     microsoft: filename
   });
-  console.log(`Snapshot Microsoft salvata: ${outputPath} (${items.length} items)`);
+  console.log(
+    `Snapshot Microsoft salvata: ${outputPath} (${enrichment.items.length} items)`
+  );
+  console.log(
+    `[LearnEnrichment] matched=${enrichment.stats.matched}, skipped=${enrichment.stats.skippedWithLearnUrl}, missingMapping=${enrichment.stats.noProductMapping}`
+  );
 };
 
 run().catch((error) => {
