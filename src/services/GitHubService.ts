@@ -75,6 +75,9 @@ export class GitHubIssuesClient {
             'Accept': 'application/vnd.github.v3+json',
             'Content-Type': 'application/json',
         };
+        if (this.isWeb) {
+            headers['X-Requested-With'] = 'XMLHttpRequest';
+        }
         if (this.token) {
             headers['Authorization'] = `Bearer ${this.token}`;
         }

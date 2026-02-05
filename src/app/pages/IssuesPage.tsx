@@ -206,7 +206,13 @@ const IssuesPage = () => {
     useEffect(() => {
         const checkProxy = async () => {
             try {
-                const res = await fetch('/api/github/health');
+                const res = await fetch('/api/github/health', {
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    credentials: 'same-origin'
+                });
                 if (res.ok) {
                     const data = await res.json();
                     if (data.mode === 'web' && data.ok) {

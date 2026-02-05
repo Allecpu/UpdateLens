@@ -1,4 +1,4 @@
-import type { ReleaseItem } from '../models/ReleaseItem';
+import type { ReleaseItem, ReleaseSource } from '../models/ReleaseItem';
 import { ReleaseItemSchema } from '../models/ReleaseItem';
 import type { ProductsConfig, RulesConfig } from '../models/Config';
 import { ProductsConfigSchema, RulesConfigSchema } from '../models/Config';
@@ -26,9 +26,23 @@ type LatestSnapshots = {
   m365roadmap?: string;
 };
 
+type SnapshotManifestKey = keyof LatestSnapshots;
+
+const SOURCE_KEY_TO_RELEASE_SOURCE: Record<SnapshotManifestKey, ReleaseSource> = {
+  microsoft: 'Microsoft',
+  eos: 'EOS',
+  fabric: 'Fabric',
+  m365roadmap: 'MICROSOFT 365'
+};
+
 export type SnapshotLoadResult = {
   items: ReleaseItem[];
   errors: string[];
+};
+
+export type SnapshotLoadWithPreviousResult = SnapshotLoadResult & {
+  previousItems: ReleaseItem[];
+  previousBaselineSources: ReleaseSource[];
 };
 
 const EOS_TITLE_REGEX = /^(.*)\s+\(([^)]+)\)\s*$/;
@@ -278,6 +292,58 @@ const loadSnapshotWithFallback = async (
   }
 };
 
+const SNAPSHOT_FILENAME_REGEX = /^(.*)_(\d{4})_(\d{2})_(\d{2})\.json$/;
+const PREVIOUS_LOOKBACK_DAYS = 31;
+
+const extractSnapshotFilenameParts = (
+  filename: string
+): { prefix: string; date: Date } | null => {
+  const match = filename.match(SNAPSHOT_FILENAME_REGEX);
+  if (!match) {
+    return null;
+  }
+  const [, prefix, year, month, day] = match;
+  const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return { prefix, date };
+};
+
+const toSnapshotFilename = (prefix: string, date: Date): string => {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  return `${prefix}_${year}_${month}_${day}.json`;
+};
+
+const loadPreviousSnapshot = async (
+  latestFilename: string | undefined
+): Promise<{ items: ReleaseItem[]; found: boolean }> => {
+  if (!latestFilename) {
+    return { items: [], found: false };
+  }
+
+  const parts = extractSnapshotFilenameParts(latestFilename);
+  if (!parts) {
+    return { items: [], found: false };
+  }
+
+  for (let offset = 1; offset <= PREVIOUS_LOOKBACK_DAYS; offset += 1) {
+    const candidateDate = new Date(parts.date.getTime());
+    candidateDate.setUTCDate(candidateDate.getUTCDate() - offset);
+    const candidateFilename = toSnapshotFilename(parts.prefix, candidateDate);
+    try {
+      const payload = await loadSnapshotFromUrl(candidateFilename);
+      return { items: parseSnapshot(payload), found: true };
+    } catch {
+      // Continue looking backward until the first available snapshot is found.
+    }
+  }
+
+  return { items: [], found: false };
+};
+
 export const loadAllSnapshots = async (): Promise<SnapshotLoadResult> => {
   let manifest: LatestSnapshots | null = null;
   try {
@@ -362,6 +428,39 @@ export const loadAllSnapshots = async (): Promise<SnapshotLoadResult> => {
   }
 
   return { items, errors };
+};
+
+export const loadAllSnapshotsWithPrevious = async (): Promise<SnapshotLoadWithPreviousResult> => {
+  const current = await loadAllSnapshots();
+
+  let manifest: LatestSnapshots | null = null;
+  try {
+    manifest = await fetchJson<LatestSnapshots>(LATEST_MANIFEST_URL);
+  } catch {
+    manifest = null;
+  }
+
+  const previousBySource = await Promise.all(
+    (Object.keys(SOURCE_KEY_TO_RELEASE_SOURCE) as SnapshotManifestKey[]).map(async (key) => {
+      const loaded = await loadPreviousSnapshot(manifest?.[key]);
+      return {
+        key,
+        items: loaded.items,
+        found: loaded.found
+      };
+    })
+  );
+
+  const previousItems = previousBySource.flatMap((entry) => entry.items);
+  const previousBaselineSources = previousBySource
+    .filter((entry) => entry.found)
+    .map((entry) => SOURCE_KEY_TO_RELEASE_SOURCE[entry.key]);
+
+  return {
+    ...current,
+    previousItems,
+    previousBaselineSources
+  };
 };
 
 export const loadProductsConfig = (): ProductsConfig => {

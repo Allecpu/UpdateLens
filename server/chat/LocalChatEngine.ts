@@ -19,12 +19,19 @@ type SnapshotItem = {
   category?: string;
   wave?: string;
   availabilityTypes?: string[];
+  availabilityDate?: string;
   releaseDate?: string;
+  lastUpdatedDate?: string;
+  tags?: string[];
+  enabledFor?: string;
+  language?: string;
+  minBcVersion?: number;
 };
 
 type ChatContextBookmark = {
   showBookmarksOnly?: unknown;
   bookmarkedIds?: unknown;
+  currentScopeItemIds?: unknown;
 };
 
 type BaseFilters = Partial<{
@@ -35,6 +42,16 @@ type BaseFilters = Partial<{
   waves: string[];
   availabilityTypes: string[];
   periodNewDays: number;
+  periodChangedDays: number;
+  releaseInDays: number;
+  months: string[];
+  tags: string[];
+  enabledFor: string[];
+  language: string[];
+  bcVersions: string[];
+  minBcVersionMin: number | null;
+  horizonMonths: number;
+  historyMonths: number;
   releaseDateFrom: string;
   releaseDateTo: string;
   query: string;
@@ -54,8 +71,9 @@ const STOP_WORDS = new Set([
   'the', 'a', 'an', 'of', 'for', 'to', 'in', 'on', 'with', 'and',
   'il', 'lo', 'la', 'i', 'gli', 'le', 'di', 'del', 'della', 'delle', 'dei',
   'su', 'con', 'per', 'e', 'da', 'al', 'ai', 'alle', 'agli',
-  'release', 'notes', 'novita', 'novità',
-  'che', 'ci', 'sono', 'cosa', 'quale', 'quali', 'mi', 'puoi', 'puo', 'può'
+  'release', 'notes', 'novita', 'novità', 'novit',
+  'che', 'ci', 'sono', 'cosa', 'quale', 'quali', 'mi', 'puoi', 'puo', 'può',
+  'quanti', 'quante', 'quanto', 'quanta', 'how', 'many'
 ]);
 
 const normalizeText = (value: string): string => {
@@ -123,6 +141,96 @@ const detectSource = (text: string): Array<'Microsoft' | 'EOS' | 'Fabric' | 'MIC
   return Array.from(new Set(matches));
 };
 
+const extractSemanticQuery = (text: string): string => {
+  const normalized = normalizeText(text);
+  if (!normalized) return '';
+
+  const countPatterns = [
+    /^(?:quanti|quante|quanto|quanta|numero(?:\s+di)?|count)\s+(?:elementi|novita|risultati|update|aggiornamenti)\s+(?:per|su|di)\s+(.+)$/i,
+    /^(?:how many)\s+(?:items|updates|results)\s+(?:for|about)\s+(.+)$/i
+  ];
+
+  for (const pattern of countPatterns) {
+    const match = normalized.match(pattern);
+    if (match?.[1]) {
+      return match[1].trim();
+    }
+  }
+
+  return text.trim();
+};
+
+const levenshteinDistance = (a: string, b: string): number => {
+  const m = a.length;
+  const n = b.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+
+  const dp: number[] = Array.from({ length: n + 1 }, (_, i) => i);
+  for (let i = 1; i <= m; i++) {
+    let prev = dp[0];
+    dp[0] = i;
+    for (let j = 1; j <= n; j++) {
+      const temp = dp[j];
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[j] = Math.min(
+        dp[j] + 1,
+        dp[j - 1] + 1,
+        prev + cost
+      );
+      prev = temp;
+    }
+  }
+  return dp[n];
+};
+
+const detectProductFromQuery = (items: SnapshotItem[], query: string): string | null => {
+  const normalizedQuery = normalizeText(query);
+  if (!normalizedQuery) return null;
+
+  const productMap = new Map<string, string>();
+  for (const item of items) {
+    const label = (item.productName ?? item.product ?? '').trim();
+    if (!label) continue;
+    const normalizedLabel = normalizeText(label);
+    if (!normalizedLabel) continue;
+    if (!productMap.has(normalizedLabel)) {
+      productMap.set(normalizedLabel, label);
+    }
+  }
+
+  const exact = productMap.get(normalizedQuery);
+  if (exact) return exact;
+
+  const candidates = Array.from(productMap.entries())
+    .filter(([normalizedLabel]) =>
+      normalizedLabel.includes(normalizedQuery) || normalizedQuery.includes(normalizedLabel)
+    )
+    .sort((a, b) => b[0].length - a[0].length);
+
+  if (candidates[0]) {
+    return candidates[0][1];
+  }
+
+  // Fuzzy fallback for common typos (e.g. "autoamte" -> "automate")
+  let bestLabel: string | null = null;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (const [normalizedLabel, label] of productMap.entries()) {
+    const distance = levenshteinDistance(normalizedQuery, normalizedLabel);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestLabel = label;
+    }
+  }
+  const maxAllowedDistance =
+    normalizedQuery.length >= 16 ? 3 : normalizedQuery.length >= 8 ? 2 : 1;
+  if (bestLabel && bestDistance <= maxAllowedDistance) {
+    return bestLabel;
+  }
+
+  return null;
+};
+
 const toPreviewItem = (item: SnapshotItem) => {
   return {
     id: item.id ?? crypto.randomUUID(),
@@ -138,10 +246,29 @@ const toStringArray = (value: unknown): string[] => {
   return value.filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
 };
 
+const toMonthDate = (value?: string): number | null => {
+  if (!value) return null;
+  if (/^\d{4}-\d{2}$/.test(value)) {
+    const [yearRaw, monthRaw] = value.split('-');
+    const year = Number(yearRaw);
+    const month = Number(monthRaw);
+    if (!year || !month || month < 1 || month > 12) return null;
+    return new Date(year, month - 1, 1).getTime();
+  }
+  return null;
+};
+
 const parseIsoDate = (value: unknown): number | null => {
   if (typeof value !== 'string' || value.trim().length === 0) return null;
   const ts = Date.parse(value);
   return Number.isFinite(ts) ? ts : null;
+};
+
+const parseDateAny = (value: unknown): number | null => {
+  const iso = parseIsoDate(value);
+  if (iso !== null) return iso;
+  if (typeof value !== 'string') return null;
+  return toMonthDate(value);
 };
 
 const applyBaseFilters = (items: SnapshotItem[], baseFiltersRaw: unknown): SnapshotItem[] => {
@@ -153,17 +280,53 @@ const applyBaseFilters = (items: SnapshotItem[], baseFiltersRaw: unknown): Snaps
   const categorySet = new Set(toStringArray(baseFilters.categories).map(normalizeText));
   const waveSet = new Set(toStringArray(baseFilters.waves).map(normalizeText));
   const availabilitySet = new Set(toStringArray(baseFilters.availabilityTypes).map(normalizeText));
+  const monthsSet = new Set(toStringArray(baseFilters.months));
+  const tagsSet = new Set(toStringArray(baseFilters.tags).map(normalizeText));
+  const enabledForSet = new Set(toStringArray(baseFilters.enabledFor).map(normalizeText));
+  const languageSet = new Set(toStringArray(baseFilters.language).map(normalizeText));
+  const bcVersionSet = new Set(
+    toStringArray(baseFilters.bcVersions)
+      .map((value) => Number(value))
+      .filter((value) => Number.isFinite(value))
+  );
 
   const periodNewDays =
     typeof baseFilters.periodNewDays === 'number' && Number.isFinite(baseFilters.periodNewDays)
       ? Math.max(0, baseFilters.periodNewDays)
       : 0;
   const periodSince = periodNewDays > 0 ? Date.now() - periodNewDays * 24 * 60 * 60 * 1000 : null;
+  const periodChangedDays =
+    typeof baseFilters.periodChangedDays === 'number' && Number.isFinite(baseFilters.periodChangedDays)
+      ? Math.max(0, baseFilters.periodChangedDays)
+      : 0;
+  const periodChangedSince = periodChangedDays > 0 ? Date.now() - periodChangedDays * 24 * 60 * 60 * 1000 : null;
+  const releaseInDays =
+    typeof baseFilters.releaseInDays === 'number' && Number.isFinite(baseFilters.releaseInDays)
+      ? Math.max(0, baseFilters.releaseInDays)
+      : 0;
+  const releaseInLimit = releaseInDays > 0 ? Date.now() + releaseInDays * 24 * 60 * 60 * 1000 : null;
 
-  const releaseFrom = parseIsoDate(baseFilters.releaseDateFrom);
-  const releaseTo = parseIsoDate(baseFilters.releaseDateTo);
+  const horizonMonths =
+    typeof baseFilters.horizonMonths === 'number' && Number.isFinite(baseFilters.horizonMonths)
+      ? baseFilters.horizonMonths
+      : 12;
+  const historyMonths =
+    typeof baseFilters.historyMonths === 'number' && Number.isFinite(baseFilters.historyMonths)
+      ? baseFilters.historyMonths
+      : 6;
+  const nowDate = new Date();
+  const horizonDate = new Date(nowDate.getTime());
+  horizonDate.setMonth(horizonDate.getMonth() + horizonMonths);
+  const historyLimitDate = new Date(nowDate.getTime());
+  historyLimitDate.setMonth(historyLimitDate.getMonth() - historyMonths);
+  const horizonTs = horizonDate.getTime();
+  const historyTs = historyLimitDate.getTime();
+
+  const releaseFrom = parseDateAny(baseFilters.releaseDateFrom);
+  const releaseTo = parseDateAny(baseFilters.releaseDateTo);
 
   const baseQuery = typeof baseFilters.query === 'string' ? normalizeText(baseFilters.query) : '';
+  const baseQueryTokens = tokenizeQuery(baseFilters.query ?? '');
 
   return items.filter((item) => {
     if (sourceSet.size > 0) {
@@ -196,10 +359,46 @@ const applyBaseFilters = (items: SnapshotItem[], baseFiltersRaw: unknown): Snaps
       if (!itemAvailability.some((value) => availabilitySet.has(value))) return false;
     }
 
-    const releaseTs = parseIsoDate(item.releaseDate);
-    if (periodSince && releaseTs !== null && releaseTs < periodSince) return false;
-    if (releaseFrom !== null && releaseTs !== null && releaseTs < releaseFrom) return false;
-    if (releaseTo !== null && releaseTs !== null && releaseTs > releaseTo) return false;
+    const availabilityTs = parseDateAny(item.availabilityDate);
+    if (availabilityTs !== null && availabilityTs > horizonTs) return false;
+    if (availabilityTs !== null && availabilityTs < historyTs) return false;
+
+    if (monthsSet.size > 0) {
+      if (!item.availabilityDate || !monthsSet.has(item.availabilityDate)) return false;
+    }
+
+    if (tagsSet.size > 0) {
+      const itemTags = (item.tags ?? []).map(normalizeText);
+      if (!itemTags.some((tag) => tagsSet.has(tag))) return false;
+    }
+
+    if (enabledForSet.size > 0) {
+      const enabledFor = normalizeText(item.enabledFor ?? '');
+      if (!enabledForSet.has(enabledFor)) return false;
+    }
+
+    if (languageSet.size > 0) {
+      const language = normalizeText(item.language ?? '');
+      if (!languageSet.has(language)) return false;
+    }
+
+    if (bcVersionSet.size > 0) {
+      if (item.minBcVersion == null || !bcVersionSet.has(item.minBcVersion)) return false;
+    } else if (typeof baseFilters.minBcVersionMin === 'number' && Number.isFinite(baseFilters.minBcVersionMin)) {
+      if (item.minBcVersion != null && item.minBcVersion < baseFilters.minBcVersionMin) return false;
+    }
+
+    const releaseTs = parseDateAny(item.releaseDate);
+    if (periodSince && (releaseTs === null || releaseTs < periodSince)) return false;
+    if (periodChangedSince) {
+      const changedTs = parseDateAny(item.lastUpdatedDate) ?? releaseTs;
+      if (changedTs === null || changedTs < periodChangedSince) return false;
+    }
+    if (releaseInLimit !== null) {
+      if (releaseTs === null || releaseTs < Date.now() || releaseTs > releaseInLimit) return false;
+    }
+    if (releaseFrom !== null && (releaseTs === null || releaseTs < releaseFrom)) return false;
+    if (releaseTo !== null && (releaseTs === null || releaseTs > releaseTo)) return false;
 
     if (baseQuery) {
       const haystack = normalizeText(
@@ -207,7 +406,11 @@ const applyBaseFilters = (items: SnapshotItem[], baseFiltersRaw: unknown): Snaps
           .filter(Boolean)
           .join(' ')
       );
-      if (!haystack.includes(baseQuery)) return false;
+      if (!haystack.includes(baseQuery)) {
+        const haystackSet = new Set(haystack.split(' ').filter(Boolean));
+        if (baseQueryTokens.length === 0) return false;
+        if (!baseQueryTokens.every((token) => haystackSet.has(token))) return false;
+      }
     }
 
     return true;
@@ -245,8 +448,19 @@ export const runLocalChatEngine = async (
 
   const detectedSources = detectSource(text);
   const allItems = await loadLatestItems();
+  const currentScopeIdsSet = new Set(
+    Array.isArray(chatContext.currentScopeItemIds)
+      ? chatContext.currentScopeItemIds.filter(
+          (value): value is string => typeof value === 'string' && value.length > 0
+        )
+      : []
+  );
   const scopedItems =
-    req.searchScope === 'current' ? applyBaseFilters(allItems, req.baseFilters) : allItems;
+    req.searchScope === 'current'
+      ? currentScopeIdsSet.size > 0
+        ? allItems.filter((item) => !!item.id && currentScopeIdsSet.has(item.id))
+        : applyBaseFilters(allItems, req.baseFilters)
+      : allItems;
 
   if (FAVORITES_PATTERN.test(normalized)) {
     if (bookmarkedIdsSet.size === 0) {
@@ -316,13 +530,21 @@ export const runLocalChatEngine = async (
     filterPatch.availabilityTypes = ['Public Preview'];
   }
 
-  if (Object.keys(filterPatch).length === 0 && text.length >= 3) {
-    filterPatch.query = text;
+  const semanticQuery = extractSemanticQuery(text);
+  const matchedProduct =
+    semanticQuery.length >= 2 ? detectProductFromQuery(scopedItems, semanticQuery) : null;
+  if (matchedProduct) {
+    filterPatch.products = [matchedProduct];
+  } else if (Object.keys(filterPatch).length === 0 && semanticQuery.length >= 3) {
+    filterPatch.query = semanticQuery;
   }
 
   const quickQuery = filterPatch.query ? normalizeText(filterPatch.query) : '';
   const queryTokens = tokenizeQuery(filterPatch.query ?? '');
   const sourceFilter = filterPatch.sources;
+  const productFilter = new Set(
+    (filterPatch.products ?? []).map((value) => normalizeText(value))
+  );
 
   const filtered = scopedItems.filter((item) => {
     if (showBookmarksOnly && (!item.id || !bookmarkedIdsSet.has(item.id))) {
@@ -330,6 +552,12 @@ export const runLocalChatEngine = async (
     }
     if (sourceFilter?.length && (!item.source || !sourceFilter.includes(item.source as never))) {
       return false;
+    }
+    if (productFilter.size > 0) {
+      const product = normalizeText(item.productName ?? item.product ?? '');
+      if (!productFilter.has(product)) {
+        return false;
+      }
     }
     if (quickQuery || queryTokens.length > 0) {
       const haystackRaw =

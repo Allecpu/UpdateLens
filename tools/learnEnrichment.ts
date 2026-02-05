@@ -51,6 +51,11 @@ type LearnCatalogResource = {
   type: LearnType;
   level?: string;
   products: string[];
+  durationMinutes?: number;
+  moduleCount?: number;
+  xp?: number;
+  roles: string[];
+  subjects: string[];
 };
 
 type LearnCatalogCache = Record<string, LearnCatalogResource[]>;
@@ -123,6 +128,48 @@ const normalizeCatalogResource = (
         .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
         .filter((entry) => entry.length > 0)
     : [];
+  const roles = Array.isArray(value.roles)
+    ? value.roles
+        .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+        .filter((entry) => entry.length > 0)
+    : [];
+  const subjects = Array.isArray(value.subjects)
+    ? value.subjects
+        .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+        .filter((entry) => entry.length > 0)
+    : [];
+  const durationRaw =
+    typeof value.duration_in_minutes === 'number'
+      ? value.duration_in_minutes
+      : typeof value.durationMinutes === 'number'
+        ? value.durationMinutes
+        : undefined;
+  const durationMinutes =
+    typeof durationRaw === 'number' && Number.isFinite(durationRaw) && durationRaw > 0
+      ? Math.round(durationRaw)
+      : undefined;
+  const moduleCountRaw =
+    typeof value.number_of_children === 'number'
+      ? value.number_of_children
+      : typeof value.moduleCount === 'number'
+        ? value.moduleCount
+        : undefined;
+  const moduleCount =
+    typeof moduleCountRaw === 'number' &&
+    Number.isFinite(moduleCountRaw) &&
+    moduleCountRaw >= 0
+      ? Math.round(moduleCountRaw)
+      : undefined;
+  const xpRaw =
+    typeof value.xp === 'number'
+      ? value.xp
+      : typeof value.xpPoints === 'number'
+        ? value.xpPoints
+        : undefined;
+  const xp =
+    typeof xpRaw === 'number' && Number.isFinite(xpRaw) && xpRaw > 0
+      ? Math.round(xpRaw)
+      : undefined;
 
   return {
     uid,
@@ -130,7 +177,12 @@ const normalizeCatalogResource = (
     url,
     type,
     level,
-    products: products.length > 0 ? products : [fallbackProductKey]
+    products: products.length > 0 ? products : [fallbackProductKey],
+    durationMinutes,
+    moduleCount,
+    xp,
+    roles,
+    subjects
   };
 };
 
@@ -289,7 +341,12 @@ const selectBestCandidate = (
       level: normalizeLearnLevel(selected.candidate.level),
       uid: selected.candidate.uid,
       productKey,
-      score: selected.score
+      score: selected.score,
+      durationMinutes: selected.candidate.durationMinutes,
+      moduleCount: selected.candidate.moduleCount,
+      xp: selected.candidate.xp,
+      roles: selected.candidate.roles,
+      subjects: selected.candidate.subjects
     }
   };
 };

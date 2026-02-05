@@ -48,8 +48,18 @@ export const ReleaseItemSchema = z.object({
       level: z.string().optional(),
       uid: z.string().optional(),
       productKey: z.string().optional(),
-      score: z.number().optional()
+      score: z.number().optional(),
+      durationMinutes: z.number().optional(),
+      estimatedMinutes: z.number().optional(),
+      duration: z.string().optional(),
+      durationText: z.string().optional(),
+      timeToComplete: z.string().optional(),
+      moduleCount: z.number().optional(),
+      xp: z.number().optional(),
+      roles: z.array(z.string()).optional(),
+      subjects: z.array(z.string()).optional()
     })
+    .passthrough()
     .nullable()
     .optional(),
   url: z.string().url().nullable().optional()

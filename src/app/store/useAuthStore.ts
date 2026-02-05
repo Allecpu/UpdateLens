@@ -40,21 +40,68 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     set({ isLoading: true, error: null });
 
+    const env = (import.meta as ImportMeta & { env?: Record<string, string> }).env;
+    const localAuthProbeEnabled = env?.VITE_LOCAL_AUTH_PROBE === 'true';
+    const isLocalhost =
+      typeof window !== 'undefined' &&
+      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+    // Easy Auth does not run on localhost by default: avoid noisy 503 calls in dev.
+    if (isLocalhost && !localAuthProbeEnabled) {
+      set({
+        isAuthenticated: false,
+        isAuthConfigured: false,
+        currentUser: null,
+        isLoading: false,
+        hasFetched: true,
+        accessDenied: false,
+        accessDeniedReason: null,
+        userEmail: null,
+        error: null
+      });
+      return;
+    }
+
     try {
-      const response = await fetch('/api/auth/me');
-      const data = await response.json();
+      const response = await fetch('/api/auth/me', {
+        headers: {
+          'Accept': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        credentials: 'same-origin'
+      });
+      const contentType = response.headers.get('content-type') || '';
+      const isJson = contentType.includes('application/json');
+      const data = isJson ? await response.json().catch(() => null) : null;
+      const payload = data && typeof data === 'object' ? (data as Record<string, unknown>) : null;
 
       // Handle 403 - access denied (not whitelisted or disabled)
-      if (response.status === 403 && data.accessDenied) {
+      if (response.status === 403 && payload?.accessDenied) {
         set({
-          isAuthenticated: data.authenticated ?? false,
-          isAuthConfigured: data.authConfigured ?? true,
+          isAuthenticated: (payload.authenticated as boolean | undefined) ?? false,
+          isAuthConfigured: (payload.authConfigured as boolean | undefined) ?? true,
           currentUser: null,
           isLoading: false,
           hasFetched: true,
           accessDenied: true,
-          accessDeniedReason: data.accessDeniedReason || 'NOT_WHITELISTED',
-          userEmail: data.user?.email || null
+          accessDeniedReason: (payload.accessDeniedReason as AccessDeniedReason | undefined) || 'NOT_WHITELISTED',
+          userEmail: (payload.user as { email?: string } | undefined)?.email || null
+        });
+        return;
+      }
+
+      // Auth is configured but user is not logged in yet
+      if (response.status === 401) {
+        set({
+          isAuthenticated: false,
+          isAuthConfigured: true,
+          currentUser: null,
+          isLoading: false,
+          hasFetched: true,
+          accessDenied: false,
+          accessDeniedReason: null,
+          userEmail: null,
+          error: null
         });
         return;
       }
@@ -71,26 +118,31 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           accessDenied: false,
           accessDeniedReason: null,
           userEmail: null,
-          error: isNotConfigured ? null : (data.error || 'Errore durante il recupero utente')
+          error:
+            isNotConfigured
+              ? null
+              : (payload && typeof payload.error === 'string'
+                ? payload.error
+                : 'Errore durante il recupero utente')
         });
         return;
       }
 
       // Success - user is authenticated and whitelisted
       set({
-        isAuthenticated: data.authenticated,
-        isAuthConfigured: data.authConfigured,
-        currentUser: data.user || null,
+        isAuthenticated: Boolean(payload?.authenticated),
+        isAuthConfigured: Boolean(payload?.authConfigured),
+        currentUser: payload ? (payload.user as UserInfo | null) : null,
         isLoading: false,
         hasFetched: true,
         accessDenied: false,
         accessDeniedReason: null,
-        userEmail: data.user?.email || null
+        userEmail: payload ? ((payload.user as { email?: string } | undefined)?.email || null) : null
       });
 
       // Log bound shares if any
-      if (data.boundShares && data.boundShares > 0) {
-        console.log(`[Auth] Bound ${data.boundShares} pending share(s) to user`);
+      if (payload && typeof payload.boundShares === 'number' && payload.boundShares > 0) {
+        console.log(`[Auth] Bound ${payload.boundShares} pending share(s) to user`);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to fetch user';

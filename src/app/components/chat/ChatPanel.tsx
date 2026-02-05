@@ -68,13 +68,38 @@ const ChatPanel = () => {
     setActiveTab,
     setSearchScope
   } = useChatStore();
-  const { cssFilters, setChatFilters, clearChatFilters } = useFilterStore();
+  const {
+    cssFilters,
+    dashboardRuntimeFilters,
+    dashboardScopeItemIds,
+    setChatFilters,
+    clearChatFilters
+  } = useFilterStore();
   const { bookmarkedIds, showBookmarksOnly } = useBookmarkStore();
 
   const [items, setItems] = useState<ReleaseItem[]>([]);
   const [metadata, setMetadata] = useState<FilterMetadata | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  const currentScopeItemIds = useMemo(() => {
+    if (dashboardScopeItemIds !== null) {
+      return dashboardScopeItemIds;
+    }
+    const activeFilters = dashboardRuntimeFilters ?? cssFilters ?? DEFAULT_FILTERS;
+    const scoped = filterReleaseItems(items, activeFilters);
+    const scopedWithBookmarks = showBookmarksOnly
+      ? scoped.filter((item) => bookmarkedIds.includes(item.id))
+      : scoped;
+    return scopedWithBookmarks.map((item) => item.id);
+  }, [
+    items,
+    dashboardRuntimeFilters,
+    dashboardScopeItemIds,
+    cssFilters,
+    showBookmarksOnly,
+    bookmarkedIds
+  ]);
 
   // Load data on first open
   useEffect(() => {
@@ -110,7 +135,9 @@ const ChatPanel = () => {
       setTimeout(() => {
         const run = async () => {
           const baseFilters =
-            searchScope === 'all' ? DEFAULT_FILTERS : (cssFilters ?? DEFAULT_FILTERS);
+            searchScope === 'all'
+              ? DEFAULT_FILTERS
+              : (dashboardRuntimeFilters ?? cssFilters ?? DEFAULT_FILTERS);
 
           if (chatBackendEnabled) {
             try {
@@ -120,7 +147,8 @@ const ChatPanel = () => {
                 baseFilters,
                 chatContext: {
                   showBookmarksOnly,
-                  bookmarkedIds
+                  bookmarkedIds,
+                  currentScopeItemIds: searchScope === 'current' ? currentScopeItemIds : undefined
                 },
                 preferAzure: chatAzureEnabled,
                 topK: 5
@@ -193,6 +221,7 @@ const ChatPanel = () => {
       metadata,
       items,
       cssFilters,
+      dashboardRuntimeFilters,
       searchScope,
       addMessage,
       addToHistory,
@@ -200,7 +229,8 @@ const ChatPanel = () => {
       chatBackendEnabled,
       chatAzureEnabled,
       bookmarkedIds,
-      showBookmarksOnly
+      showBookmarksOnly,
+      currentScopeItemIds
     ]
   );
 

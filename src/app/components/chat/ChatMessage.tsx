@@ -35,7 +35,6 @@ const ChatMessage = ({
       setVisibleLength((current) => {
         if (current >= message.text.length) {
           window.clearInterval(intervalId);
-          onAnimationComplete?.();
           return current;
         }
         return current + 2;
@@ -47,6 +46,15 @@ const ChatMessage = ({
 
   const displayedText = isUser ? message.text : message.text.slice(0, visibleLength);
   const isTyping = !isUser && visibleLength < message.text.length;
+
+  useEffect(() => {
+    if (!shouldAnimateMessage || !canAnimate || isUser) {
+      return;
+    }
+    if (!isTyping) {
+      onAnimationComplete?.();
+    }
+  }, [shouldAnimateMessage, canAnimate, isUser, isTyping, onAnimationComplete]);
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>

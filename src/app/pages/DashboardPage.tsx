@@ -277,7 +277,9 @@ const DashboardPage = () => {
     customerFilterMode,
     ensureCssFilters,
     chatFilters,
-    clearChatFilters
+    clearChatFilters,
+    setDashboardRuntimeFilters,
+    setDashboardScopeItemIds
   } = useFilterStore();
 
   // Preset management (session-only in Dashboard)
@@ -517,6 +519,17 @@ const DashboardPage = () => {
     return stripTargetingFields(merged);
   }, [persistentBaseFilters, tempFilters, chatFilters]);
 
+  useEffect(() => {
+    setDashboardRuntimeFilters(dashboardFilters);
+  }, [dashboardFilters, setDashboardRuntimeFilters]);
+
+  useEffect(() => {
+    return () => {
+      setDashboardRuntimeFilters(null);
+      setDashboardScopeItemIds(null);
+    };
+  }, [setDashboardRuntimeFilters, setDashboardScopeItemIds]);
+
   // Deferred filters for expensive computations (filterReleaseItems)
   // This allows UI to remain responsive while filtering is processed
   const deferredDashboardFilters = useDeferredValue(dashboardFilters);
@@ -645,6 +658,10 @@ const DashboardPage = () => {
     }
     return result;
   }, [filteredItems, drillSource, drillProduct]);
+
+  useEffect(() => {
+    setDashboardScopeItemIds(drilledItems.map((item) => item.id));
+  }, [drilledItems, setDashboardScopeItemIds]);
 
   // Sort drilled items (same logic as sortedItems)
   const sortedDrilledItems = useMemo(() => {

@@ -48,17 +48,34 @@ export class PresetService {
 
   private async fetch<T>(path: string, options?: RequestInit): Promise<T> {
     const url = `${this.baseUrl}${path}`;
+    const headers = new Headers(options?.headers);
+    headers.set('Accept', 'application/json');
+    headers.set('X-Requested-With', 'XMLHttpRequest');
+
+    const hasBody = options?.body !== undefined && options?.body !== null;
+    if (hasBody && !headers.has('Content-Type') && !(options.body instanceof FormData)) {
+      headers.set('Content-Type', 'application/json');
+    }
+
     const response = await fetch(url, {
       ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options?.headers
-      }
+      headers,
+      credentials: 'same-origin'
     });
 
+    const contentType = response.headers.get('content-type') || '';
+    const isJson = contentType.includes('application/json');
+    const responseData = isJson ? await response.json().catch(() => null) : null;
+
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Request failed' }));
-      throw new Error(errorData.error || `HTTP error ${response.status}`);
+      const errorMessage =
+        responseData &&
+        typeof responseData === 'object' &&
+        'error' in responseData &&
+        typeof responseData.error === 'string'
+          ? responseData.error
+          : `HTTP error ${response.status}`;
+      throw new Error(errorMessage);
     }
 
     // Handle 204 No Content
@@ -66,7 +83,11 @@ export class PresetService {
       return undefined as T;
     }
 
-    return response.json();
+    if (responseData !== null) {
+      return responseData as T;
+    }
+
+    throw new Error(`Risposta API non valida (${response.status})`);
   }
 
   // ============================================

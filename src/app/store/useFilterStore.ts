@@ -7,6 +7,8 @@ type FilterMode = 'inherit' | 'custom';
 
 type FilterStoreState = {
   cssFilters: FilterState | null;
+  dashboardRuntimeFilters: FilterState | null;
+  dashboardScopeItemIds: string[] | null;
   customerFilters: Record<string, FilterState>;
   customerFilterMode: Record<string, FilterMode>;
   // Chat filters: temporary, not persisted, does not affect global filters
@@ -27,6 +29,8 @@ type FilterStoreState = {
   removeGroupFromFilters: (groupId: string) => void;
   applyGlobalToCustomers: (customerIds: string[], globalFilters: FilterState) => void;
   clearOverridesForCustomers: (customerIds: string[]) => void;
+  setDashboardRuntimeFilters: (filters: FilterState | null) => void;
+  setDashboardScopeItemIds: (itemIds: string[] | null) => void;
   // Chat filter actions (temporary, no persistence)
   setChatFilters: (filters: Partial<FilterState>) => void;
   clearChatFilters: () => void;
@@ -86,10 +90,38 @@ const loadInitial = (): {
   };
 };
 
+const areFiltersEquivalent = (
+  a: FilterState | null,
+  b: FilterState | null
+): boolean => {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  try {
+    return JSON.stringify(a) === JSON.stringify(b);
+  } catch {
+    return false;
+  }
+};
+
+const areStringArraysEquivalent = (
+  a: string[] | null,
+  b: string[] | null
+): boolean => {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+};
+
 export const useFilterStore = create<FilterStoreState>((set, get) => {
   const initial = loadInitial();
   return {
     cssFilters: initial.cssFilters,
+    dashboardRuntimeFilters: null,
+    dashboardScopeItemIds: null,
     customerFilters: initial.customerFilters,
     customerFilterMode: initial.customerFilterMode,
     autoSaveEnabled: initial.autoSaveEnabled,
@@ -175,6 +207,20 @@ export const useFilterStore = create<FilterStoreState>((set, get) => {
 
       persist(cssFilters, nextFilters, nextMode);
       set({ customerFilters: nextFilters, customerFilterMode: nextMode });
+    },
+    setDashboardRuntimeFilters: (filters) => {
+      const current = get().dashboardRuntimeFilters;
+      if (areFiltersEquivalent(current, filters)) {
+        return;
+      }
+      set({ dashboardRuntimeFilters: filters });
+    },
+    setDashboardScopeItemIds: (itemIds) => {
+      const current = get().dashboardScopeItemIds;
+      if (areStringArraysEquivalent(current, itemIds)) {
+        return;
+      }
+      set({ dashboardScopeItemIds: itemIds });
     },
     // Chat filters: temporary overlay, NOT persisted, does NOT affect global filters
     setChatFilters: (filters) => {

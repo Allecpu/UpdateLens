@@ -16,6 +16,11 @@ export type LearnMeta = {
   uid?: string;
   productKey?: string;
   score?: number;
+  durationMinutes?: number;
+  moduleCount?: number;
+  xp?: number;
+  roles?: string[];
+  subjects?: string[];
 };
 
 type LearnProductRule = {
