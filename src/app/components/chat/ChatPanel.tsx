@@ -270,6 +270,14 @@ const ChatPanel = () => {
       // Check if this is a reset
       const isReset = Object.keys(filterPatch).length === 0;
 
+      // DEBUG: Log what we're applying
+      console.log('[ChatPanel] APPLY_FILTERS', {
+        filterPatch,
+        filterPatchProducts: filterPatch.products,
+        applyScope: message.applyScope,
+        isReset
+      });
+
       if (isReset) {
         // Clear chat filters - dashboard will show base filters
         clearChatFilters();
@@ -280,6 +288,10 @@ const ChatPanel = () => {
           message.applyScope === 'all'
             ? { ...DEFAULT_FILTERS, ...filterPatch }
             : filterPatch;
+        console.log('[ChatPanel] SCOPE_AWARE_FILTERS', {
+          scopeAwareFilters,
+          scopeAwareProducts: scopeAwareFilters.products
+        });
         setChatFilters(scopeAwareFilters);
       }
       trackChatMetric('filters_applied', {

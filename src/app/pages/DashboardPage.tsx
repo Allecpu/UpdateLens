@@ -525,6 +525,13 @@ const DashboardPage = () => {
     if (chatFilters && Object.keys(chatFilters).length > 0) {
       merged = { ...merged, ...chatFilters };
     }
+    // DEBUG: Log filter merge process
+    console.log('[DashboardPage] FILTER_MERGE', {
+      chatFilters,
+      chatFiltersProducts: chatFilters?.products,
+      mergedProducts: merged.products,
+      hasChatFilters: chatFilters && Object.keys(chatFilters).length > 0
+    });
     return stripTargetingFields(merged);
   }, [persistentBaseFilters, tempFilters, chatFilters]);
 
