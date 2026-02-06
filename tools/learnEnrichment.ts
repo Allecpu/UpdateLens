@@ -122,7 +122,14 @@ const normalizeCatalogResource = (
   }
   const uid = typeof value.uid === 'string' ? value.uid.trim() : undefined;
   const type = normalizeLearnType(typeof value.type === 'string' ? value.type : null);
-  const level = typeof value.level === 'string' ? value.level : undefined;
+  const levelFromString = typeof value.level === 'string' ? value.level : undefined;
+  const levelFromArray = Array.isArray(value.levels)
+    ? value.levels.find((entry) => typeof entry === 'string' && entry.trim().length > 0)
+    : undefined;
+  const level =
+    typeof levelFromArray === 'string'
+      ? levelFromArray
+      : levelFromString;
   const products = Array.isArray(value.products)
     ? value.products
         .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
@@ -214,6 +221,27 @@ const parseCatalogPayload = (
 
   const dedupe = new Map<string, LearnCatalogResource>();
 
+  const mergeCatalogResource = (
+    current: LearnCatalogResource,
+    incoming: LearnCatalogResource
+  ): LearnCatalogResource => {
+    const mergedProducts = Array.from(new Set([...current.products, ...incoming.products]));
+    const mergedRoles = Array.from(new Set([...current.roles, ...incoming.roles]));
+    const mergedSubjects = Array.from(new Set([...current.subjects, ...incoming.subjects]));
+    return {
+      ...current,
+      title: incoming.title.length > current.title.length ? incoming.title : current.title,
+      type: current.type === 'documentation' ? incoming.type : current.type,
+      level: current.level ?? incoming.level,
+      products: mergedProducts.length > 0 ? mergedProducts : current.products,
+      durationMinutes: incoming.durationMinutes ?? current.durationMinutes,
+      moduleCount: incoming.moduleCount ?? current.moduleCount,
+      xp: incoming.xp ?? current.xp,
+      roles: mergedRoles,
+      subjects: mergedSubjects
+    };
+  };
+
   rows.forEach(({ row, fallbackType }) => {
     if (!row || typeof row !== 'object') {
       return;
@@ -227,9 +255,12 @@ const parseCatalogPayload = (
       return;
     }
     const key = normalized.uid ?? normalized.url;
-    if (!dedupe.has(key)) {
+    const existing = dedupe.get(key);
+    if (!existing) {
       dedupe.set(key, normalized);
+      return;
     }
+    dedupe.set(key, mergeCatalogResource(existing, normalized));
   });
 
   return Array.from(dedupe.values());

@@ -60,6 +60,7 @@ const PRESETS_KEY = 'updatelens.learn.presets.v1';
 const SOURCE_MICROSOFT_LEARN = 'Microsoft Learn';
 const SOURCE_EXTERNAL = 'External';
 const DURATION_BUCKETS: LearnDurationBucket[] = ['short', 'medium', 'long', 'unknown'];
+const ALL_PRODUCTS_KEY = '__all__';
 
 const slugify = (value: string): string =>
   value
@@ -556,6 +557,7 @@ const LearnPage = () => {
 
     const saved = loadSavedFilters();
     const validKeys = new Set(productOptions.map((entry) => entry.key));
+    validKeys.add(ALL_PRODUCTS_KEY);
     const fromRoute =
       routeProductKey && validKeys.has(routeProductKey) ? routeProductKey : '';
     const fromSession =
@@ -584,6 +586,7 @@ const LearnPage = () => {
       return;
     }
     const validKeys = new Set(productOptions.map((entry) => entry.key));
+    validKeys.add(ALL_PRODUCTS_KEY);
     if (!validKeys.has(routeProductKey)) {
       return;
     }
@@ -606,7 +609,10 @@ const LearnPage = () => {
     const query = filters.query.trim().toLowerCase();
     return sortResources(
       resources.filter((resource) => {
-        if (resource.productKey !== filters.selectedProductKey) {
+        if (
+          filters.selectedProductKey !== ALL_PRODUCTS_KEY &&
+          resource.productKey !== filters.selectedProductKey
+        ) {
           return false;
         }
         if (filters.types.length > 0 && !filters.types.includes(resource.type)) {
@@ -633,8 +639,9 @@ const LearnPage = () => {
 
   const setSelectedProduct = (nextProductKey: string) => {
     setFilters((current) => ({ ...current, selectedProductKey: nextProductKey }));
-    if (location.pathname !== `/learn/${nextProductKey}`) {
-      navigate(`/learn/${nextProductKey}`);
+    const nextPath = nextProductKey === ALL_PRODUCTS_KEY ? '/learn' : `/learn/${nextProductKey}`;
+    if (location.pathname !== nextPath) {
+      navigate(nextPath);
     }
   };
 
@@ -697,6 +704,7 @@ const LearnPage = () => {
     }
 
     const validProductKeys = new Set(productOptions.map((entry) => entry.key));
+    validProductKeys.add(ALL_PRODUCTS_KEY);
     const fallbackProductKey = productOptions[0]?.key ?? '';
     const nextProductKey = validProductKeys.has(preset.filters.selectedProductKey)
       ? preset.filters.selectedProductKey
@@ -704,8 +712,9 @@ const LearnPage = () => {
 
     const nextFilters = { ...preset.filters, selectedProductKey: nextProductKey };
     setFilters(nextFilters);
-    if (nextProductKey && location.pathname !== `/learn/${nextProductKey}`) {
-      navigate(`/learn/${nextProductKey}`);
+    const nextPath = nextProductKey === ALL_PRODUCTS_KEY ? '/learn' : `/learn/${nextProductKey}`;
+    if (nextProductKey && location.pathname !== nextPath) {
+      navigate(nextPath);
     }
   };
 
@@ -791,6 +800,7 @@ const LearnPage = () => {
               value={filters.selectedProductKey}
               onChange={(event) => setSelectedProduct(event.target.value)}
             >
+              <option value={ALL_PRODUCTS_KEY}>Tutti ({resources.length})</option>
               {productOptions.map((product) => (
                 <option key={product.key} value={product.key}>
                   {product.name} ({product.count})
@@ -892,7 +902,12 @@ const LearnPage = () => {
           <h1 className="text-3xl font-semibold">Learn</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {filteredResources.length} risorse disponibili
-            {selectedProduct ? ` per ${selectedProduct.name}` : ''}.
+            {filters.selectedProductKey === ALL_PRODUCTS_KEY
+              ? ' per tutti i prodotti'
+              : selectedProduct
+                ? ` per ${selectedProduct.name}`
+                : ''}
+            .
           </p>
         </header>
 
@@ -950,14 +965,16 @@ const LearnPage = () => {
                     </span>
                   )}
                   {resource.xp !== null && <span className="ul-chip">{resource.xp} XP</span>}
-                  <span className="ul-chip">{resource.source}</span>
                 </div>
                 <h2 className="mt-3 text-lg font-semibold">{resource.title}</h2>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <span className="ul-chip font-medium">👤 Ruolo: {resource.roles.length > 0 ? resource.roles.join(', ') : 'N/D'}</span>
+                  <span className="ul-chip font-medium">📶 Level: {getLearnLevelLabel(resource.level)}</span>
+                </div>
                 <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                  <span>Prodotto: {resource.productName}</span>
                   {resource.category && <span>Categoria: {resource.category}</span>}
-                  {resource.roles.length > 0 && <span>Ruolo: {resource.roles.join(', ')}</span>}
                   {resource.subjects.length > 0 && <span>Oggetto: {resource.subjects.join(', ')}</span>}
+                  <span>Prodotto: {resource.productName}</span>
                   {formatDateLabel(resource.lastUpdatedDate) && (
                     <span>Aggiornato: {formatDateLabel(resource.lastUpdatedDate)}</span>
                   )}
