@@ -40,8 +40,8 @@ const DEFAULT_FILTERS: FilterState = {
   releaseDateTo: '',
   sortOrder: 'newest',
   query: '',
-  horizonMonths: 12,
-  historyMonths: 6
+  horizonMonths: 120,
+  historyMonths: 120
 };
 
 const ChatPanel = () => {

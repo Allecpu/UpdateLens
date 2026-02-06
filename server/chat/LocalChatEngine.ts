@@ -546,6 +546,17 @@ export const runLocalChatEngine = async (
     (filterPatch.products ?? []).map((value) => normalizeText(value))
   );
 
+  // Default temporal filters (aligned with rules.json configuration)
+  const DEFAULT_HORIZON_MONTHS = 120;
+  const DEFAULT_HISTORY_MONTHS = 120;
+  const nowTs = Date.now();
+  const horizonDate = new Date(nowTs);
+  horizonDate.setMonth(horizonDate.getMonth() + DEFAULT_HORIZON_MONTHS);
+  const historyLimitDate = new Date(nowTs);
+  historyLimitDate.setMonth(historyLimitDate.getMonth() - DEFAULT_HISTORY_MONTHS);
+  const horizonTs = horizonDate.getTime();
+  const historyTs = historyLimitDate.getTime();
+
   const filtered = scopedItems.filter((item) => {
     if (showBookmarksOnly && (!item.id || !bookmarkedIdsSet.has(item.id))) {
       return false;
@@ -558,6 +569,14 @@ export const runLocalChatEngine = async (
       if (!productFilter.has(product)) {
         return false;
       }
+    }
+    // Filtro horizon/history (allineato con FilterService.ts)
+    const availabilityTs = parseDateAny(item.availabilityDate);
+    if (availabilityTs !== null && availabilityTs > horizonTs) {
+      return false;
+    }
+    if (availabilityTs !== null && availabilityTs < historyTs) {
+      return false;
     }
     if (quickQuery || queryTokens.length > 0) {
       const haystackRaw =

@@ -28,7 +28,8 @@
       "Bash(grep:*)",
       "Bash(az webapp restart:*)",
       "Bash(az webapp auth:*)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "WebSearch"
     ]
   }
 }

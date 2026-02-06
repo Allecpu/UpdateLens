@@ -6,7 +6,7 @@ import { extractCountriesFromHtml } from '../utils/geography';
 import { normalizeAvailabilityType } from './FilterMetadata';
 
 // Enable debug logging only when needed (set to true for troubleshooting)
-const DEBUG_FILTERS = true;
+const DEBUG_FILTERS = false;
 
 const toMonthDate = (value: string): Date | null => {
   const [yearRaw, monthRaw] = value.split('-');
