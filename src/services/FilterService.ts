@@ -3,7 +3,7 @@ import type { ReleaseSource } from '../models/ReleaseItem';
 import type { FilterState } from '../models/Filters';
 import { isFilterSupported } from './FilterDefinitions';
 import { extractCountriesFromHtml } from '../utils/geography';
-import { normalizeProductLabel, normalizeAvailabilityType } from './FilterMetadata';
+import { normalizeAvailabilityType } from './FilterMetadata';
 
 // Enable debug logging only when needed (set to true for troubleshooting)
 const DEBUG_FILTERS = false;
@@ -92,8 +92,8 @@ export const filterReleaseItems = (
   // Pre-compute filter values as Sets for O(1) lookup
   const sourcesSet = new Set(filters.sources);
   const statusesSet = new Set(filters.statuses);
-  // Normalize products to lowercase for case-insensitive comparison
-  const productsSet = new Set(filters.products.map(p => normalizeProductLabel(p).toLowerCase()));
+  // Normalize products using same logic as backend for consistent comparison
+  const productsSet = new Set(filters.products.map(normalizeSearchText));
   const categoriesSet = new Set(filters.categories);
   const wavesSet = new Set(filters.waves);
   const tagsSet = new Set(filters.tags);
@@ -127,7 +127,7 @@ export const filterReleaseItems = (
   if (productsSet.size > 0) {
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
-      const normalizedName = normalizeProductLabel(item.productName).toLowerCase();
+      const normalizedName = normalizeSearchText(item.productName ?? '');
       if (productsSet.has(normalizedName)) {
         selectedSources.add(item.source);
       }
@@ -175,7 +175,7 @@ export const filterReleaseItems = (
       if (!selectedSources.has(item.source)) {
         continue;
       }
-      const normalizedItemProduct = normalizeProductLabel(item.productName).toLowerCase();
+      const normalizedItemProduct = normalizeSearchText(item.productName ?? '');
       if (!productsSet.has(normalizedItemProduct)) {
         continue;
       }
