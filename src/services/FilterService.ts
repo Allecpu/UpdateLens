@@ -6,7 +6,7 @@ import { extractCountriesFromHtml } from '../utils/geography';
 import { normalizeAvailabilityType } from './FilterMetadata';
 
 // Enable debug logging only when needed (set to true for troubleshooting)
-const DEBUG_FILTERS = false;
+const DEBUG_FILTERS = true;
 
 const toMonthDate = (value: string): Date | null => {
   const [yearRaw, monthRaw] = value.split('-');
@@ -59,6 +59,7 @@ const normalizeSearchText = (value: string): string => {
     .toLowerCase()
     .normalize('NFD')
     .replace(/\p{Diacritic}/gu, '')
+    .replace(/\bd365\b/g, 'dynamics 365')
     .replace(/[^\p{L}\p{N}\s]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
@@ -360,6 +361,17 @@ export const filterReleaseItems = (
         query: query.length > 0
       }
     });
+    if (hasProductsFilter) {
+      console.log('[FilterService] PRODUCT_FILTER', {
+        rawProducts: filters.products,
+        normalizedProducts: Array.from(productsSet),
+        matchingItems: result.map(i => ({
+          productName: i.productName,
+          product: i.product,
+          normalized: normalizeSearchText(i.productName ?? i.product ?? '')
+        })).slice(0, 5)
+      });
+    }
   }
 
   return result;
