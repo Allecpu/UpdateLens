@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useDeferredValue } from 'react';
+import { useEffect, useMemo, useState, useDeferredValue, useRef } from 'react';
 import { loadAllSnapshots, loadRulesConfig } from '../../services/DataLoader';
 import { filterReleaseItems } from '../../services/FilterService';
 import { buildMarkdown, downloadMarkdown } from '../../services/ExportService';
@@ -475,13 +475,22 @@ const DashboardPage = () => {
     normContext
   ]);
 
+  // Track previous activeCustomerId to detect actual changes
+  const prevCustomerIdRef = useRef<string | null | undefined>(undefined);
+
   // Reset tempFilters, chatFilters and drill state when activeCustomerId changes
   useEffect(() => {
-    setTempFilters({});
-    clearChatFilters();
-    setDrillSource(null);
-    setDrillProduct(null);
-    setVisibleCount(ITEMS_PER_PAGE); // Reset pagination
+    // Only clear chatFilters when activeCustomerId actually changes (not on initial mount or other deps)
+    const customerIdChanged = prevCustomerIdRef.current !== undefined && prevCustomerIdRef.current !== activeCustomerId;
+    prevCustomerIdRef.current = activeCustomerId;
+
+    if (customerIdChanged) {
+      setTempFilters({});
+      clearChatFilters();
+      setDrillSource(null);
+      setDrillProduct(null);
+      setVisibleCount(ITEMS_PER_PAGE); // Reset pagination
+    }
 
     // When switching back to global scope, resync with active preset
     if (!activeCustomerId) {
