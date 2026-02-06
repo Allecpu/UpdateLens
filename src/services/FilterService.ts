@@ -92,7 +92,7 @@ export const filterReleaseItems = (
   // Pre-compute filter values as Sets for O(1) lookup
   const sourcesSet = new Set(filters.sources);
   const statusesSet = new Set(filters.statuses);
-  const productsSet = new Set(filters.products);
+  const productsSet = new Set(filters.products.map(normalizeProductLabel));
   const categoriesSet = new Set(filters.categories);
   const wavesSet = new Set(filters.waves);
   const tagsSet = new Set(filters.tags);
