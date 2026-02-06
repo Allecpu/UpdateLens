@@ -36,7 +36,8 @@ export const ChatQueryResponseSchema = z.object({
   fallbackUsed: z.boolean(),
   traceId: z.string(),
   confidence: z.number().min(0).max(1).optional(),
-  model: z.string().optional()
+  model: z.string().optional(),
+  totalCount: z.number().int().nonnegative().optional()
 });
 
 export type ChatQueryRequest = z.infer<typeof ChatQueryRequestSchema>;

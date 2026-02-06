@@ -127,7 +127,7 @@ export const filterReleaseItems = (
   if (productsSet.size > 0) {
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
-      const normalizedName = normalizeSearchText(item.productName ?? '');
+      const normalizedName = normalizeSearchText(item.productName ?? item.product ?? '');
       if (productsSet.has(normalizedName)) {
         selectedSources.add(item.source);
       }
@@ -175,7 +175,7 @@ export const filterReleaseItems = (
       if (!selectedSources.has(item.source)) {
         continue;
       }
-      const normalizedItemProduct = normalizeSearchText(item.productName ?? '');
+      const normalizedItemProduct = normalizeSearchText(item.productName ?? item.product ?? '');
       if (!productsSet.has(normalizedItemProduct)) {
         continue;
       }

@@ -594,6 +594,7 @@ export const runLocalChatEngine = async (
     filterPatch,
     engine: 'local',
     fallbackUsed: false,
-    traceId
+    traceId,
+    totalCount: filtered.length
   };
 };
