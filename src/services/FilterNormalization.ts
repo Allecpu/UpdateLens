@@ -92,22 +92,9 @@ export const normalizeFilters = (
     matchAllSources
   );
 
-  // Expand products to include at least one product per active source
-  const expandedProducts = new Set(productSelection);
-  sources.forEach((source) => {
-    const hasProduct = productSelection.some(
-      (product) => productSourceMap.get(product) === source
-    );
-    if (!hasProduct) {
-      (productsBySource.get(source) ?? []).forEach((product) =>
-        expandedProducts.add(product)
-      );
-    }
-  });
-
   return {
     ...merged,
-    products: Array.from(expandedProducts),
+    products: productSelection,
     sources,
     bcVersions: normalizeSelection(merged.bcVersions, context.bcVersionOptions),
     statuses: normalizeSelectionForSources(
