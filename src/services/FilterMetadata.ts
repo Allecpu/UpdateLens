@@ -83,7 +83,7 @@ const countProductsWithNormalization = (
   >();
 
   items.forEach((item) => {
-    const rawValue = item.productName;
+    const rawValue = item.productName || item.product;
     if (!rawValue) return;
 
     const label = normalizeProductLabel(rawValue);
