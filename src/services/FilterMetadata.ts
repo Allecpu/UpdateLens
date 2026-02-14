@@ -158,6 +158,19 @@ const countValues = (
     .sort((a, b) => a.value.localeCompare(b.value));
 };
 
+const parseMonthSortKey = (value: string): number => {
+  const match = value.match(/^(\d{4})-(\d{1,2})$/);
+  if (!match) {
+    return 0;
+  }
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  if (!Number.isFinite(year) || !Number.isFinite(month)) {
+    return 0;
+  }
+  return year * 100 + month;
+};
+
 const sortMonthsDesc = (
   items: ReleaseItem[],
   extractValues: (item: ReleaseItem) => string[]
@@ -180,7 +193,53 @@ const sortMonthsDesc = (
       count: entry.count,
       sources: Array.from(entry.sources)
     }))
-    .sort((a, b) => b.value.localeCompare(a.value));
+    .sort((a, b) => {
+      const diff = parseMonthSortKey(b.value) - parseMonthSortKey(a.value);
+      if (diff !== 0) {
+        return diff;
+      }
+      return b.value.localeCompare(a.value);
+    });
+};
+
+const parseWaveSortKey = (value: string): number => {
+  const normalized = value.toLowerCase();
+  const yearMatch = normalized.match(/\b(19|20)\d{2}\b/);
+  const waveMatch = normalized.match(/\bwave\s*([12])\b/);
+  const year = yearMatch ? Number(yearMatch[0]) : 0;
+  const wave = waveMatch ? Number(waveMatch[1]) : 0;
+  return year * 10 + wave;
+};
+
+const sortWavesDesc = (
+  items: ReleaseItem[],
+  extractValues: (item: ReleaseItem) => string[]
+): FilterOption[] => {
+  const counts = new Map<string, { count: number; sources: Set<ReleaseSource> }>();
+  items.forEach((item) => {
+    extractValues(item).forEach((value) => {
+      if (!value) {
+        return;
+      }
+      const entry = counts.get(value) ?? { count: 0, sources: new Set<ReleaseSource>() };
+      entry.count += 1;
+      entry.sources.add(item.source);
+      counts.set(value, entry);
+    });
+  });
+  return Array.from(counts.entries())
+    .map(([value, entry]) => ({
+      value,
+      count: entry.count,
+      sources: Array.from(entry.sources)
+    }))
+    .sort((a, b) => {
+      const diff = parseWaveSortKey(b.value) - parseWaveSortKey(a.value);
+      if (diff !== 0) {
+        return diff;
+      }
+      return b.value.localeCompare(a.value);
+    });
 };
 
 export const buildFilterMetadata = (items: ReleaseItem[]): FilterMetadata => {
@@ -190,7 +249,7 @@ export const buildFilterMetadata = (items: ReleaseItem[]): FilterMetadata => {
     statuses: countValues(items, (item) => [item.status]),
     categories: countValues(items, (item) => [item.category ?? '']),
     tags: countValues(items, (item) => item.tags ?? []),
-    waves: countValues(items, (item) => [item.wave ?? '']),
+    waves: sortWavesDesc(items, (item) => [item.wave ?? '']),
     months: sortMonthsDesc(items, (item) => [item.availabilityDate]),
     availabilityTypes: countValues(items, (item) => item.availabilityTypes ?? [], normalizeAvailabilityType),
     enabledFor: countValues(items, (item) => [item.enabledFor ?? '']),

@@ -55,6 +55,15 @@ type LearnPreset = {
   filters: LearnFiltersState;
 };
 
+type SidebarSectionKey =
+  | 'presets'
+  | 'product'
+  | 'query'
+  | 'types'
+  | 'levels'
+  | 'durations'
+  | 'sources';
+
 const SESSION_KEY = 'updatelens.learn.filters.v2';
 const PRESETS_KEY = 'updatelens.learn.presets.v1';
 const SOURCE_MICROSOFT_LEARN = 'Microsoft Learn';
@@ -281,6 +290,19 @@ const getDeltaRank = (delta: LearnSnapshotDelta): number => {
   return 0;
 };
 
+const resolveLearnResourceUrl = (item: ReleaseItem): string | null => {
+  const candidates = [item.learnUrl, item.docsUrl];
+
+  for (const candidate of candidates) {
+    const normalized = candidate?.trim() ?? '';
+    if (normalized && isValidHttpUrl(normalized)) {
+      return normalized;
+    }
+  }
+
+  return null;
+};
+
 const buildLearnResources = (
   items: ReleaseItem[],
   previousItems: ReleaseItem[],
@@ -292,8 +314,8 @@ const buildLearnResources = (
   const baselineSet = new Set(previousBaselineSources);
 
   previousItems.forEach((item) => {
-    const learnUrl = item.learnUrl;
-    if (!learnUrl || !isValidHttpUrl(learnUrl)) {
+    const resourceUrl = resolveLearnResourceUrl(item);
+    if (!resourceUrl) {
       return;
     }
     const productName = (item.productName ?? item.product).trim();
@@ -302,16 +324,16 @@ const buildLearnResources = (
     }
     const productKey = buildProductKey(item);
     const estimatedMinutes = resolveEstimatedMinutes(item);
-    const signature = buildComparableSignature(item, productKey, learnUrl, estimatedMinutes);
+    const signature = buildComparableSignature(item, productKey, resourceUrl, estimatedMinutes);
     const itemKey = `${item.source}::${item.id.trim().toLowerCase()}::${productKey}`;
-    const urlKey = `${item.source}::${productKey}::${learnUrl.trim().toLowerCase()}`;
+    const urlKey = `${item.source}::${productKey}::${resourceUrl.trim().toLowerCase()}`;
     previousByItem.set(itemKey, signature);
     previousByUrl.set(urlKey, signature);
   });
 
   items.forEach((item) => {
-    const learnUrl = item.learnUrl;
-    if (!learnUrl || !isValidHttpUrl(learnUrl)) {
+    const resourceUrl = resolveLearnResourceUrl(item);
+    if (!resourceUrl) {
       return;
     }
 
@@ -323,7 +345,7 @@ const buildLearnResources = (
     const productKey = buildProductKey(item);
     const type = normalizeLearnType(item.learnMeta?.type);
     const level = normalizeLearnLevel(item.learnMeta?.level);
-    const source = /learn\.microsoft\.com/i.test(learnUrl)
+    const source = /learn\.microsoft\.com/i.test(resourceUrl)
       ? SOURCE_MICROSOFT_LEARN
       : SOURCE_EXTERNAL;
     const roles = resolveRoles(item);
@@ -331,9 +353,9 @@ const buildLearnResources = (
     const moduleCount = resolveModuleCount(item);
     const xp = resolveXp(item);
     const estimatedMinutes = resolveEstimatedMinutes(item);
-    const signature = buildComparableSignature(item, productKey, learnUrl, estimatedMinutes);
+    const signature = buildComparableSignature(item, productKey, resourceUrl, estimatedMinutes);
     const itemKey = `${item.source}::${item.id.trim().toLowerCase()}::${productKey}`;
-    const urlKey = `${item.source}::${productKey}::${learnUrl.trim().toLowerCase()}`;
+    const urlKey = `${item.source}::${productKey}::${resourceUrl.trim().toLowerCase()}`;
     const previousSignature = previousByItem.get(itemKey) ?? previousByUrl.get(urlKey);
 
     let snapshotDelta: LearnSnapshotDelta = null;
@@ -346,7 +368,7 @@ const buildLearnResources = (
     }
 
     const resource: LearnResource = {
-      id: `${productKey}::${learnUrl}`,
+      id: `${productKey}::${resourceUrl}`,
       productKey,
       productName,
       category: item.category?.trim() || '',
@@ -356,7 +378,7 @@ const buildLearnResources = (
       xp,
       title: item.learnMeta?.title || item.title,
       description: item.summary || item.description || '',
-      url: learnUrl,
+      url: resourceUrl,
       type,
       level,
       source,
@@ -483,6 +505,15 @@ const LearnPage = () => {
   const [selectedPresetId, setSelectedPresetId] = useState('');
   const [newPresetName, setNewPresetName] = useState('');
   const [copiedResourceId, setCopiedResourceId] = useState<string | null>(null);
+  const [sidebarSections, setSidebarSections] = useState<Record<SidebarSectionKey, boolean>>({
+    presets: true,
+    product: true,
+    query: true,
+    types: true,
+    levels: true,
+    durations: true,
+    sources: true
+  });
 
   useEffect(() => {
     let active = true;
@@ -741,89 +772,149 @@ const LearnPage = () => {
     });
   };
 
+  const setSectionOpen = (key: SidebarSectionKey, open: boolean) => {
+    setSidebarSections((prev) => ({ ...prev, [key]: open }));
+  };
+
+  const expandAllSections = () => {
+    setSidebarSections((prev) => {
+      const next = { ...prev };
+      (Object.keys(next) as SidebarSectionKey[]).forEach((key) => {
+        next[key] = true;
+      });
+      return next;
+    });
+  };
+
+  const collapseAllSections = () => {
+    setSidebarSections((prev) => {
+      const next = { ...prev };
+      (Object.keys(next) as SidebarSectionKey[]).forEach((key) => {
+        next[key] = false;
+      });
+      return next;
+    });
+  };
+
+  const hasAnyCollapsed = Object.values(sidebarSections).some((isOpen) => !isOpen);
+  const hasAnyExpanded = Object.values(sidebarSections).some((isOpen) => isOpen);
+  const isProductFilterActive = filters.selectedProductKey !== ALL_PRODUCTS_KEY;
+  const isQueryFilterActive = filters.query.trim().length > 0;
+  const isTypesFilterActive = filters.types.length > 0;
+  const isLevelsFilterActive = filters.levels.length > 0;
+  const isDurationsFilterActive = filters.durations.length > 0;
+  const isSourcesFilterActive = filters.sources.length > 0;
+
   return (
     <div className="flex min-h-[calc(100vh-140px)] gap-6">
       <aside className="w-72 rounded-3xl bg-sidebar px-4 py-5 text-sidebar-foreground shadow-soft">
         <div className="sticky top-4 space-y-4">
-          <div>
-            <h2 className="text-lg font-semibold">Learn</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Contenuti formativi filtrabili per prodotto.
-            </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">Learn</h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Contenuti formativi filtrabili per prodotto.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              {hasAnyCollapsed && (
+                <button
+                  type="button"
+                  className="ul-button ul-button-ghost px-3 py-1 text-xs"
+                  onClick={expandAllSections}
+                >
+                  Espandi
+                </button>
+              )}
+              {hasAnyExpanded && (
+                <button
+                  type="button"
+                  className="ul-button ul-button-ghost px-3 py-1 text-xs"
+                  onClick={collapseAllSections}
+                >
+                  Comprimi
+                </button>
+              )}
+            </div>
           </div>
-
-          <div className="rounded-2xl border border-border/60 p-3">
-            <div className="mb-2 text-xs uppercase text-muted-foreground">Miei preset Learn</div>
-            <select
-              className="ul-input rounded-xl"
-              value={selectedPresetId}
-              onChange={(event) => setSelectedPresetId(event.target.value)}
-            >
-              <option value="">Seleziona preset...</option>
-              {presets.map((preset) => (
-                <option key={preset.id} value={preset.id}>
-                  {preset.name}
-                </option>
-              ))}
-            </select>
-            <div className="mt-2 flex gap-2">
-              <button
-                className="ul-button ul-button-ghost flex-1"
-                onClick={handleApplyPreset}
-                disabled={!selectedPresetId}
+          <details open={sidebarSections.presets} onToggle={(e) => setSectionOpen('presets', (e.currentTarget as HTMLDetailsElement).open)}>
+            <summary className="cursor-pointer text-xs uppercase text-muted-foreground marker:text-muted-foreground">Miei preset Learn</summary>
+            <div className="mt-2 rounded-2xl border border-border/60 p-3">
+              <select
+                className="ul-input rounded-xl"
+                value={selectedPresetId}
+                onChange={(event) => setSelectedPresetId(event.target.value)}
               >
-                Applica
-              </button>
-              <button
-                className="ul-button ul-button-ghost flex-1"
-                onClick={handleDeletePreset}
-                disabled={!selectedPresetId}
-              >
-                Elimina
+                <option value="">Seleziona preset...</option>
+                {presets.map((preset) => (
+                  <option key={preset.id} value={preset.id}>
+                    {preset.name}
+                  </option>
+                ))}
+              </select>
+              <div className="mt-2 flex gap-2">
+                <button
+                  className="ul-button ul-button-ghost flex-1"
+                  onClick={handleApplyPreset}
+                  disabled={!selectedPresetId}
+                >
+                  Applica
+                </button>
+                <button
+                  className="ul-button ul-button-ghost flex-1"
+                  onClick={handleDeletePreset}
+                  disabled={!selectedPresetId}
+                >
+                  Elimina
+                </button>
+              </div>
+              <input
+                className="ul-input mt-2 rounded-xl"
+                value={newPresetName}
+                placeholder="Nome nuovo preset..."
+                onChange={(event) => setNewPresetName(event.target.value)}
+              />
+              <button className="ul-button ul-button-primary mt-2 w-full" onClick={handleSavePreset}>
+                Salva preset corrente
               </button>
             </div>
-            <input
-              className="ul-input mt-2 rounded-xl"
-              value={newPresetName}
-              placeholder="Nome nuovo preset..."
-              onChange={(event) => setNewPresetName(event.target.value)}
-            />
-            <button className="ul-button ul-button-primary mt-2 w-full" onClick={handleSavePreset}>
-              Salva preset corrente
-            </button>
-          </div>
+          </details>
 
-          <div>
-            <label className="mb-1 block text-xs uppercase text-muted-foreground">Prodotto</label>
-            <select
-              className="ul-input rounded-xl"
-              value={filters.selectedProductKey}
-              onChange={(event) => setSelectedProduct(event.target.value)}
-            >
-              <option value={ALL_PRODUCTS_KEY}>Tutti ({resources.length})</option>
-              {productOptions.map((product) => (
-                <option key={product.key} value={product.key}>
-                  {product.name} ({product.count})
-                </option>
-              ))}
-            </select>
-          </div>
+          <details open={sidebarSections.product} onToggle={(e) => setSectionOpen('product', (e.currentTarget as HTMLDetailsElement).open)}>
+            <summary className={`cursor-pointer text-xs uppercase text-muted-foreground ${isProductFilterActive ? 'marker:text-primary' : 'marker:text-muted-foreground'}`}>Prodotto</summary>
+            <div className="mt-2">
+              <select
+                className="ul-input rounded-xl"
+                value={filters.selectedProductKey}
+                onChange={(event) => setSelectedProduct(event.target.value)}
+              >
+                <option value={ALL_PRODUCTS_KEY}>Tutti ({resources.length})</option>
+                {productOptions.map((product) => (
+                  <option key={product.key} value={product.key}>
+                    {product.name} ({product.count})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </details>
 
-          <div>
-            <label className="mb-1 block text-xs uppercase text-muted-foreground">Ricerca</label>
-            <input
-              className="ul-input rounded-xl"
-              value={filters.query}
-              placeholder="Cerca titolo o descrizione..."
-              onChange={(event) =>
-                setFilters((current) => ({ ...current, query: event.target.value }))
-              }
-            />
-          </div>
+          <details open={sidebarSections.query} onToggle={(e) => setSectionOpen('query', (e.currentTarget as HTMLDetailsElement).open)}>
+            <summary className={`cursor-pointer text-xs uppercase text-muted-foreground ${isQueryFilterActive ? 'marker:text-primary' : 'marker:text-muted-foreground'}`}>Ricerca</summary>
+            <div className="mt-2">
+              <input
+                className="ul-input rounded-xl"
+                value={filters.query}
+                placeholder="Cerca titolo o descrizione..."
+                onChange={(event) =>
+                  setFilters((current) => ({ ...current, query: event.target.value }))
+                }
+              />
+            </div>
+          </details>
 
-          <div>
-            <div className="mb-1 text-xs uppercase text-muted-foreground">Tipo contenuto</div>
-            <div className="space-y-1">
+          <details open={sidebarSections.types} onToggle={(e) => setSectionOpen('types', (e.currentTarget as HTMLDetailsElement).open)}>
+            <summary className={`cursor-pointer text-xs uppercase text-muted-foreground ${isTypesFilterActive ? 'marker:text-primary' : 'marker:text-muted-foreground'}`}>Tipo contenuto</summary>
+            <div className="mt-2 space-y-1">
               {(['learningPath', 'module', 'course', 'certification'] as LearnType[]).map(
                 (type) => (
                   <label key={type} className="flex items-center gap-2 text-sm">
@@ -838,11 +929,11 @@ const LearnPage = () => {
                 )
               )}
             </div>
-          </div>
+          </details>
 
-          <div>
-            <div className="mb-1 text-xs uppercase text-muted-foreground">Livello</div>
-            <div className="space-y-1">
+          <details open={sidebarSections.levels} onToggle={(e) => setSectionOpen('levels', (e.currentTarget as HTMLDetailsElement).open)}>
+            <summary className={`cursor-pointer text-xs uppercase text-muted-foreground ${isLevelsFilterActive ? 'marker:text-primary' : 'marker:text-muted-foreground'}`}>Livello</summary>
+            <div className="mt-2 space-y-1">
               {(['beginner', 'intermediate', 'advanced'] as LearnLevel[]).map((level) => (
                 <label key={level} className="flex items-center gap-2 text-sm">
                   <input
@@ -855,11 +946,11 @@ const LearnPage = () => {
                 </label>
               ))}
             </div>
-          </div>
+          </details>
 
-          <div>
-            <div className="mb-1 text-xs uppercase text-muted-foreground">Durata stimata</div>
-            <div className="space-y-1">
+          <details open={sidebarSections.durations} onToggle={(e) => setSectionOpen('durations', (e.currentTarget as HTMLDetailsElement).open)}>
+            <summary className={`cursor-pointer text-xs uppercase text-muted-foreground ${isDurationsFilterActive ? 'marker:text-primary' : 'marker:text-muted-foreground'}`}>Durata stimata</summary>
+            <div className="mt-2 space-y-1">
               {DURATION_BUCKETS.map((bucket) => (
                 <label key={bucket} className="flex items-center gap-2 text-sm">
                   <input
@@ -872,11 +963,11 @@ const LearnPage = () => {
                 </label>
               ))}
             </div>
-          </div>
+          </details>
 
-          <div>
-            <div className="mb-1 text-xs uppercase text-muted-foreground">Fonte</div>
-            <div className="space-y-1">
+          <details open={sidebarSections.sources} onToggle={(e) => setSectionOpen('sources', (e.currentTarget as HTMLDetailsElement).open)}>
+            <summary className={`cursor-pointer text-xs uppercase text-muted-foreground ${isSourcesFilterActive ? 'marker:text-primary' : 'marker:text-muted-foreground'}`}>Fonte</summary>
+            <div className="mt-2 space-y-1">
               {sourceOptions.map((source) => (
                 <label key={source} className="flex items-center gap-2 text-sm">
                   <input
@@ -889,7 +980,7 @@ const LearnPage = () => {
                 </label>
               ))}
             </div>
-          </div>
+          </details>
 
           <button className="ul-button ul-button-ghost w-full" onClick={resetFilters}>
             Reset filtri
@@ -989,7 +1080,7 @@ const LearnPage = () => {
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    Apri su Learn
+                    {resource.source === SOURCE_MICROSOFT_LEARN ? 'Apri su Learn' : 'Apri risorsa'}
                   </a>
                   <button
                     className="ul-button ul-button-ghost inline-flex items-center gap-2"
