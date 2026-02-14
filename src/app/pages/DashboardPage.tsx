@@ -441,13 +441,6 @@ const DashboardPage = () => {
     normContext.sourceOptions.length > 0 && normContext.metadata.products.length > 0;
   const filtersReady = snapshotsLoaded && contextReady && cssFilters !== null;
 
-  // Debug log for filter hydration sequence (can be removed after verification)
-  useEffect(() => {
-    if (filtersReady) {
-      console.log('[FILTERS_HYDRATED] Filters ready before KPI render - no flash expected');
-    }
-  }, [filtersReady]);
-
   // =====================================================================
   // SINGLE SOURCE OF TRUTH: Use selectEffectiveFilters
   // This is the SAME function used by GlobalFiltersPage
@@ -525,13 +518,6 @@ const DashboardPage = () => {
     if (chatFilters && Object.keys(chatFilters).length > 0) {
       merged = { ...merged, ...chatFilters };
     }
-    // DEBUG: Log filter merge process
-    console.log('[DashboardPage] FILTER_MERGE', {
-      chatFilters,
-      chatFiltersProducts: chatFilters?.products,
-      mergedProducts: merged.products,
-      hasChatFilters: chatFilters && Object.keys(chatFilters).length > 0
-    });
     return stripTargetingFields(merged);
   }, [persistentBaseFilters, tempFilters, chatFilters]);
 

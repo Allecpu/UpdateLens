@@ -69,7 +69,7 @@ export const normalizeFilters = (
     return defaults;
   }
 
-  const { sourceOptions, metadata, productSourceMap, productsBySource } = context;
+  const { sourceOptions, metadata } = context;
   const merged = { ...defaults, ...raw };
   const matchAllSources = false;
 

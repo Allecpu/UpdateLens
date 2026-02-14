@@ -6,12 +6,13 @@ import {
 import { exportCustomers, importCustomers } from '../../services/CustomerStorage';
 import type { Customer } from '../../models/Customer';
 import type { CustomerGroup } from '../../models/CustomerGroup';
-import type { ReleaseItem, ReleaseSource } from '../../models/ReleaseItem';
+import type { ReleaseItem } from '../../models/ReleaseItem';
 import { ALL_RELEASE_SOURCES } from '../../services/FilterDefinitions';
 import { useCustomerStore } from '../store/useCustomerStore';
 import { useCustomerGroupStore } from '../store/useCustomerGroupStore';
 import { useFilterStore, type FilterState } from '../store/useFilterStore';
-import { buildBcVersionOptions, buildFilterMetadata } from '../../services/FilterMetadata';
+import { buildFilterMetadata } from '../../services/FilterMetadata';
+import { useNormalizedFilters } from '../../hooks/useNormalizedFilters';
 import FilterListSection from '../components/FilterListSection';
 
 const slugify = (value: string): string =>
@@ -30,35 +31,6 @@ const formatDateLabel = (value?: string | null): string => {
   }
   return parsed.toLocaleDateString('it-IT');
 };
-
-const normalizeSelection = (values: string[], options: string[]): string[] => {
-  if (values.length === 0) {
-    return [];
-  }
-  const valid = values.filter((value) => options.includes(value));
-  return valid.length > 0 ? valid : options;
-};
-
-const optionValuesForSources = (
-  options: { value: string; sources: ReleaseSource[] }[],
-  sources: ReleaseSource[],
-  matchAllSources: boolean
-): string[] => {
-  return options
-    .filter((option) =>
-      matchAllSources
-        ? sources.every((source) => option.sources.includes(source))
-        : option.sources.some((source) => sources.includes(source))
-    )
-    .map((option) => option.value);
-};
-
-const normalizeSelectionForSources = (
-  values: string[],
-  options: { value: string; sources: ReleaseSource[] }[],
-  sources: ReleaseSource[],
-  matchAllSources: boolean
-): string[] => normalizeSelection(values, optionValuesForSources(options, sources, matchAllSources));
 
 const isEntryActive = (entry: { isActive?: boolean }): boolean => entry.isActive !== false;
 
@@ -165,34 +137,6 @@ const ClientsPage = () => {
     () => metadata.products.map((opt) => opt.value),
     [metadata.products]
   );
-  const bcVersionOptions = useMemo(
-    () => buildBcVersionOptions(snapshotItems),
-    [snapshotItems]
-  );
-  const bcVersionValues = useMemo(
-    () => bcVersionOptions.map((option) => option.value),
-    [bcVersionOptions]
-  );
-  const productSourceMap = useMemo(() => {
-    const map = new Map<string, ReleaseSource>();
-    snapshotItems.forEach((item) => {
-      if (!map.has(item.productName)) {
-        map.set(item.productName, item.source);
-      }
-    });
-    return map;
-  }, [snapshotItems]);
-  const productsBySource = useMemo(() => {
-    const map = new Map<ReleaseSource, string[]>();
-    snapshotItems.forEach((item) => {
-      const list = map.get(item.source) ?? [];
-      if (!list.includes(item.productName)) {
-        list.push(item.productName);
-        map.set(item.source, list);
-      }
-    });
-    return map;
-  }, [snapshotItems]);
   const customerOptions = useMemo(
     () =>
       index
@@ -225,41 +169,25 @@ const ClientsPage = () => {
     ]
   );
 
-  const defaultFilters: FilterState = useMemo(
-    () => ({
-      targetCustomerIds: [],
-      targetGroupIds: [],
-      targetCssOwners: [],
-      products: productOptions,
-      sources: sourceOptions,
-      statuses: statusOptions,
-      categories: [],
-      tags: [],
-      waves: [],
-      months: [],
-      availabilityTypes: [],
-      enabledFor: [],
-      geography: [],
-      language: [],
-      bcVersions: [],
-      periodNewDays: 0,
-      periodChangedDays: 0,
-      releaseInDays: 0,
-      minBcVersionMin: null,
-      releaseDateFrom: '',
-      releaseDateTo: '',
-      sortOrder: 'newest',
-      query: '',
-      horizonMonths: rulesConfig.defaults.horizonMonths,
-      historyMonths: rulesConfig.defaults.historyMonths
-    }),
-    [
-      productOptions,
+  // Centralized normalization via hook - editingId acts as "customer scope"
+  const customerMode =
+    editingId ? customerFilterMode[editingId] ?? 'inherit' : 'inherit';
+
+  const {
+    normalizedGlobal: normalizedCssFilters,
+    currentFilters: normalizedCustomerFilters,
+    defaultFilters
+  } = useNormalizedFilters(
+    {
+      items: snapshotItems,
+      metadata,
       sourceOptions,
       statusOptions,
-      rulesConfig.defaults.horizonMonths,
-      rulesConfig.defaults.historyMonths
-    ]
+      productOptions,
+      rulesDefaults: rulesConfig.defaults
+    },
+    editingId && customerMode === 'custom' ? 'customer' : 'global',
+    editingId
   );
 
   useEffect(() => {
@@ -268,156 +196,6 @@ const ClientsPage = () => {
     }
     ensureCssFilters(defaultFilters);
   }, [ensureCssFilters, defaultFilters, snapshotsLoaded]);
-
-  const normalizeFilters = (raw: FilterState): FilterState => {
-    const merged = { ...defaultFilters, ...raw };
-    const sources = normalizeSelection(merged.sources, sourceOptions) as ReleaseSource[];
-    const matchAllSources = false;
-    const productSelection = normalizeSelectionForSources(
-      merged.products,
-      metadata.products,
-      sources,
-      matchAllSources
-    );
-    const statuses = normalizeSelectionForSources(
-      merged.statuses,
-      metadata.statuses,
-      sources,
-      matchAllSources
-    );
-    const categories = normalizeSelectionForSources(
-      merged.categories,
-      metadata.categories,
-      sources,
-      matchAllSources
-    );
-    const tags = normalizeSelectionForSources(
-      merged.tags,
-      metadata.tags,
-      sources,
-      matchAllSources
-    );
-    const waves = normalizeSelectionForSources(
-      merged.waves,
-      metadata.waves,
-      sources,
-      matchAllSources
-    );
-    const months = normalizeSelectionForSources(
-      merged.months,
-      metadata.months,
-      sources,
-      matchAllSources
-    );
-    const availabilityTypes = normalizeSelectionForSources(
-      merged.availabilityTypes,
-      metadata.availabilityTypes,
-      sources,
-      matchAllSources
-    );
-    const enabledFor = normalizeSelectionForSources(
-      merged.enabledFor,
-      metadata.enabledFor,
-      sources,
-      matchAllSources
-    );
-    const geography = normalizeSelectionForSources(
-      merged.geography,
-      metadata.geography,
-      sources,
-      matchAllSources
-    );
-    const bcVersions = normalizeSelection(merged.bcVersions, bcVersionValues);
-    const language = normalizeSelectionForSources(
-      merged.language,
-      metadata.language,
-      sources,
-      matchAllSources
-    );
-    const expandedProducts = new Set(productSelection);
-    sources.forEach((source) => {
-      const hasProduct = productSelection.some(
-        (product) => productSourceMap.get(product) === source
-      );
-      if (!hasProduct) {
-        (productsBySource.get(source) ?? []).forEach((product) =>
-          expandedProducts.add(product)
-        );
-      }
-    });
-    return {
-      ...merged,
-      products: Array.from(expandedProducts),
-      sources,
-      statuses,
-      categories,
-      tags,
-      waves,
-      months,
-      availabilityTypes,
-      enabledFor,
-      geography,
-      bcVersions,
-      language
-    };
-  };
-
-  const normalizedCssFilters = useMemo(() => {
-    return normalizeFilters(cssFilters ?? defaultFilters);
-  }, [
-    defaultFilters,
-    cssFilters,
-    productOptions,
-    sourceOptions,
-    statusOptions,
-    metadata.products,
-    metadata.statuses,
-    metadata.categories,
-    metadata.tags,
-    metadata.waves,
-    metadata.months,
-    metadata.availabilityTypes,
-    metadata.enabledFor,
-    metadata.geography,
-    metadata.language,
-    bcVersionValues,
-    productSourceMap,
-    productsBySource
-  ]);
-
-  const customerMode =
-    editingId ? customerFilterMode[editingId] ?? 'inherit' : 'inherit';
-  const normalizedCustomerFilters = useMemo(() => {
-    if (!editingId || customerMode === 'inherit') {
-      return normalizedCssFilters;
-    }
-    const custom = customerFilters[editingId];
-    if (!custom) {
-      return normalizedCssFilters;
-    }
-    return normalizeFilters(custom);
-  }, [
-    editingId,
-    customerMode,
-    customerFilters,
-    normalizedCssFilters,
-    productOptions,
-    sourceOptions,
-    statusOptions,
-    metadata.products,
-    metadata.statuses,
-    metadata.categories,
-    metadata.tags,
-    metadata.waves,
-    metadata.months,
-    metadata.availabilityTypes,
-    metadata.enabledFor,
-    metadata.geography,
-    metadata.language,
-    bcVersionValues,
-    productSourceMap,
-    productsBySource
-  ]);
 
   const normalizeGroupName = (name: string): string => name.trim().toLowerCase();
 

@@ -12,10 +12,15 @@ import {
 import {
   ALL_RELEASE_SOURCES,
   RELEASE_SOURCE_LABELS,
-  getActiveSupportedSources,
-  getSupportedSourcesForFilter,
   resolveActiveSources
 } from '../../services/FilterDefinitions';
+import {
+  hasOptionsForSources as sharedHasOptionsForSources,
+  sourceTagFor as sharedSourceTagFor,
+  isFilterVisible as sharedIsFilterVisible,
+  sourcesFromOptions,
+  splitProductsBySource
+} from '../../utils/filterDisplayHelpers';
 import { isSectionActive, isAdvancedSectionActive } from '../../utils/filterSectionActive';
 import FilterListSection from './FilterListSection';
 import FilterSourceToggle from './FilterSourceToggle';
@@ -59,20 +64,6 @@ type Props = {
   customerPreviewSlot?: React.ReactNode;
   // Layout variant
   variant?: 'full' | 'sidebar';
-};
-
-const optionValuesForSources = (
-  options: { value: string; sources: ReleaseSource[] }[],
-  sources: ReleaseSource[],
-  matchAllSources: boolean
-): string[] => {
-  return options
-    .filter((option) =>
-      matchAllSources
-        ? sources.every((source) => option.sources.includes(source))
-        : option.sources.some((source) => sources.includes(source))
-    )
-    .map((option) => option.value);
 };
 
 // Expand/Collapse All button component - defined outside FiltersPanel to prevent
@@ -159,66 +150,19 @@ const FiltersPanel = ({
 
   const hasOptionsForSources = (
     opts: { value: string; sources: ReleaseSource[] }[]
-  ): boolean => {
-    if (activeSources.length === 0) {
-      return opts.length > 0;
-    }
-    return optionValuesForSources(opts, activeSources, matchAllSources).length > 0;
-  };
-
-  const sourcesFromOptions = (opts: { sources: ReleaseSource[] }[]): ReleaseSource[] => {
-    const set = new Set<ReleaseSource>();
-    opts.forEach((option) => option.sources.forEach((source) => set.add(source)));
-    return Array.from(set);
-  };
-
-  const formatSourceBadge = (sources: ReleaseSource[]): string | undefined => {
-    const ordered = (['Microsoft', 'EOS', 'Fabric', 'MICROSOFT 365'] as ReleaseSource[]).filter((source) =>
-      sources.includes(source)
-    );
-    if (ordered.length === 4) {
-      return 'Tutte le fonti';
-    }
-    if (ordered.length === 3) {
-      return `${RELEASE_SOURCE_LABELS[ordered[0]]} + ${RELEASE_SOURCE_LABELS[ordered[1]]} + ${RELEASE_SOURCE_LABELS[ordered[2]]}`;
-    }
-    if (ordered.length === 2) {
-      return `${RELEASE_SOURCE_LABELS[ordered[0]]} + ${RELEASE_SOURCE_LABELS[ordered[1]]}`;
-    }
-    if (ordered.length === 1) {
-      return RELEASE_SOURCE_LABELS[ordered[0]];
-    }
-    return undefined;
-  };
+  ): boolean => sharedHasOptionsForSources(opts, activeSources, matchAllSources);
 
   const sourceTagFor = (
     key: FilterKey,
     availableSources?: ReleaseSource[]
-  ): string | undefined => {
-    const supported = availableSources ?? getActiveSupportedSources(activeSources, key);
-    const activeSupported = supported.filter((source) => activeSources.includes(source));
-    if (activeSources.length > 1 && activeSupported.length > 0) {
-      return formatSourceBadge(activeSupported);
-    }
-    return undefined;
-  };
+  ): string | undefined => sharedSourceTagFor(activeSources, key, availableSources);
 
-  const isFilterVisible = (key: FilterKey): boolean => {
-    if (activeSources.length === 0) {
-      return getSupportedSourcesForFilter(key).length > 0;
-    }
-    return getActiveSupportedSources(activeSources, key).length > 0;
-  };
+  const isFilterVisible = (key: FilterKey): boolean =>
+    sharedIsFilterVisible(activeSources, key);
 
   const showProductSplit = activeSources.length > 1;
-  const microsoftProducts = metadata.products.filter((option) =>
-    option.sources.includes('Microsoft')
-  );
-  const eosProducts = metadata.products.filter((option) => option.sources.includes('EOS'));
-  const fabricProducts = metadata.products.filter((option) => option.sources.includes('Fabric'));
-  const m365RoadmapProducts = metadata.products.filter((option) =>
-    option.sources.includes('MICROSOFT 365')
-  );
+  const { microsoftProducts, eosProducts, fabricProducts, m365RoadmapProducts } =
+    splitProductsBySource(metadata.products);
 
   const updateProductsForSource = (source: ReleaseSource, next: string[]) => {
     const toKeep = (filters.products ?? []).filter(

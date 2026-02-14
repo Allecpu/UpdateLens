@@ -1,9 +1,8 @@
 import type { ReleaseItem } from '../models/ReleaseItem';
-import type { ReleaseSource } from '../models/ReleaseItem';
 import type { FilterState } from '../models/Filters';
 import { isFilterSupported } from './FilterDefinitions';
 import { extractCountriesFromHtml } from '../utils/geography';
-import { normalizeAvailabilityType } from './FilterMetadata';
+import { normalizeAvailabilityType, normalizeProductLabel } from './FilterMetadata';
 
 // Enable debug logging only when needed (set to true for troubleshooting)
 const DEBUG_FILTERS = false;
@@ -84,6 +83,9 @@ export const filterReleaseItems = (
   items: ReleaseItem[],
   filters: FilterState
 ): ReleaseItem[] => {
+  const normalizeProductKey = (value: string): string =>
+    normalizeSearchText(normalizeProductLabel(value));
+
   // Pre-compute date boundaries once
   const now = new Date();
   const nowTime = now.getTime();
@@ -94,7 +96,7 @@ export const filterReleaseItems = (
   const sourcesSet = new Set(filters.sources);
   const statusesSet = new Set(filters.statuses);
   // Normalize products using same logic as backend for consistent comparison
-  const productsSet = new Set(filters.products.map(normalizeSearchText));
+  const productsSet = new Set(filters.products.map(normalizeProductKey));
   const categoriesSet = new Set(filters.categories);
   const wavesSet = new Set(filters.waves);
   const tagsSet = new Set(filters.tags);
@@ -122,18 +124,6 @@ export const filterReleaseItems = (
   const releaseInDaysLimit = filters.releaseInDays > 0
     ? new Date(nowTime + filters.releaseInDays * 24 * 60 * 60 * 1000)
     : null;
-
-  // Pre-compute which sources have selected products (single pass)
-  const selectedSources = new Set<ReleaseSource>();
-  if (productsSet.size > 0) {
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      const normalizedName = normalizeSearchText(item.productName || item.product || '');
-      if (productsSet.has(normalizedName)) {
-        selectedSources.add(item.source);
-      }
-    }
-  }
 
   // Check if filters are active (for early exit optimization)
   const hasSourcesFilter = sourcesSet.size > 0;
@@ -173,10 +163,7 @@ export const filterReleaseItems = (
 
     // 3. Products filter
     if (hasProductsFilter && isFilterSupported(item.source, 'productOrApp')) {
-      if (!selectedSources.has(item.source)) {
-        continue;
-      }
-      const normalizedItemProduct = normalizeSearchText(item.productName || item.product || '');
+      const normalizedItemProduct = normalizeProductKey(item.productName || item.product || '');
       if (!productsSet.has(normalizedItemProduct)) {
         continue;
       }
@@ -369,7 +356,7 @@ export const filterReleaseItems = (
         matchingItems: result.map(i => ({
           productName: i.productName,
           product: i.product,
-          normalized: normalizeSearchText(i.productName ?? i.product ?? '')
+          normalized: normalizeProductKey(i.productName ?? i.product ?? '')
         })).slice(0, 5)
       });
     }
