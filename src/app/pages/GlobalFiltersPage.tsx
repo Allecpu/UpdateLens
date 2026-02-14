@@ -304,16 +304,12 @@ const GlobalFiltersPage = () => {
     const merged = { ...defaultFilters, ...raw };
     const sources = normalizeSelection(merged.sources, sourceOptions) as ReleaseSource[];
     const matchAllSources = false;
-    const productSelection = normalizeSelectionForSources(
+    const products = normalizeSelectionForSources(
       merged.products,
       metadata.products,
       sources,
       matchAllSources
     );
-    // When all products are selected (system default or fallback), disable the filter
-    // to avoid excluding items whose productName doesn't match any normalized option
-    const allProductOptions = optionValuesForSources(metadata.products, sources, matchAllSources);
-    const products = productSelection.length >= allProductOptions.length ? [] : productSelection;
     const result: FilterState = {
       ...merged,
       products,
