@@ -1,4 +1,4 @@
-import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 
 import { loadAllSnapshots, loadRulesConfig } from '../../services/DataLoader';
 import { useDebouncedInput } from '../../hooks/useDebouncedValue';
@@ -294,8 +294,13 @@ const GlobalFiltersPage = () => {
     }
   }, [cssFilters, setCssFilters]);
 
-  // Normalization logic helper
-  const normalizeFiltersInternal = (raw: FilterState): FilterState => {
+  // Normalization logic helper with WeakMap cache
+  const normalizeFiltersCache = useRef(new WeakMap<FilterState, FilterState>());
+
+  const normalizeFiltersInternal = useCallback((raw: FilterState): FilterState => {
+    const cached = normalizeFiltersCache.current.get(raw);
+    if (cached) return cached;
+
     const merged = { ...defaultFilters, ...raw };
     const sources = normalizeSelection(merged.sources, sourceOptions) as ReleaseSource[];
     const matchAllSources = false;
@@ -305,9 +310,13 @@ const GlobalFiltersPage = () => {
       sources,
       matchAllSources
     );
-    return {
+    // When all products are selected (system default or fallback), disable the filter
+    // to avoid excluding items whose productName doesn't match any normalized option
+    const allProductOptions = optionValuesForSources(metadata.products, sources, matchAllSources);
+    const products = productSelection.length >= allProductOptions.length ? [] : productSelection;
+    const result: FilterState = {
       ...merged,
-      products: productSelection,
+      products,
       sources,
       statuses: normalizeSelectionForSources(
         merged.statuses,
@@ -360,7 +369,14 @@ const GlobalFiltersPage = () => {
         matchAllSources
       )
     };
-  };
+    normalizeFiltersCache.current.set(raw, result);
+    return result;
+  }, [defaultFilters, sourceOptions, statusOptions, metadata, bcVersionValues]);
+
+  // Invalidate cache when normalizeFiltersInternal dependencies change
+  useEffect(() => {
+    normalizeFiltersCache.current = new WeakMap();
+  }, [normalizeFiltersInternal]);
 
   const normalizedGlobal = useMemo(() => {
     if (!cssFilters) {
@@ -657,89 +673,74 @@ const GlobalFiltersPage = () => {
     });
     return map;
   }, [groups]);
-  const globalProductsCount = useMemo(
-    () => filterReleaseItems(items, deferredNormalizedGlobal).length,
-    [items, deferredNormalizedGlobal]
+  const globalKpiItems = useMemo(
+    () => filterScope === 'global'
+      ? kpiItems
+      : filterReleaseItems(items, deferredNormalizedGlobal),
+    [filterScope, kpiItems, items, deferredNormalizedGlobal]
   );
+  const globalProductsCount = globalKpiItems.length;
+  // Step A: customerPreviewBase without expensive counts (cheap)
+  const customerPreviewBase = useMemo(() => {
+    return activeIndex
+      .filter((entry) => activeIncludedCustomerIds.has(entry.id))
+      .map((entry) => ({
+        ...entry,
+        groups: groupNamesByCustomerId.get(entry.id) ?? [],
+        hasOverride: (customerFilterMode[entry.id] ?? 'inherit') === 'custom' && Boolean(customerFilters[entry.id])
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [customerFilters, customerFilterMode, groupNamesByCustomerId, activeIncludedCustomerIds, activeIndex]);
+
+  // Step B: Paginate BEFORE expensive count computation
+  const pageSize = 20;
+  const totalPages = Math.max(1, Math.ceil(customerPreviewBase.length / pageSize));
+  const clampedPageIndex = Math.min(pageIndex, totalPages - 1);
+  const visibleCustomerIds = useMemo(() => {
+    const start = clampedPageIndex * pageSize;
+    return customerPreviewBase.slice(start, start + pageSize).map((e) => e.id);
+  }, [clampedPageIndex, customerPreviewBase]);
+
+  // Step C: overrideCounts only for visible page (max 20 instead of ALL)
   const overrideCounts = useMemo(() => {
-    const overrideCustomers = new Set(
-      Object.entries(customerFilterMode)
-        .filter(([id, mode]) => mode === 'custom' && customerFilters[id])
-        .map(([id]) => id)
-    );
     const counts = new Map<string, number>();
-    overrideCustomers.forEach((id) => {
+    for (const id of visibleCustomerIds) {
+      const mode = customerFilterMode[id] ?? 'inherit';
       const raw = customerFilters[id];
-      if (!raw) {
-        return;
-      }
+      if (mode !== 'custom' || !raw) continue;
       const normalized = normalizeFiltersInternal(raw);
       counts.set(id, filterReleaseItems(items, normalized).length);
-    });
+    }
     return counts;
-  }, [
-    customerFilters,
-    customerFilterMode,
-    items,
-    // dependencies for normalizeFiltersInternal
-    defaultFilters,
-    sourceOptions,
-    metadata
-  ]);
-  const customerPreview = useMemo(() => {
-    const entries = activeIndex
-      .filter((entry) => activeIncludedCustomerIds.has(entry.id))
-      .map((entry) => {
-        const hasOverride =
-          (customerFilterMode[entry.id] ?? 'inherit') === 'custom' &&
-          Boolean(customerFilters[entry.id]);
-        const productsCount = hasOverride
-          ? overrideCounts.get(entry.id) ?? globalProductsCount
-          : globalProductsCount;
-        return {
-          ...entry,
-          groups: groupNamesByCustomerId.get(entry.id) ?? [],
-          productsCount,
-          hasOverride
-        };
-      })
-      .sort((a, b) => {
-        if (b.productsCount !== a.productsCount) {
-          return b.productsCount - a.productsCount;
-        }
-        return a.name.localeCompare(b.name);
-      });
-    const totalProductsCount = entries.length > 0 ? globalProductsCount : 0;
-    const avgProductsPerCustomer = entries.length > 0 ? globalProductsCount : 0;
-    const overridesCount = entries.filter((entry) => entry.hasOverride).length;
-    const inheritedSample = entries.find((entry) => !entry.hasOverride) ?? null;
-    const overrideSample = entries.find((entry) => entry.hasOverride) ?? null;
-    return {
-      entries,
-      totalProductsCount,
-      avgProductsPerCustomer,
-      overridesCount,
-      globalProductsCount,
-      inheritedSample,
-      overrideSample
-    };
-  }, [
-    customerFilters,
-    customerFilterMode,
-    groupNamesByCustomerId,
-    activeIncludedCustomerIds,
-    activeIndex,
-    overrideCounts,
-    globalProductsCount
-  ]);
-  const pageSize = 20;
-  const totalPages = Math.max(1, Math.ceil(customerPreview.entries.length / pageSize));
-  const clampedPageIndex = Math.min(pageIndex, totalPages - 1);
+  }, [visibleCustomerIds, customerFilters, customerFilterMode, items, normalizeFiltersInternal]);
+
+  // Step D: visibleCustomers with counts and local sort
   const visibleCustomers = useMemo(() => {
     const start = clampedPageIndex * pageSize;
-    return customerPreview.entries.slice(start, start + pageSize);
-  }, [clampedPageIndex, customerPreview.entries]);
-  const avgProductsValue = customerPreview.avgProductsPerCustomer;
+    return customerPreviewBase.slice(start, start + pageSize)
+      .map((entry) => ({
+        ...entry,
+        productsCount: entry.hasOverride
+          ? overrideCounts.get(entry.id) ?? globalProductsCount
+          : globalProductsCount
+      }))
+      .sort((a, b) => {
+        if (b.productsCount !== a.productsCount) return b.productsCount - a.productsCount;
+        return a.name.localeCompare(b.name);
+      });
+  }, [clampedPageIndex, customerPreviewBase, overrideCounts, globalProductsCount]);
+
+  // Step E: Stats without expensive counts
+  const customerPreviewStats = useMemo(() => ({
+    totalEntries: customerPreviewBase.length,
+    overridesCount: customerPreviewBase.filter((e) => e.hasOverride).length,
+    globalProductsCount,
+    totalProductsCount: customerPreviewBase.length > 0 ? globalProductsCount : 0,
+    avgProductsPerCustomer: customerPreviewBase.length > 0 ? globalProductsCount : 0,
+    inheritedSample: customerPreviewBase.find((e) => !e.hasOverride) ?? null,
+    overrideSample: customerPreviewBase.find((e) => e.hasOverride) ?? null
+  }), [customerPreviewBase, globalProductsCount]);
+  const avgProductsValue = customerPreviewStats.avgProductsPerCustomer;
   const avgProductsLabel = Number.isInteger(avgProductsValue)
     ? String(avgProductsValue)
     : avgProductsValue.toFixed(1);
@@ -1212,11 +1213,11 @@ const GlobalFiltersPage = () => {
             <div className="ul-surface px-3 py-2">
               <div className="text-xs uppercase text-muted-foreground">Clienti inclusi</div>
               <div className="mt-1 text-lg font-semibold">
-                {customerPreview.entries.length}
+                {customerPreviewStats.totalEntries}
               </div>
-              {customerPreview.overridesCount > 0 && (
+              {customerPreviewStats.overridesCount > 0 && (
                 <div className="text-[11px] text-muted-foreground">
-                  {customerPreview.overridesCount} clienti con override
+                  {customerPreviewStats.overridesCount} clienti con override
                 </div>
               )}
             </div>
@@ -1237,10 +1238,10 @@ const GlobalFiltersPage = () => {
             <div>
               <div className="text-xs uppercase text-muted-foreground">Clienti inclusi</div>
               <div className="mt-1 text-sm text-muted-foreground">
-                Totale: {customerPreview.entries.length}
+                Totale: {customerPreviewStats.totalEntries}
               </div>
             </div>
-            {customerPreview.entries.length > pageSize && (
+            {customerPreviewStats.totalEntries > pageSize && (
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <button
                   className="ul-button ul-button-ghost px-2 py-1 text-xs"
@@ -1282,7 +1283,7 @@ const GlobalFiltersPage = () => {
                 </div>
               </div>
             ))}
-            {customerPreview.entries.length === 0 && (
+            {customerPreviewStats.totalEntries === 0 && (
               <div className="text-xs text-muted-foreground">
                 Nessun cliente incluso con i filtri correnti.
               </div>
@@ -1291,19 +1292,19 @@ const GlobalFiltersPage = () => {
           <details className="mt-4 text-xs text-muted-foreground">
             <summary className="cursor-pointer uppercase">Debug KPI</summary>
             <div className="mt-2 space-y-1">
-              <div>GlobalProductSet: {customerPreview.globalProductsCount}</div>
-              <div>CustomersIncluded: {customerPreview.entries.length}</div>
-              <div>Customers with override: {customerPreview.overridesCount}</div>
-              {customerPreview.inheritedSample && (
+              <div>GlobalProductSet: {customerPreviewStats.globalProductsCount}</div>
+              <div>CustomersIncluded: {customerPreviewStats.totalEntries}</div>
+              <div>Customers with override: {customerPreviewStats.overridesCount}</div>
+              {customerPreviewStats.inheritedSample && (
                 <div>
-                  Ereditato ({customerPreview.inheritedSample.name}):{' '}
-                  {customerPreview.inheritedSample.productsCount}
+                  Ereditato ({customerPreviewStats.inheritedSample.name}):{' '}
+                  {customerPreviewStats.globalProductsCount}
                 </div>
               )}
-              {customerPreview.overrideSample && (
+              {customerPreviewStats.overrideSample && (
                 <div>
-                  Override ({customerPreview.overrideSample.name}):{' '}
-                  {customerPreview.overrideSample.productsCount}
+                  Override ({customerPreviewStats.overrideSample.name}):{' '}
+                  {overrideCounts.get(customerPreviewStats.overrideSample.id) ?? customerPreviewStats.globalProductsCount}
                 </div>
               )}
             </div>

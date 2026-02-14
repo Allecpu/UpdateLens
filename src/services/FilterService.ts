@@ -361,6 +361,7 @@ export const filterReleaseItems = (
         query: query.length > 0
       }
     });
+
     if (hasProductsFilter) {
       console.log('[FilterService] PRODUCT_FILTER', {
         rawProducts: filters.products,
