@@ -5,8 +5,36 @@ import { useAuthStore } from '../app/store/useAuthStore';
 
 const BOOTSTRAP_FLAG_KEY = 'updatelens.presets.bootstrapped';
 
-// Global lock to prevent concurrent bootstrap executions (important for React 18 Strict Mode)
-let globalBootstrapLock = false;
+// Shared bootstrap state to prevent duplicate work across pages/components.
+let bootstrapPromise: Promise<void> | null = null;
+let bootstrapCompleted = false;
+
+const syncStartupPreset = () => {
+  const presetState = usePresetStore.getState();
+  const defaultPreset =
+    presetState.getDefaultPreset() ?? presetState.presets.find((preset) => preset.name === 'Default');
+  const activePreset = presetState.activePresetId
+    ? presetState.getPreset(presetState.activePresetId)
+    : undefined;
+  const startupPreset = defaultPreset ?? activePreset ?? presetState.presets[0];
+
+  if (!startupPreset) {
+    return false;
+  }
+
+  presetState.applyPresetToFilters(startupPreset.id);
+
+  if (presetState.activePresetId !== startupPreset.id) {
+    presetState.setActivePreset(startupPreset.id);
+  }
+
+  return true;
+};
+
+const isStoreReady = () => {
+  const { presets } = usePresetStore.getState();
+  return presets.length > 0;
+};
 
 /**
  * Hook to bootstrap presets on first load.
@@ -17,40 +45,41 @@ let globalBootstrapLock = false;
  */
 export function useBootstrapPresets() {
   const bootstrappedRef = useRef(false);
+  const { hasFetched } = useAuthStore();
 
-  // Ready immediately if presets already exist in the store (hydrated synchronously)
   const [ready, setReady] = useState(() => {
-    const { presets, activePresetId } = usePresetStore.getState();
-    const alreadyBootstrapped = localStorage.getItem(BOOTSTRAP_FLAG_KEY) === 'true';
-    return alreadyBootstrapped && presets.length > 0 && activePresetId !== null;
+    return bootstrapCompleted || (hasFetched && isStoreReady());
   });
 
   useEffect(() => {
-    // Skip if already processed (ref for component instance, global lock for concurrent instances)
-    if (bootstrappedRef.current || globalBootstrapLock) {
-      if (!ready) setReady(true);
+    if (!hasFetched) {
+      return;
+    }
+
+    // Skip if already processed for this component instance
+    if (bootstrappedRef.current) {
+      if (!ready) {
+        setReady(true);
+      }
       return;
     }
     bootstrappedRef.current = true;
-    globalBootstrapLock = true;
 
-    const bootstrap = async () => {
+    const runBootstrap = async () => {
       const alreadyBootstrapped = localStorage.getItem(BOOTSTRAP_FLAG_KEY) === 'true';
-      const { presets: initialPresets, activePresetId, createPreset, setAsDefault, setActivePreset, getDefaultPreset, loadPresets } = usePresetStore.getState();
+      const {
+        presets: initialPresets,
+        createPreset,
+        setAsDefault,
+        setActivePreset,
+        loadPresets
+      } = usePresetStore.getState();
       const { isAuthenticated } = useAuthStore.getState();
 
-      // If already bootstrapped and presets exist, we're done
+      // Always align the startup preset on app load. The "bootstrapped" flag
+      // only controls one-time creation, not which preset must be loaded.
       if (alreadyBootstrapped && initialPresets.length > 0) {
-        // Ensure an active preset is set (store should handle this, but double-check)
-        if (!activePresetId) {
-          const defaultPreset = getDefaultPreset();
-          if (defaultPreset) {
-            setActivePreset(defaultPreset.id);
-          } else if (initialPresets.length > 0) {
-            setActivePreset(initialPresets[0].id);
-          }
-        }
-        if (!ready) setReady(true);
+        syncStartupPreset();
         return;
       }
 
@@ -65,26 +94,25 @@ export function useBootstrapPresets() {
           if (serverState.presets.length > 0) {
             // Server has presets, use them
             console.log('[Bootstrap] Found', serverState.presets.length, 'preset(s) on server');
-            if (!serverState.activePresetId) {
-              const defaultPreset = serverState.getDefaultPreset() || serverState.presets.find(p => p.name === 'Default');
-              if (defaultPreset) {
-                setActivePreset(defaultPreset.id);
-              } else {
-                setActivePreset(serverState.presets[0].id);
-              }
-            }
+            syncStartupPreset();
             localStorage.setItem(BOOTSTRAP_FLAG_KEY, 'true');
-            setReady(true);
             return;
           }
         } catch (err) {
           console.warn('[Bootstrap] Failed to load presets from server:', err instanceof Error ? err.message : err);
-          // Continue to create default preset locally
+          // Continue with local bootstrap/recovery.
         }
       }
 
-      // First-time bootstrap: create Default preset if none exist
+      // If presets already exist locally, use the Default preset at startup.
       const { presets } = usePresetStore.getState();
+      if (presets.length > 0) {
+        syncStartupPreset();
+        localStorage.setItem(BOOTSTRAP_FLAG_KEY, 'true');
+        return;
+      }
+
+      // First-time bootstrap: create Default preset if none exist
       if (presets.length === 0) {
         const { cssFilters } = useFilterStore.getState();
 
@@ -96,6 +124,7 @@ export function useBootstrapPresets() {
             if (defaultPreset?.id) {
               await setAsDefault(defaultPreset.id);
               setActivePreset(defaultPreset.id);
+              usePresetStore.getState().applyPresetToFilters(defaultPreset.id);
             }
           } catch (err) {
             // Preset might already exist (race/duplicate): reload and recover.
@@ -114,39 +143,34 @@ export function useBootstrapPresets() {
             if (recoveredPreset?.id) {
               console.log('[Bootstrap] Recovered preset:', recoveredPreset.id);
               setActivePreset(recoveredPreset.id);
+              freshState.applyPresetToFilters(recoveredPreset.id);
             } else if (freshState.presets.length > 0) {
               // Fallback to first available preset
               console.log('[Bootstrap] Using first available preset:', freshState.presets[0].id);
               setActivePreset(freshState.presets[0].id);
+              freshState.applyPresetToFilters(freshState.presets[0].id);
             }
           }
           localStorage.setItem(BOOTSTRAP_FLAG_KEY, 'true');
         }
-      } else {
-        console.log('[Bootstrap] Presets already exist, skipping creation');
-
-        // Ensure an active preset is set
-        if (!activePresetId) {
-          const defaultPreset = getDefaultPreset();
-          if (defaultPreset) {
-            setActivePreset(defaultPreset.id);
-          } else {
-            setActivePreset(presets[0].id);
-          }
-        }
-        localStorage.setItem(BOOTSTRAP_FLAG_KEY, 'true');
       }
-
-      setReady(true);
-      // Note: we don't release globalBootstrapLock because bootstrap should only run once per app lifecycle
     };
 
-    bootstrap().catch((err) => {
-      // Ensure any unhandled errors are logged but don't crash the app
-      console.error('[Bootstrap] Unhandled error:', err);
-      setReady(true); // Still mark as ready to prevent infinite loading
+    if (!bootstrapPromise) {
+      bootstrapPromise = runBootstrap()
+        .catch((err) => {
+          // Ensure any unhandled errors are logged but don't crash the app
+          console.error('[Bootstrap] Unhandled error:', err);
+        })
+        .finally(() => {
+          bootstrapCompleted = true;
+        });
+    }
+
+    bootstrapPromise.finally(() => {
+      setReady(true);
     });
-  }, []);
+  }, [hasFetched, ready]);
 
   return { ready };
 }

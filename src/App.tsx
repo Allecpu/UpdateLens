@@ -15,6 +15,7 @@ import { useCustomerStore } from './app/store/useCustomerStore';
 import { useFilterStore } from './app/store/useFilterStore';
 import { useAuthStore } from './app/store/useAuthStore';
 import { useBootstrapFilters } from './hooks/useBootstrapFilters';
+import { useBootstrapPresets } from './hooks/useBootstrapPresets';
 
 const isEntryActive = (entry: { isActive?: boolean }): boolean => entry.isActive !== false;
 type NavItem = {
@@ -217,6 +218,7 @@ const CustomerPicker = () => {
 const App = () => {
   // Bootstrap global filters if needed
   useBootstrapFilters();
+  useBootstrapPresets();
 
   // Auth state
   const { fetchCurrentUser, accessDenied, accessDeniedReason, userEmail, isLoading, hasFetched } = useAuthStore();

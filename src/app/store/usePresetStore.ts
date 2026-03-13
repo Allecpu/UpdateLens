@@ -141,17 +141,21 @@ export const usePresetStore = create<PresetStoreState>((set, get) => {
 
         try {
           const response = await presetService.getPresets(true);
-          const activePresetId = get().activePresetId;
-
-          // Check if active preset still exists
           const allPresets = [...response.myPresets, ...response.sharedPresets];
-          const activeExists = activePresetId && allPresets.some(p => p.id === activePresetId);
+          const defaultPreset = response.myPresets.find(p => p.isDefault);
+          const activePresetId = get().activePresetId;
+          const activePreset = activePresetId
+            ? allPresets.find((preset) => preset.id === activePresetId)
+            : undefined;
 
-          let newActiveId = activePresetId;
-          if (!activeExists && response.myPresets.length > 0) {
-            const defaultPreset = response.myPresets.find(p => p.isDefault);
-            newActiveId = defaultPreset?.id ?? response.myPresets[0].id;
-          }
+          // On authenticated startup, the server-side Default preset must win.
+          // Fall back to the current active preset only if no default exists.
+          const newActiveId =
+            defaultPreset?.id ??
+            activePreset?.id ??
+            response.myPresets[0]?.id ??
+            response.sharedPresets[0]?.id ??
+            null;
 
           set({
             presets: response.myPresets,
