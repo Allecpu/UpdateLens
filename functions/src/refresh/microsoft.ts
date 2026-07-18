@@ -31,7 +31,7 @@ type RawMicrosoftItem = {
   ['Public Preview Release Wave']?: string;
   ['GA Release Wave']?: string;
   ['Enabled for']?: string;
-  ['GeographicAreasDetails']?: string;
+  ['GeographicAreasDetails']?: string | string[];
   ['Last Gitcommit date']?: string;
   ['Release Plan ID']?: string;
 };
@@ -169,7 +169,10 @@ const extractItems = (
     const availabilityDateFull = gaFull || publicFull || earlyFull || null;
     const lastUpdated = parseDateFull(raw['Last Gitcommit date'] ?? '');
 
-    const geographyRaw = raw['GeographicAreasDetails'] ?? '';
+    const geographyValue = raw['GeographicAreasDetails'];
+    const geographyRaw = Array.isArray(geographyValue)
+      ? geographyValue.join(' ')
+      : geographyValue ?? '';
     const geographyCountries = geographyRaw
       ? extractCountriesFromHtmlNode(geographyRaw)
       : undefined;
