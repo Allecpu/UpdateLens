@@ -32,15 +32,15 @@ type RawFabricResponse = {
 };
 
 const parseMonthDate = (dateStr: string): string => {
-  if (!dateStr) return monthStamp();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return monthStamp();
-  const [year, month] = dateStr.split('-');
+  const fullDate = parseFabricDateFull(dateStr);
+  if (!fullDate) return monthStamp();
+  const [year, month] = fullDate.split('-');
   return `${year}-${month}`;
 };
 
 const parseFabricDateFull = (dateStr: string): string | null => {
-  if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return null;
-  return dateStr;
+  const match = dateStr?.match(/^(\d{4}-\d{2}-\d{2})(?:$|T)/);
+  return match?.[1] ?? null;
 };
 
 const sleep = (ms: number): Promise<void> =>

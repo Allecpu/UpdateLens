@@ -191,6 +191,9 @@ const parseSnapshot = (payload: SnapshotPayload): ReleaseItem[] => {
     if (item.source === 'Fabric') {
       const normalized = {
         ...item,
+        availabilityDateFull: item.availabilityDateFull ?? undefined,
+        firstAvailableDate: item.firstAvailableDate ?? undefined,
+        lastUpdatedDate: item.lastUpdatedDate ?? undefined,
         productName: item.product,
         description: item.summary,
         releaseDate:

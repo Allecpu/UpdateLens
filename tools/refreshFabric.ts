@@ -84,19 +84,15 @@ const normalizeText = (value: string): string => {
 };
 
 const parseMonthDate = (dateStr: string): string => {
-  if (!dateStr) return monthStamp();
-
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-    return monthStamp();
-  }
-
-  const [year, month] = dateStr.split('-');
+  const fullDate = parseDateFull(dateStr);
+  if (!fullDate) return monthStamp();
+  const [year, month] = fullDate.split('-');
   return `${year}-${month}`;
 };
 
 const parseDateFull = (dateStr: string): string | null => {
-  if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return null;
-  return dateStr;
+  const match = dateStr?.match(/^(\d{4}-\d{2}-\d{2})(?:$|T)/);
+  return match?.[1] ?? null;
 };
 
 async function fetchWithRetry(
@@ -231,13 +227,13 @@ function extractItems(rawItems: RawFabricItem[]): ReleaseItem[] {
         description: normalizeText(raw.feature_description ?? ''),
         status: buildStatus(raw),
         availabilityDate,
-        availabilityDateFull,
+        availabilityDateFull: availabilityDateFull ?? undefined,
         releaseDate,
         tryNow: buildStatus(raw) === 'Try now',
         minBcVersion: null,
         availabilityTypes: buildAvailabilityTypes(raw),
-        firstAvailableDate: availabilityDateFull,
-        lastUpdatedDate: parseDateFull(raw.last_modified),
+        firstAvailableDate: availabilityDateFull ?? undefined,
+        lastUpdatedDate: parseDateFull(raw.last_modified) ?? undefined,
         sourceUrl: releasePage,
         learnUrl: null,
         docsUrl: null,
