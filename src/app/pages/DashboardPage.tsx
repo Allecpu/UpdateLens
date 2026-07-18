@@ -33,6 +33,14 @@ type Chip = {
 
 type DrillSource = ReleaseSource | null;
 
+// Stable empty reference so memoized filter derivations don't recompute needlessly
+// when no Dashboard override exists for the current scope.
+const EMPTY_OVERRIDE: Partial<FilterState> = {};
+
+// Scope key under which Dashboard sidebar overrides are persisted.
+const getDashboardScopeKey = (customerId: string | null): string =>
+  customerId ? `customer:${customerId}` : 'global';
+
 const isEntryActive = (entry: { isActive?: boolean }): boolean => entry.isActive !== false;
 
 const ReleaseCard = ({ item }: { item: ReleaseItem }) => {
@@ -279,14 +287,21 @@ const DashboardPage = () => {
     chatFilters,
     clearChatFilters,
     setDashboardRuntimeFilters,
-    setDashboardScopeItemIds
+    setDashboardScopeItemIds,
+    dashboardOverrides,
+    setDashboardOverride,
+    clearDashboardOverride
   } = useFilterStore();
 
   // Preset management (session-only in Dashboard)
   const { presets, getPreset, applyPresetToFilters, activePresetId, getDefaultPreset } = usePresetStore();
   const [sessionPresetId, setSessionPresetId] = useState<string | null>(null);
 
-  const [tempFilters, setTempFilters] = useState<Partial<FilterState>>({});
+  // Dashboard sidebar overrides are persisted per scope (global / per-customer)
+  // so they survive navigation and reload (see useFilterStore.dashboardOverrides).
+  const scopeKey = getDashboardScopeKey(activeCustomerId);
+  const tempFilters = dashboardOverrides[scopeKey] ?? EMPTY_OVERRIDE;
+  const hasDashboardOverride = Object.keys(tempFilters).length > 0;
   const activeCustomer = activeCustomerId ? customers[activeCustomerId] : null;
   // Sync session preset with active preset from store on mount
   useEffect(() => {
@@ -478,7 +493,8 @@ const DashboardPage = () => {
     prevCustomerIdRef.current = activeCustomerId;
 
     if (customerIdChanged) {
-      setTempFilters({});
+      // Dashboard overrides are keyed by scope, so switching customer automatically
+      // loads that scope's persisted overrides (no manual clearing needed here).
       clearChatFilters();
       setDrillSource(null);
       setDrillProduct(null);
@@ -541,20 +557,21 @@ const DashboardPage = () => {
     setVisibleCount(ITEMS_PER_PAGE);
   }, [deferredDashboardFilters, drillSource, drillProduct]);
 
-  // updateFilters: local-only, does NOT persist to store
+  // updateFilters: persisted per scope in the store (survives navigation + reload)
   // Also clears chatFilters when user manually changes filters
   const updateFilters = (nextFilters: Partial<FilterState>) => {
     if (chatFilters) {
       clearChatFilters();
     }
-    setTempFilters((prev) => ({ ...prev, ...nextFilters }));
+    const current = dashboardOverrides[scopeKey] ?? EMPTY_OVERRIDE;
+    setDashboardOverride(scopeKey, { ...current, ...nextFilters });
   };
 
   // Preset selection handler (Dashboard only, session-only)
   const handlePresetSelect = (presetId: string) => {
     setSessionPresetId(presetId);
     applyPresetToFilters(presetId);
-    setTempFilters({}); // Clear temp filters to show pure preset effect
+    clearDashboardOverride(scopeKey); // Clear overrides to show pure preset effect
   };
 
   const filterScope = activeCustomerId ? 'customer' : 'global';
@@ -873,6 +890,22 @@ const DashboardPage = () => {
                 Preset attivo: {getPreset(sessionPresetId)?.name}
               </div>
             )}
+          </div>
+        )}
+
+        {hasDashboardOverride && (
+          <div className="mt-4">
+            <button
+              type="button"
+              className="ul-button ul-button-ghost w-full text-xs"
+              onClick={() => clearDashboardOverride(scopeKey)}
+              title="Rimuove le modifiche locali dei filtri e riallinea la Dashboard ai Filtri Globali"
+            >
+              Torna ai filtri globali
+            </button>
+            <div className="mt-1 text-[10px] text-muted-foreground">
+              Filtri modificati in Dashboard: prevalgono sui Filtri Globali finché non li ripristini.
+            </div>
           </div>
         )}
 

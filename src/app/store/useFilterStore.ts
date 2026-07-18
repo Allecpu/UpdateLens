@@ -9,6 +9,9 @@ type FilterStoreState = {
   cssFilters: FilterState | null;
   dashboardRuntimeFilters: FilterState | null;
   dashboardScopeItemIds: string[] | null;
+  // Persisted Dashboard sidebar overrides, keyed by scope ("global" or "customer:<id>").
+  // Survive navigation and reload so ad-hoc filters set in the Dashboard are not lost.
+  dashboardOverrides: Record<string, Partial<FilterState>>;
   customerFilters: Record<string, FilterState>;
   customerFilterMode: Record<string, FilterMode>;
   // Chat filters: temporary, not persisted, does not affect global filters
@@ -31,6 +34,9 @@ type FilterStoreState = {
   clearOverridesForCustomers: (customerIds: string[]) => void;
   setDashboardRuntimeFilters: (filters: FilterState | null) => void;
   setDashboardScopeItemIds: (itemIds: string[] | null) => void;
+  // Dashboard override actions (persisted per scope)
+  setDashboardOverride: (scopeKey: string, override: Partial<FilterState>) => void;
+  clearDashboardOverride: (scopeKey: string) => void;
   // Chat filter actions (temporary, no persistence)
   setChatFilters: (filters: Partial<FilterState>) => void;
   clearChatFilters: () => void;
@@ -46,6 +52,7 @@ const CUSTOM_KEY = 'updatelens_filters_v1_custom'; // Stable key requests
 const MODE_KEY = 'updatelens_filters_v1_mode'; // Stable key requests
 const AUTOSAVE_ENABLED_KEY = 'updatelens.filters.autosave.enabled';
 const AUTOSAVE_PREF_KEY = 'updatelens.filters.autosave.preference';
+const DASHBOARD_OVERRIDES_KEY = 'updatelens.filters.dashboard.overrides.v1';
 
 const readJson = <T,>(key: string, fallback: T): T => {
   const raw = localStorage.getItem(key);
@@ -75,6 +82,7 @@ const loadInitial = (): {
   cssFilters: FilterState | null;
   customerFilters: Record<string, FilterState>;
   customerFilterMode: Record<string, FilterMode>;
+  dashboardOverrides: Record<string, Partial<FilterState>>;
   autoSaveEnabled: boolean;
   autoSaveUserPreference: boolean;
 } => {
@@ -85,6 +93,7 @@ const loadInitial = (): {
     cssFilters: readJson<FilterState | null>(CSS_KEY, null),
     customerFilters: readJson<Record<string, FilterState>>(CUSTOM_KEY, {}),
     customerFilterMode: readJson<Record<string, FilterMode>>(MODE_KEY, {}),
+    dashboardOverrides: readJson<Record<string, Partial<FilterState>>>(DASHBOARD_OVERRIDES_KEY, {}),
     autoSaveEnabled,
     autoSaveUserPreference
   };
@@ -122,6 +131,7 @@ export const useFilterStore = create<FilterStoreState>((set, get) => {
     cssFilters: initial.cssFilters,
     dashboardRuntimeFilters: null,
     dashboardScopeItemIds: null,
+    dashboardOverrides: initial.dashboardOverrides,
     customerFilters: initial.customerFilters,
     customerFilterMode: initial.customerFilterMode,
     autoSaveEnabled: initial.autoSaveEnabled,
@@ -158,7 +168,15 @@ export const useFilterStore = create<FilterStoreState>((set, get) => {
     },
     resetAllFilters: (defaults) => {
       persist(defaults, {}, {});
-      set({ cssFilters: defaults, customerFilters: {}, customerFilterMode: {} });
+      // A global reset also discards ad-hoc Dashboard overrides so the Dashboard
+      // returns to the freshly reset defaults instead of showing stale tweaks.
+      localStorage.setItem(DASHBOARD_OVERRIDES_KEY, JSON.stringify({}));
+      set({
+        cssFilters: defaults,
+        customerFilters: {},
+        customerFilterMode: {},
+        dashboardOverrides: {}
+      });
     },
     resetCustomerFilters: (customerId) => {
       const nextFilters = { ...get().customerFilters };
@@ -221,6 +239,22 @@ export const useFilterStore = create<FilterStoreState>((set, get) => {
         return;
       }
       set({ dashboardScopeItemIds: itemIds });
+    },
+    // Persisted Dashboard sidebar overrides (per scope key)
+    setDashboardOverride: (scopeKey, override) => {
+      const next = { ...get().dashboardOverrides, [scopeKey]: override };
+      localStorage.setItem(DASHBOARD_OVERRIDES_KEY, JSON.stringify(next));
+      set({ dashboardOverrides: next });
+    },
+    clearDashboardOverride: (scopeKey) => {
+      const current = get().dashboardOverrides;
+      if (!(scopeKey in current)) {
+        return;
+      }
+      const next = { ...current };
+      delete next[scopeKey];
+      localStorage.setItem(DASHBOARD_OVERRIDES_KEY, JSON.stringify(next));
+      set({ dashboardOverrides: next });
     },
     // Chat filters: temporary overlay, NOT persisted, does NOT affect global filters
     setChatFilters: (filters) => {
