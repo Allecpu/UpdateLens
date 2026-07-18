@@ -46,6 +46,7 @@ const GlobalFiltersPage = () => {
     resetCustomerFilters,
     ensureCssFilters,
     applyGlobalToCustomers,
+    clearDashboardOverride,
     autoSaveEnabled,
     setAutoSaveUserPreference,
     disableAutoSaveForPreset,
@@ -289,6 +290,9 @@ const GlobalFiltersPage = () => {
   const onResetGlobal = () => {
     setSaveStatus('pending');
     setCssFilters(defaultFilters);
+    // Discard any ad-hoc Dashboard override for the global scope so the Dashboard
+    // returns to the freshly reset defaults instead of showing stale tweaks.
+    clearDashboardOverride('global');
     // If on Default preset with auto-save ON, also update the preset
     if (autoSaveEnabled && isActivePresetDefault()) {
       const defaultPreset = getDefaultPreset();
@@ -309,6 +313,9 @@ const GlobalFiltersPage = () => {
 
     // 1. Reset overrides for filters (inherit mode)
     resetCustomerFilters(activeCustomerId);
+
+    // Also discard the ad-hoc Dashboard override for this customer's scope.
+    clearDashboardOverride(`customer:${activeCustomerId}`);
 
     // 2. Destructively reset Customer record fields
     const customer = customers[activeCustomerId];
@@ -334,6 +341,9 @@ const GlobalFiltersPage = () => {
     // Even if in customer scope, preset modifies global filters only
     applyPresetToFilters(presetId);
     setActivePreset(presetId);
+    // Switching preset redefines the global baseline: drop the global Dashboard
+    // override so the new preset is shown cleanly on the Dashboard.
+    clearDashboardOverride('global');
 
     // Auto-save management: disable for non-default presets, restore for default
     const targetPreset = presets.find(p => p.id === presetId);
