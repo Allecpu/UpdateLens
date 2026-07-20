@@ -29,7 +29,12 @@
       "Bash(az webapp restart:*)",
       "Bash(az webapp auth:*)",
       "Bash(tree:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(git -C C:/Github/UpdateLens fetch --all --prune)",
+      "Bash(git -C C:/Github/UpdateLens status -sb)",
+      "Bash(git -C C:/Github/UpdateLens rev-list --left-right --count origin/main...HEAD)",
+      "Bash(git -C C:/Github/UpdateLens log --oneline -5 --decorate --all)",
+      "Bash(awk '{print $5, $9}')"
     ]
   }
 }
