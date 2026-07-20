@@ -11,18 +11,6 @@ import {
 import { useFilterStore } from '../store/useFilterStore';
 import { FilterExportSchema, type FilterExport } from '../../validators/FilterSchema';
 
-type RefreshOutcome = 'idle' | 'running' | 'success' | 'error';
-
-type RefreshInfo = {
-  status: RefreshOutcome;
-  lastRefreshAt: string | null;
-  lastResult: 'success' | 'error' | null;
-  microsoftCount: number | null;
-  eosCount: number | null;
-  message?: string | null;
-};
-
-
 type ToastInfo = {
   type: 'success' | 'error' | 'info';
   message: string;
@@ -47,7 +35,6 @@ type UpdateAllInfo = {
   completedAt: string | null;
 };
 
-const REFRESH_STORAGE_KEY = 'updatelens.refresh.status';
 const UPDATE_SOURCES: Array<SourceUpdateResult['source']> = [
   'microsoft',
   'eos',
@@ -61,54 +48,9 @@ const SOURCE_LABELS: Record<SourceUpdateResult['source'], string> = {
   m365roadmap: 'M365 Roadmap'
 };
 
-const loadRefreshInfo = (): RefreshInfo => {
-  if (typeof window === 'undefined') {
-    return {
-      status: 'idle',
-      lastRefreshAt: null,
-      lastResult: null,
-      microsoftCount: null,
-      eosCount: null,
-      message: null
-    };
-  }
-  try {
-    const raw = window.localStorage.getItem(REFRESH_STORAGE_KEY);
-    if (!raw) {
-      throw new Error('missing');
-    }
-    return JSON.parse(raw) as RefreshInfo;
-  } catch {
-    return {
-      status: 'idle',
-      lastRefreshAt: null,
-      lastResult: null,
-      microsoftCount: null,
-      eosCount: null,
-      message: null
-    };
-  }
-};
-
-const persistRefreshInfo = (info: RefreshInfo) => {
-  if (typeof window === 'undefined') {
-    return;
-  }
-  window.localStorage.setItem(REFRESH_STORAGE_KEY, JSON.stringify(info));
-};
-
-const parseFilename = (contentDisposition: string | null): string | null => {
-  if (!contentDisposition) {
-    return null;
-  }
-  const match = contentDisposition.match(/filename="([^"]+)"/i);
-  return match?.[1] ?? null;
-};
-
 const VersionPage = () => {
   const buildLabel = buildTime || 'N/D';
   const commitLabel = gitCommit || 'N/D';
-  const [refreshInfo, setRefreshInfo] = useState<RefreshInfo>(() => loadRefreshInfo());
   const [toast, setToast] = useState<ToastInfo | null>(null);
   const [updateAllInfo, setUpdateAllInfo] = useState<UpdateAllInfo>({
     state: 'idle',
@@ -116,90 +58,9 @@ const VersionPage = () => {
     completedAt: null
   });
 
-  const updateRefreshInfo = (next: RefreshInfo) => {
-    setRefreshInfo(next);
-    persistRefreshInfo(next);
-  };
-
   const triggerToast = (next: ToastInfo) => {
     setToast(next);
     window.setTimeout(() => setToast(null), 3500);
-  };
-
-  const handleRefresh = async () => {
-    if (refreshInfo.status === 'running') {
-      return;
-    }
-    const runningState: RefreshInfo = {
-      ...refreshInfo,
-      status: 'running',
-      message: 'Aggiornamento in corso...',
-      lastResult: null
-    };
-    updateRefreshInfo(runningState);
-    triggerToast({ type: 'info', message: 'Aggiornamento in corso...' });
-
-    try {
-      const response = await fetch('/api/refresh-zip', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ sources: ['microsoft', 'eos'] })
-      });
-
-      if (!response.ok) {
-        const errorPayload = await response.json().catch(() => null);
-        const errorMessage =
-          errorPayload?.error || `Errore refresh (${response.status}).`;
-        throw new Error(errorMessage);
-      }
-
-      const blob = await response.blob();
-      const contentDisposition = response.headers.get('content-disposition');
-      const filename =
-        parseFilename(contentDisposition) ??
-        `UpdateLens_refresh_${new Date().toISOString().replace(/[:.]/g, '-')}.zip`;
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      link.click();
-      window.URL.revokeObjectURL(url);
-
-      const refreshAt =
-        response.headers.get('x-updatelens-refresh-at') ?? new Date().toISOString();
-      const microsoftCount = Number(
-        response.headers.get('x-updatelens-items-microsoft') ?? 0
-      );
-      const eosCount = Number(
-        response.headers.get('x-updatelens-items-eos') ?? 0
-      );
-
-      updateRefreshInfo({
-        status: 'success',
-        lastRefreshAt: refreshAt,
-        lastResult: 'success',
-        microsoftCount,
-        eosCount,
-        message: 'Aggiornamento completato'
-      });
-      triggerToast({
-        type: 'success',
-        message: 'Aggiornamento completato, download avviato.'
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Errore inatteso.';
-      updateRefreshInfo({
-        status: 'error',
-        lastRefreshAt: refreshInfo.lastRefreshAt,
-        lastResult: 'error',
-        microsoftCount: refreshInfo.microsoftCount,
-        eosCount: refreshInfo.eosCount,
-        message
-      });
-      triggerToast({ type: 'error', message });
-    }
   };
 
   const handleUpdateAll = async () => {
@@ -373,31 +234,6 @@ const VersionPage = () => {
               <li key={note}>{note}</li>
             ))}
           </ul>
-        </div>
-      </section>
-
-      <section className="ul-surface p-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-semibold">Aggiornamento dati</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Esegue il refresh degli snapshot e genera lo ZIP con manifest.
-            </p>
-          </div>
-          <button
-            className="ul-button ul-button-primary"
-            onClick={handleRefresh}
-            disabled={refreshInfo.status === 'running'}
-          >
-            {refreshInfo.status === 'running' ? (
-              <span className="inline-flex items-center gap-2">
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                Aggiornamento in corso...
-              </span>
-            ) : (
-              'Esegui ultimo aggiornamento + Scarica ZIP'
-            )}
-          </button>
         </div>
       </section>
 

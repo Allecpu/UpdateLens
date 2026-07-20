@@ -4,6 +4,7 @@ import ClientsPage from './app/pages/ClientsPage';
 import DashboardPage from './app/pages/DashboardPage';
 import GlobalFiltersPage from './app/pages/GlobalFiltersPage';
 import LearnPage from './app/pages/LearnPage';
+import ManualPage from './app/pages/ManualPage';
 import VersionPage from './app/pages/VersionPage';
 import IssuesPage from './app/pages/IssuesPage';
 import SharesPage from './app/components/shares/SharesPage';
@@ -31,7 +32,8 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/learn', label: 'Learn' },
   { to: '/versione', label: 'Versione' },
   { to: '/issues', label: 'Segnalazioni' },
-  { to: '/condivisioni', label: 'Condivisioni' }
+  { to: '/condivisioni', label: 'Condivisioni' },
+  { to: '/manuale', label: 'Manuale' }
 ];
 
 const getNavLinkClassName = (isActive: boolean): string =>
@@ -344,6 +346,7 @@ const App = () => {
           <Route path="/versione" element={<VersionPage />} />
           <Route path="/issues" element={<IssuesPage />} />
           <Route path="/condivisioni" element={<SharesPage />} />
+          <Route path="/manuale" element={<ManualPage />} />
         </Routes>
       </div>
       <ChatPanel />

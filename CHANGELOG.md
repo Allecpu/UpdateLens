@@ -1,6 +1,6 @@
 # UpdateLens - Changelog Dettagliato
 
-## v0.5.0 (Unreleased)
+## v0.5.0 (2026-07-20) - Manuale operativo e applicazione web
 
 ### Parte 2 — Rimozione della modalità offline
 
