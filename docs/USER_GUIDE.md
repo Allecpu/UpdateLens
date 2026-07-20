@@ -308,16 +308,54 @@ blocco di codice
 
 ---
 
+## Export PowerPoint (report cliente)
+
+Genera una presentazione con l'identità visiva EOS Solutions a partire dagli
+aggiornamenti attualmente filtrati.
+
+### Come si genera
+
+1. Applica i filtri desiderati nella Dashboard (e seleziona il cliente, se serve)
+2. Click su **"Esporta PPTX"** (in alto a destra)
+3. Nel modal imposta **Titolo** e **Sottotitolo** della copertina
+4. Spunta le sezioni da includere — in basso vedi la stima delle slide che verranno prodotte
+5. Click **"Genera PPTX"**: il file viene scaricato dal browser
+
+Il nome del file è `UpdateLens-<Cliente>-<data>.pptx`.
+
+### Sezioni disponibili
+
+| Sezione | Contenuto |
+|---|---|
+| Copertina e chiusura | Sempre incluse: richieste dal brand book EOS |
+| Sintesi KPI | Totale aggiornamenti e ripartizione per fonte |
+| Perimetro del report | Filtri applicati, numero di aggiornamenti, data di generazione |
+| Prodotti più interessati | Grafico a barre con i primi 10 prodotti |
+| Novità per prodotto | Una o più slide per prodotto, max 6 voci per slide |
+| Dettaglio aggiornamenti | Una slide per aggiornamento, con sintesi e link |
+
+### Cosa aspettarsi
+
+- Il deck resta **compatto per scelta**: massimo 15 prodotti e 3 slide per prodotto.
+  Quando qualcosa viene omesso, la slide lo dichiara sempre (es. *"+42 altri
+  aggiornamenti per Dynamics 365 Sales non elencati"*) — non ci sono tagli silenziosi.
+- Con **Dettaglio aggiornamenti** attivo puoi scegliere quante slide di dettaglio
+  produrre (1-60, default 20).
+- Il testo usa il font **Calibri**: i font brand EOS (Humble, Open Sans) non possono
+  essere incorporati in un file PowerPoint, e Calibri è il ripiego previsto dal brand
+  book. Il deck si vede quindi identico su qualsiasi PC senza font aggiuntivi.
+- Prima di inviare il deck a un cliente, **aprilo in PowerPoint** e dai una scorsa:
+  è il controllo finale sulla resa grafica.
+
+---
+
 ## Export Markdown
 
 ### Generazione Report
 
 1. Applica i filtri desiderati nella Dashboard
 2. Click su **"Esporta Markdown"** (in alto a destra)
-3. Si apre un'anteprima del report
-4. Verifica il contenuto
-5. Click **"Scarica Markdown"**
-6. Il file `.md` viene scaricato nel tuo browser
+3. Il file `.md` viene scaricato subito dal browser, senza anteprima
 
 ### Struttura Report
 

@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState, useDeferredValue, useRef } from 'react';
 import { loadAllSnapshots, loadRulesConfig } from '../../services/DataLoader';
 import { filterReleaseItems } from '../../services/FilterService';
 import { buildMarkdown, downloadMarkdown } from '../../services/ExportService';
+import { describeFilterState } from '../../services/FilterDescription';
+import ExportDeckModal from '../components/exports/ExportDeckModal';
 import type { ReleaseItem, ReleaseSource, ReleaseStatus } from '../../models/ReleaseItem';
 import { useCustomerStore } from '../store/useCustomerStore';
 import { useCustomerGroupStore } from '../store/useCustomerGroupStore';
@@ -328,6 +330,9 @@ const DashboardPage = () => {
   // =====================================================================
   const [drillSource, setDrillSource] = useState<DrillSource>(null);
   const [drillProduct, setDrillProduct] = useState<string | null>(null);
+
+  // Export PowerPoint
+  const [isExportDeckOpen, setIsExportDeckOpen] = useState(false);
 
   // Pagination state
   const [visibleCount, setVisibleCount] = useState(50);
@@ -765,73 +770,29 @@ const DashboardPage = () => {
 
   const isDrillActive = drillSource !== null || drillProduct !== null;
 
+  // Le etichette arrivano da describeFilterState, condivisa con l'export
+  // PowerPoint: qui si aggiunge solo l'azione di rimozione.
   const chips = useMemo<Chip[]>(() => {
     if (!dashboardFilters) {
       return [];
     }
-    const entries: Chip[] = [];
-    const removeFrom = (key: keyof FilterState, value: string) => {
-      const current = dashboardFilters[key] as string[];
-      updateFilters({ [key]: current.filter((item) => item !== value) });
-    };
-    const pushValues = (label: string, key: keyof FilterState, values: string[]) => {
-      values.forEach((value) => {
-        entries.push({
-          label: `${label}: ${value}`,
-          onRemove: () => removeFrom(key, value)
-        });
-      });
-    };
-    pushValues('Fonte', 'sources', dashboardFilters.sources);
-    pushValues('Stato', 'statuses', dashboardFilters.statuses);
-    pushValues('Prodotto', 'products', dashboardFilters.products);
-    pushValues('Tag', 'tags', dashboardFilters.tags);
-    pushValues('Mese', 'months', dashboardFilters.months);
-    if (dashboardFilters.query) {
-      entries.push({
-        label: `Ricerca: ${dashboardFilters.query}`,
-        onRemove: () => updateFilters({ query: '' })
-      });
-    }
-    if (dashboardFilters.periodNewDays > 0) {
-      entries.push({
-        label: `Nuovi: ${dashboardFilters.periodNewDays} giorni`,
-        onRemove: () => updateFilters({ periodNewDays: 0 })
-      });
-    }
-    if (dashboardFilters.periodChangedDays > 0) {
-      entries.push({
-        label: `Modificati: ${dashboardFilters.periodChangedDays} giorni`,
-        onRemove: () => updateFilters({ periodChangedDays: 0 })
-      });
-    }
-    if (dashboardFilters.releaseInDays > 0) {
-      entries.push({
-        label: `Release entro: ${dashboardFilters.releaseInDays} giorni`,
-        onRemove: () => updateFilters({ releaseInDays: 0 })
-      });
-    }
-    if (dashboardFilters.bcVersions.length > 0) {
-      pushValues('BC', 'bcVersions', dashboardFilters.bcVersions);
-    } else if (dashboardFilters.minBcVersionMin !== null) {
-      entries.push({
-        label: `BC Min Version >= ${dashboardFilters.minBcVersionMin}`,
-        onRemove: () => updateFilters({ minBcVersionMin: null })
-      });
-    }
-    if (dashboardFilters.releaseDateFrom) {
-      entries.push({
-        label: `Da: ${dashboardFilters.releaseDateFrom}`,
-        onRemove: () => updateFilters({ releaseDateFrom: '' })
-      });
-    }
-    if (dashboardFilters.releaseDateTo) {
-      entries.push({
-        label: `A: ${dashboardFilters.releaseDateTo}`,
-        onRemove: () => updateFilters({ releaseDateTo: '' })
-      });
-    }
-    return entries;
+    return describeFilterState(dashboardFilters).map((entry) => {
+      if (entry.kind === 'value') {
+        return {
+          label: entry.label,
+          onRemove: () => {
+            const current = dashboardFilters[entry.key] as string[];
+            updateFilters({
+              [entry.key]: current.filter((item) => item !== entry.value)
+            });
+          }
+        };
+      }
+      return {
+        label: entry.label,
+        onRemove: () => updateFilters({ [entry.key]: entry.resetValue })
+      };
+    });
   }, [dashboardFilters, updateFilters]);
 
   const onExport = () => {
@@ -981,8 +942,20 @@ const DashboardPage = () => {
                 {bookmarkedIds.length}
               </span>
             </button>
-            <button className="ul-button ul-button-primary" onClick={onExport}>
+            <button className="ul-button ul-button-secondary" onClick={onExport}>
               Esporta Markdown
+            </button>
+            <button
+              className="ul-button ul-button-primary"
+              onClick={() => setIsExportDeckOpen(true)}
+              disabled={!dashboardFilters || sortedItems.length === 0}
+              title={
+                sortedItems.length === 0
+                  ? 'Nessun aggiornamento da esportare'
+                  : 'Genera una presentazione PowerPoint con il brand EOS'
+              }
+            >
+              Esporta PPTX
             </button>
           </div>
         </header>
@@ -1237,6 +1210,16 @@ const DashboardPage = () => {
           )}
         </section>
       </main>
+
+      {dashboardFilters && (
+        <ExportDeckModal
+          isOpen={isExportDeckOpen}
+          onClose={() => setIsExportDeckOpen(false)}
+          items={sortedItems}
+          filters={dashboardFilters}
+          customerName={activeCustomer?.name || 'Cliente'}
+        />
+      )}
     </div>
   );
 };

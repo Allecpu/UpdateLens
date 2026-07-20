@@ -1,8 +1,43 @@
 import type { ReleaseItem } from '../models/ReleaseItem';
 import { isValidHttpUrl } from '../utils/url';
 import { isReleasePlansUrl, isValidGuid } from '../utils/releaseplans';
+import { downloadBlob } from '../exports/downloadBlob';
 
-const groupByProduct = (items: ReleaseItem[]): Record<string, ReleaseItem[]> => {
+export type ItemLinks = {
+  /** URL della fonte, oppure null se assente o non valido. */
+  sourceUrl: string | null;
+  /** URL della documentazione Microsoft Learn, oppure null. */
+  docUrl: string | null;
+};
+
+/**
+ * Risolve e valida i link di un item, con regole diverse per sorgente:
+ * per Microsoft l'URL deve essere un Release Plans con GUID valido, per le
+ * altre sorgenti basta un URL http(s) ben formato.
+ *
+ * Ritorna null invece di un testo di fallback, cosi' ogni formato di export
+ * decide come presentare l'assenza del link.
+ */
+export const resolveItemLinks = (item: ReleaseItem): ItemLinks => {
+  const sourceUrl =
+    item.source === 'Microsoft'
+      ? item.sourceUrl &&
+        item.sourcePlanId &&
+        isValidGuid(item.sourcePlanId) &&
+        isReleasePlansUrl(item.sourceUrl)
+        ? item.sourceUrl
+        : null
+      : item.sourceUrl && isValidHttpUrl(item.sourceUrl)
+        ? item.sourceUrl
+        : null;
+
+  const docUrl =
+    item.learnUrl && isValidHttpUrl(item.learnUrl) ? item.learnUrl : null;
+
+  return { sourceUrl, docUrl };
+};
+
+export const groupByProduct = (items: ReleaseItem[]): Record<string, ReleaseItem[]> => {
   return items.reduce((acc, item) => {
     if (!acc[item.productName]) {
       acc[item.productName] = [];
@@ -24,22 +59,9 @@ export const buildMarkdown = (items: ReleaseItem[], customerName: string): strin
     lines.push('');
 
     grouped[product].forEach((item) => {
-      const sourceUrl =
-        item.source === 'Microsoft' &&
-        item.sourceUrl &&
-        item.sourcePlanId &&
-        isValidGuid(item.sourcePlanId) &&
-        isReleasePlansUrl(item.sourceUrl)
-          ? item.sourceUrl
-          : item.source !== 'Microsoft' &&
-              item.sourceUrl &&
-              isValidHttpUrl(item.sourceUrl)
-            ? item.sourceUrl
-            : 'Fonte non disponibile';
-      const docUrl =
-        item.learnUrl && isValidHttpUrl(item.learnUrl)
-          ? item.learnUrl
-          : 'Documentazione non disponibile';
+      const links = resolveItemLinks(item);
+      const sourceUrl = links.sourceUrl ?? 'Fonte non disponibile';
+      const docUrl = links.docUrl ?? 'Documentazione non disponibile';
       lines.push(`- ${item.title}`);
       lines.push(`  - Stato: ${item.status}`);
       lines.push(`  - Data: ${item.releaseDate}`);
@@ -55,13 +77,8 @@ export const buildMarkdown = (items: ReleaseItem[], customerName: string): strin
 };
 
 export const downloadMarkdown = (content: string, filename: string): void => {
-  const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
+  downloadBlob(
+    new Blob([content], { type: 'text/markdown;charset=utf-8' }),
+    filename
+  );
 };

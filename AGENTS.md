@@ -1,7 +1,8 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- `src/` contains the React + TypeScript app (`app/components`, `app/pages`, `services`, `models`, `utils`).
+- `src/` contains the React + TypeScript app (`app/components`, `app/pages`, `services`, `models`, `utils`, `exports`).
+- `src/exports/` builds branded PowerPoint decks: `brandTokens.ts` (EOS Brand Book values), `deckModel.ts` (pure model builder), `pptxRenderer.ts` (pptxgenjs + slide masters).
 - `public/` holds static assets and production snapshots under `public/data/`.
 - `tools/` contains data refresh scripts (e.g., `refreshMicrosoft.ts`).
 - `server/` is the optional Express + SQLite backend (API + ingestion).
@@ -26,6 +27,7 @@
 - Primary checks are `npm run typecheck` and manual QA.
 - Smoke-test offline mode with `npm run build:release` and open `release/index.html`.
 - Release plans URL check: `npm run test:releaseplans`.
+- PowerPoint export: `npm run test:deck` validates the OOXML package, logo deduplication, brand colours and slide-density limits. It cannot check visual rendering — open the generated `tmp/*.pptx` in PowerPoint for that.
 - Follow the checklist in `PRESET_TEST_CHECKLIST.md` for preset changes.
 
 ## Commit & Pull Request Guidelines

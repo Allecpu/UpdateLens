@@ -1,5 +1,56 @@
 # UpdateLens - Changelog Dettagliato
 
+## v0.5.0 (Unreleased) - Export PowerPoint brandizzato EOS
+
+### 🎉 Nuove Funzionalità
+
+#### Generazione presentazioni dalla Dashboard
+- ✅ **Bottone "Esporta PPTX"** - Genera un deck PowerPoint dagli aggiornamenti filtrati
+  - Modal `ExportDeckModal` con titolo, sottotitolo e sezioni selezionabili
+  - Stima live del numero di slide prima della generazione
+  - Generazione interamente client-side con `pptxgenjs` (nessuna chiamata server)
+- ✅ **Identità visiva EOS Solutions** applicata dai token del Brand Book
+  - Palette ufficiale: arancione `#F08019`, marrone `#382F2D`, accenti `#00B0E8` / `#485870`
+  - Logo negli slide master: versione a colori su fondo chiaro, **versione negativa su
+    fondo scuro** (cover e closing), come richiesto dal Brand Book
+  - Copertina e chiusura con claim "Digital Systems | Human Feelings" e contatti
+  - Max 6 voci per slide, corpo >= 16 pt, palette grafici a 4 serie
+- ✅ **Sezioni configurabili**: sintesi KPI, perimetro del report (filtri applicati),
+  prodotti più interessati (grafico a barre), novità per prodotto, dettaglio aggiornamenti
+- ✅ **Perimetro del report nel deck** - i filtri applicati sono documentati nelle slide,
+  informazione che l'export Markdown non riportava
+
+### 🔧 Miglioramenti Tecnici
+
+- ✅ `describeFilterState` (`src/services/FilterDescription.ts`) - descrizione dei filtri
+  attivi estratta dalla Dashboard e condivisa con l'export: una sola fonte di verità per
+  le etichette dei chip e per le slide
+- ✅ `resolveItemLinks` e `groupByProduct` esportati da `ExportService` e riusati dal deck
+  (output Markdown verificato byte-identico su 3813 item)
+- ✅ `downloadBlob` - download generalizzato ai contenuti binari; `downloadMarkdown` vi delega
+- ✅ Logo incorporati come data URI base64 e inseriti negli **slide master**: una sola copia
+  per file invece di una per slide (media da 419 KB a 18 KB)
+- ✅ `tools/deckSmokeTest.ts` - collaudo headless che valida il pacchetto OOXML, la
+  deduplicazione dei logo, i colori di brand e i limiti di densità
+- ✅ Tetto di 3 slide per prodotto e 15 sezioni prodotto: sull'intero dataset il deck resta
+  a ~51 slide invece di ~480. Le omissioni sono sempre dichiarate nella slide
+
+### ⚠️ Limiti Noti
+
+- I font brand (Humble, Open Sans) **non sono incorporabili** in un .pptx: il deck usa
+  `Calibri`, che è il fallback previsto dal Brand Book ed è presente su ogni Office
+- Il template ufficiale `eos-template.potx` non viene usato: pptxgenjs non sa leggerlo,
+  quindi il deck è una ricostruzione che ne applica i token
+- Il QA visivo va fatto aprendo il file in PowerPoint: il collaudo automatico verifica la
+  struttura del pacchetto, non la resa grafica
+
+### 📦 Dipendenze
+
+- ➕ `pptxgenjs ^4.0.1` (bundle da 542 KB a 957 KB, gzip da 150 KB a 302 KB)
+- ⚙️ `vite.config.ts`: `build.rollupOptions.output.inlineDynamicImports = true` — obbligatorio
+  perché pptxgenjs introduce uno stub di builtin Node che altrimenti diventa un secondo
+  chunk e rompe la modalità offline di `npm run build:release`
+
 ## v0.4.0 (2026-02-02) - Azure Migration \u0026 Cloud Deployment
 
 ### 🎉 Nuove Funzionalità

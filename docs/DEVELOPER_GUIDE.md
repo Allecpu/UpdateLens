@@ -246,6 +246,31 @@ npm run typecheck
 
 Verifica errori TypeScript senza build.
 
+### Export PowerPoint
+
+```bash
+npm run test:deck
+```
+
+Genera un deck da uno snapshot reale in `tmp/` e verifica il pacchetto OOXML:
+parti obbligatorie, numero di slide, deduplicazione dei logo negli slide master,
+colori di brand, limite dei 6 bullet per slide e tetto complessivo del deck.
+
+Il test **non può verificare la resa grafica**: per quella apri il `.pptx`
+prodotto in PowerPoint.
+
+#### Aggiungere un tipo di slide
+
+1. Aggiungi la variante alla union `DeckSlide` in `src/exports/deckModel.ts`
+2. Componila dentro `buildDeckModel` (funzione pura, nessuna dipendenza da pptxgenjs)
+3. Aggiungi il `case` corrispondente in `renderSlide` (`src/exports/pptxRenderer.ts`) —
+   lo `switch` è esaustivo, quindi senza il case il typecheck fallisce
+4. Se la sezione è opzionale, aggiungi il flag a `DeckOptionsSchema` e la checkbox
+   in `src/app/components/exports/ExportDeckModal.tsx`
+
+Colori, font e geometria vanno presi **sempre** da `src/exports/brandTokens.ts`,
+mai scritti inline: è l'unico punto in cui il Brand Book EOS è codificato.
+
 ### Manual Testing
 
 1. **Offline Mode**

@@ -404,7 +404,8 @@ UpdateLens/
 │   │   │   ├── CustomerSelector.tsx
 │   │   │   ├── FilterSidebar.tsx
 │   │   │   ├── ReleaseCard.tsx
-│   │   │   ├── ExportModal.tsx
+│   │   │   ├── exports/
+│   │   │   │   └── ExportDeckModal.tsx    # Modal export PowerPoint
 │   │   │   ├── GitHubTokenModal.tsx
 │   │   │   ├── IssueCreateModal.tsx
 │   │   │   └── ...
@@ -425,6 +426,14 @@ UpdateLens/
 │   │       ├── eos_whatsnew_*.json
 │   │       ├── fabric_roadmap_*.json
 │   │       └── m365roadmap_data_*.json
+│   │
+│   ├── exports/                  # Generazione PowerPoint brandizzato EOS
+│   │   ├── brandTokens.ts        # Palette, font, layout dal Brand Book
+│   │   ├── eosLogoBase64.ts      # Logo (positivo + negativo) come data URI
+│   │   ├── deckModel.ts          # Modello del deck (puro, testabile)
+│   │   ├── pptxRenderer.ts       # Rendering pptxgenjs + slide master
+│   │   ├── downloadBlob.ts       # Download di contenuti binari
+│   │   └── index.ts
 │   │
 │   ├── models/                   # Zod schemas e TypeScript types
 │   │   ├── ReleaseItem.ts

@@ -6,6 +6,7 @@
     "scripts": {
         "server:dev": "tsx server/index.ts",
         "test:releaseplans": "tsx tools/releaseplansUrlCheck.ts",
+        "test:deck": "tsx tools/deckSmokeTest.ts",
         "refresh:all": "npm run refresh:microsoft && npm run refresh:eos && npm run refresh:m365roadmap && npm run refresh:fabric",
         "refresh:eos": "tsx tools/refreshEos.ts",
         "refresh:m365roadmap": "tsx tools/refreshM365Roadmap.ts",
@@ -29,6 +30,7 @@
         "express": "^4.19.2",
         "jszip": "^3.10.1",
         "node-cron": "^3.0.3",
+        "pptxgenjs": "^4.0.1",
         "react": "^18.3.1",
         "react-dom": "^18.3.1",
         "react-router-dom": "^6.26.2",
