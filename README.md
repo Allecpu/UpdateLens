@@ -14,6 +14,7 @@ I dati provengono da snapshot JSON versionati, serviti insieme all'applicazione.
 - ✅ **Filtri Globali e Per-Cliente** - Sistema di filtri avanzato e granulare
 - ✅ **Dashboard Interattiva** - Visualizzazione KPI e drill-down
 - ✅ **Export Markdown** - Esportazione report personalizzati
+- ✅ **Export PowerPoint** - Deck cliente con l'identità visiva EOS Solutions, sezioni configurabili
 - ✅ **GitHub Issues Integration** - Gestione bug/feature direttamente dal portale
 - ✅ **Snapshot Locali** - Dati versionati e tracciabili
 

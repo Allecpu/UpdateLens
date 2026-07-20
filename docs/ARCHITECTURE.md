@@ -443,15 +443,19 @@ UpdateLens/
 │   │   ├── DataLoader.ts         # Caricamento snapshot
 │   │   ├── FilterService.ts      # Logica filtri
 │   │   ├── FilterDefinitions.ts  # Definizioni filtri per fonte
-│   │   ├── ExportService.ts      # Export Markdown
+│   │   ├── FilterDescription.ts  # Etichette filtri attivi (chip + export)
+│   │   ├── ExportService.ts      # Export Markdown + helper condivisi
+│   │   ├── KpiService.ts         # Conteggi KPI dashboard
+│   │   ├── CountsService.ts      # Conteggi per fonte e prodotto
 │   │   ├── StorageService.ts     # Persistenza LocalStorage
 │   │   ├── GitHubService.ts      # Integrazione GitHub
 │   │   └── ...
 │   │
 │   ├── utils/                    # Utility functions
 │   │   ├── productColors.ts
-│   │   ├── dateUtils.ts
-│   │   ├── textUtils.ts
+│   │   ├── date.ts
+│   │   ├── html.ts               # Decodifica entità HTML
+│   │   ├── url.ts
 │   │   └── ...
 │   │
 │   ├── App.tsx                   # Root component
@@ -464,7 +468,8 @@ UpdateLens/
 │   ├── refreshEos.ts
 │   ├── refreshFabric.ts
 │   ├── refreshM365Roadmap.ts
-│   ├── inlineReleaseAssets.ts    # Build release
+│   ├── deckSmokeTest.ts          # Collaudo export PowerPoint
+│   ├── releaseplansUrlCheck.ts
 │   └── ...
 │
 ├── server/                       # Backend opzionale
@@ -603,15 +608,22 @@ User selects customer
   → Re-render Dashboard
 ```
 
-### 4. Export Markdown
+### 4. Export
 
+**Markdown**
 ```
-User clicks Export
-  → ExportService.generateMarkdown(items, filters)
-  → Group by product
-  → Format as Markdown
-  → Add metadata (date, filters)
-  → Trigger download
+Click "Esporta Markdown"
+  → buildMarkdown(items, customerName)      // ExportService.ts
+  → groupByProduct + resolveItemLinks
+  → downloadBlob(blob, 'update-lens-export.md')
+```
+
+**PowerPoint**
+```
+Click "Esporta PPTX" → ExportDeckModal
+  → buildDeckModel(items, filters, options) // puro, stima le slide
+  → renderDeck(model)                       // import() dinamico di pptxgenjs
+  → downloadBlob(blob, 'UpdateLens-<cliente>-<data>.pptx')
 ```
 
 ### 5. GitHub Issues
@@ -940,7 +952,7 @@ npm run build
 npm run server:dev
 
 # Production
-npm run server:start
+npm run start:server
 ```
 
 #### Architettura

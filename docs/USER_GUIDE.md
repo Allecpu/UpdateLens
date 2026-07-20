@@ -9,8 +9,9 @@
 5. [Gestione Clienti](#gestione-clienti)
 6. [Filtri Globali](#filtri-globali)
 7. [GitHub Issues](#github-issues)
-8. [Export Markdown](#export-markdown)
-9. [FAQ](#faq)
+8. [Export PowerPoint](#export-powerpoint-report-cliente)
+9. [Export Markdown](#export-markdown)
+10. [FAQ](#faq)
 
 ---
 
@@ -27,6 +28,7 @@
 ✅ **Multi-Cliente** - Configurazioni personalizzate per ogni cliente  
 ✅ **Filtri Avanzati** - Filtra per fonte, stato, prodotto, date  
 ✅ **Export Markdown** - Genera report personalizzati  
+✅ **Export PowerPoint** - Deck cliente con l'identità visiva EOS Solutions  
 ✅ **GitHub Issues** - Segnala bug e richieste direttamente dal portale
 
 ---
@@ -100,8 +102,10 @@ Card per ogni aggiornamento con:
 - **Data disponibilità**
 - **Link** alla fonte originale
 
-#### 4. Pulsante Export (in alto a destra)
-Genera report Markdown degli aggiornamenti filtrati.
+#### 4. Pulsanti Export (in alto a destra)
+- **Esporta Markdown** - report testuale degli aggiornamenti filtrati
+- **Esporta PPTX** - presentazione PowerPoint brandizzata EOS (apre un modal
+  per scegliere titolo e sezioni)
 
 ### Workflow Tipico
 
@@ -450,14 +454,16 @@ A: Upload immagini è disponibile solo in modalità Web (limitazioni CORS del br
 
 ### Export
 
-**Q: Posso esportare in PDF?**  
-A: Al momento solo Markdown. Puoi convertire il Markdown in PDF con strumenti esterni (es. Pandoc, Typora).
+**Q: In quali formati posso esportare?**  
+A: Markdown e PowerPoint (.pptx). Per il PDF puoi convertire il Markdown con strumenti
+esterni (es. Pandoc, Typora) oppure salvare il deck come PDF da PowerPoint.
 
 **Q: L'export include tutti gli aggiornamenti?**  
 A: L'export include solo gli aggiornamenti **filtrati** visibili nella Dashboard.
 
 **Q: Posso personalizzare il formato export?**  
-A: Al momento no. Il formato è fisso (Markdown con struttura standard).
+A: Il Markdown ha una struttura fissa. Il deck PowerPoint è configurabile: puoi scegliere
+titolo, sottotitolo e quali sezioni includere.
 
 ### Problemi Comuni
 

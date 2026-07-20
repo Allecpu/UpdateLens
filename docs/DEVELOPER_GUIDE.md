@@ -77,6 +77,7 @@ UpdateLens/
 │   │   └── snapshots/            # Data snapshots (dev)
 │   ├── models/                   # Zod schemas & types
 │   ├── services/                 # Business logic
+│   ├── exports/                  # PowerPoint deck generation
 │   ├── utils/                    # Utility functions
 │   ├── App.tsx                   # Root component
 │   ├── main.tsx                  # Entry point
@@ -87,7 +88,7 @@ UpdateLens/
 │   ├── refreshEos.ts
 │   ├── refreshFabric.ts
 │   ├── refreshM365Roadmap.ts
-│   └── inlineReleaseAssets.ts
+│   └── deckSmokeTest.ts
 │
 ├── server/                       # Backend (optional)
 │   ├── api.ts
@@ -289,13 +290,14 @@ mai scritti inline: è l'unico punto in cui il Brand Book EOS è codificato.
    # Open http://localhost:4173
    ```
 
-3. **Test Checklist**
+2. **Test Checklist**
    - [ ] Dashboard loads without errors
    - [ ] All 4 sources display data
    - [ ] Filters work correctly
    - [ ] Customer management CRUD works
    - [ ] Global filters apply correctly
    - [ ] Export Markdown downloads
+   - [ ] Export PPTX opens the modal and downloads a valid deck
    - [ ] GitHub Issues integration works
    - [ ] LocalStorage persists data
 
@@ -473,7 +475,7 @@ interface Props {
 
 ### Naming
 
-- **Files**: PascalCase per componenti (`DashboardPage.tsx`), camelCase per utils (`dateUtils.ts`)
+- **Files**: PascalCase per componenti (`DashboardPage.tsx`), camelCase per utils (`date.ts`, `html.ts`)
 - **Components**: PascalCase (`CustomerSelector`)
 - **Functions**: camelCase (`loadData`, `applyFilters`)
 - **Constants**: UPPER_SNAKE_CASE (`ALL_RELEASE_SOURCES`)
@@ -486,7 +488,7 @@ interface Props {
 import React, { useState } from 'react';
 import { z } from 'zod';
 import { useDataStore } from '../services/DataStore';
-import { formatDate } from '../utils/dateUtils';
+import { formatDate } from '../utils/date';
 ```
 
 ### Comments

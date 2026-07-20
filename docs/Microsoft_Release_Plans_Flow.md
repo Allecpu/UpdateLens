@@ -127,5 +127,5 @@ Retrieves the history of changes for a feed or "What's New" view.
 
 ## 4. Updates & Scheduling
 *   **Azure Environment**: Updates are handled via **GitHub Actions** which run the ingestion script and commit/push the updated `data.db` (or trigger a specialized update mechanism). The API prevents manual refresh triggers in production (`/api/refresh-zip` returns 501 on Azure).
-*   **Local/Dev**: Developers can run `npm run refresh:releaseplans` to trigger `server/ingest.ts` locally.
+*   **Local/Dev**: Developers can run `npm run ingest:releaseplans` to trigger `server/ingest.ts` locally.
 

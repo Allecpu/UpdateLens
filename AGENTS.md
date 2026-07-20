@@ -18,7 +18,7 @@
 
 ## Coding Style & Naming Conventions
 - TypeScript + React function components; avoid `any`, prefer explicit types and Zod schemas.
-- File naming: PascalCase for components (`DashboardPage.tsx`), camelCase for utilities (`dateUtils.ts`).
+- File naming: PascalCase for components (`DashboardPage.tsx`), camelCase for utilities (`date.ts`, `html.ts`).
 - Symbols: components/types in PascalCase, functions in camelCase, constants in `UPPER_SNAKE_CASE`.
 - Keep imports ordered: React, libraries, then local modules.
 
