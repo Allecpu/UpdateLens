@@ -256,8 +256,21 @@ Genera un deck da uno snapshot reale in `tmp/` e verifica il pacchetto OOXML:
 parti obbligatorie, numero di slide, deduplicazione dei logo negli slide master,
 colori di brand, limite dei 6 bullet per slide e tetto complessivo del deck.
 
-Il test **non può verificare la resa grafica**: per quella apri il `.pptx`
-prodotto in PowerPoint.
+Il test verifica anche che le **dimensioni della slide** corrispondano a
+`EOS_LAYOUT` e che **nessun oggetto esca dai bordi**: i preset di pptxgenjs non
+corrispondono a queste misure (`LAYOUT_16x9` è 10 × 5.625 pollici) e con il
+preset sbagliato logo, tile e grafici finiscono fuori slide senza che il file
+risulti invalido.
+
+Il test **non verifica la resa tipografica**. Per quella, esporta le slide in
+PNG con PowerPoint e guardale:
+
+```powershell
+$ppt = New-Object -ComObject PowerPoint.Application
+$pres = $ppt.Presentations.Open("C:\...\deck.pptx", $true, $false, $false)
+$pres.SaveCopyAs("C:\out\s", 18)   # 18 = ppSaveAsPNG
+$pres.Close(); $ppt.Quit()
+```
 
 #### Aggiungere un tipo di slide
 

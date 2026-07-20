@@ -35,14 +35,35 @@
 - ✅ Tetto di 3 slide per prodotto e 15 sezioni prodotto: sull'intero dataset il deck resta
   a ~51 slide invece di ~480. Le omissioni sono sempre dichiarate nella slide
 
+### 🐛 Correzioni emerse dal QA visivo
+
+- ✅ **Layout slide** - `pptx.defineLayout` esplicito derivato da `EOS_LAYOUT`: il preset
+  `LAYOUT_16x9` di pptxgenjs è 10 x 5.625 pollici, non 13.333 x 7.5, e mandava fuori slide
+  la quinta tile KPI, il logo e parte del grafico
+- ✅ **Etichetta prodotto** - `resolveProductLabel`: 391 item su 3813 hanno `product` ma non
+  `productName` e finivano sotto il titolo letterale "undefined" (difetto presente anche
+  nell'export Markdown, dove produceva `## undefined`)
+- ✅ **Date** - `resolveItemDate` con fallback su `availabilityDateFull` / `availabilityDate` /
+  `firstAvailableDate`: gli stessi 391 item mostravano "data non disponibile" ovunque
+- ✅ **Entità HTML** - `decodeHtmlEntities` (`src/utils/html.ts`): 48 titoli contengono entità
+  già codificate dalla sorgente (`l&#39;agente`) che finivano letterali nel documento
+- ✅ **Logo sulle slide di contenuto** spostato in basso a destra su fondo bianco: il PNG a
+  colori ha fondo bianco e sulla banda arancione si vedeva come un riquadro
+- ✅ **Slide "Perimetro del report"** - `summarizeFilterState` riassume per gruppo con "+N altri"
+  invece di elencare ogni valore: con i filtri di default produceva oltre cento righe fuori slide
+- ✅ **Grafico** - altezza proporzionale al numero di barre e serie unica in arancione
+- ✅ Il test `test:deck` ora verifica le **dimensioni della slide** e che **nessun oggetto esca
+  dai bordi**: entrambi i controlli falliscono sul codice pre-correzione
+
 ### ⚠️ Limiti Noti
 
 - I font brand (Humble, Open Sans) **non sono incorporabili** in un .pptx: il deck usa
   `Calibri`, che è il fallback previsto dal Brand Book ed è presente su ogni Office
 - Il template ufficiale `eos-template.potx` non viene usato: pptxgenjs non sa leggerlo,
   quindi il deck è una ricostruzione che ne applica i token
-- Il QA visivo va fatto aprendo il file in PowerPoint: il collaudo automatico verifica la
-  struttura del pacchetto, non la resa grafica
+- Il collaudo automatico verifica struttura, geometria e colori del pacchetto, ma non la
+  resa tipografica: per quella si esportano le slide in PNG con PowerPoint
+  (`$ppt.Presentations.Open(...).SaveCopyAs($dir, 18)` via COM) e si guardano
 
 ### 📦 Dipendenze
 

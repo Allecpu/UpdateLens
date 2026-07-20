@@ -1,7 +1,6 @@
 import PptxGenJS from 'pptxgenjs';
 import type { DeckModel, DeckSlide } from './deckModel';
 import {
-  EOS_CHART_SERIES,
   EOS_CLAIM,
   EOS_COLORS,
   EOS_DENSITY,
@@ -22,6 +21,9 @@ const PptxCtor = ((PptxGenJS as unknown as { default?: typeof PptxGenJS })
 type Slide = ReturnType<PptxGenJS['addSlide']>;
 
 const CONTENT_W = EOS_LAYOUT.slideW - EOS_LAYOUT.marginX * 2;
+
+/** Nome del layout custom 16:9 in formato wide. */
+const EOS_LAYOUT_NAME = 'EOS_WIDE';
 
 /** Master per le slide di contenuto: fondo chiaro, banda arancione, logo a colori. */
 const MASTER_CONTENT = 'EOS_CONTENT';
@@ -93,7 +95,7 @@ const applyChrome = (slide: Slide, title: string, subtitle?: string): void => {
   slide.addText(title, {
     x: EOS_LAYOUT.marginX,
     y: 0.12,
-    w: CONTENT_W - 1.6,
+    w: CONTENT_W,
     h: 0.7,
     fontFace: EOS_FONTS.heading,
     fontSize: EOS_FONT_SIZES.slideTitle,
@@ -116,15 +118,16 @@ const applyChrome = (slide: Slide, title: string, subtitle?: string): void => {
 };
 
 const addFooter = (slide: Slide, index: number, total: number): void => {
+  // A sinistra: il logo occupa l'angolo in basso a destra.
   slide.addText(`${index} / ${total}`, {
-    x: EOS_LAYOUT.slideW - 1.4,
+    x: EOS_LAYOUT.marginX,
     y: EOS_LAYOUT.footerY,
-    w: 0.9,
+    w: 1.2,
     h: 0.3,
     fontFace: EOS_FONTS.body,
     fontSize: EOS_FONT_SIZES.caption,
     color: EOS_COLORS.slate,
-    align: 'right'
+    align: 'left'
   });
 };
 
@@ -242,6 +245,12 @@ const renderTopProducts = (
   data: Extract<DeckSlide, { kind: 'topProducts' }>
 ): void => {
   applyChrome(slide, data.title);
+
+  // Altezza proporzionale al numero di barre: a piena altezza con due sole
+  // categorie le barre diventano enormi e il grafico illeggibile.
+  const availableH = EOS_LAYOUT.footerY - EOS_LAYOUT.contentTop - 0.2;
+  const chartH = Math.min(availableH, Math.max(2, data.rows.length * 0.5 + 0.8));
+
   slide.addChart(
     'bar',
     [
@@ -255,9 +264,15 @@ const renderTopProducts = (
       x: EOS_LAYOUT.marginX,
       y: EOS_LAYOUT.contentTop,
       w: CONTENT_W,
-      h: 5.4,
+      h: chartH,
+      barGapWidthPct: 60,
+      valGridLine: { style: 'none' },
+      catGridLine: { style: 'none' },
       barDir: 'bar',
-      chartColors: [...EOS_CHART_SERIES],
+      // Serie unica: tutte le barre nel primario. EOS_CHART_SERIES serve
+      // quando le serie sono davvero piu' di una, altrimenti colori diversi
+      // suggerirebbero una distinzione di significato che non esiste.
+      chartColors: [EOS_COLORS.orange],
       showValue: true,
       dataLabelColor: EOS_COLORS.brown,
       dataLabelFontFace: EOS_FONTS.body,
@@ -283,28 +298,37 @@ const renderBullets = (
   const texts: PptxGenJS.TextProps[] = [];
 
   rows.forEach((bullet) => {
+    const meta = bullet.sub?.join(' · ') ?? '';
+    const hasMeta = meta.length > 0;
+
     texts.push({
       text: bullet.text,
       options: {
         bullet: true,
         color: EOS_COLORS.brown,
         fontSize: EOS_FONT_SIZES.body,
-        bold: Boolean(bullet.sub && bullet.sub.length > 0),
+        bold: hasMeta,
         hyperlink: bullet.link ? { url: bullet.link } : undefined,
-        breakLine: true
+        // Senza meta il punto elenco si chiude qui.
+        breakLine: !hasMeta
       }
     });
-    bullet.sub?.forEach((line) => {
+
+    if (hasMeta) {
+      // Stessa riga logica del titolo: una run separata con breakLine finale.
+      // Metterla in un paragrafo a se' la faceva partire dal margine sinistro
+      // invece che allineata al testo del punto elenco (indentLevel non viene
+      // applicato ai paragrafi senza bullet).
       texts.push({
-        text: line,
+        text: `  —  ${meta}`,
         options: {
-          indentLevel: 1,
           color: EOS_COLORS.slate,
           fontSize: EOS_FONT_SIZES.caption,
+          bold: false,
           breakLine: true
         }
       });
-    });
+    }
   });
 
   slide.addText(texts, {
@@ -410,7 +434,18 @@ const renderSlide = (pptx: PptxGenJS, data: DeckSlide, index: number, total: num
  */
 export const buildPresentation = (model: DeckModel): PptxGenJS => {
   const pptx = new PptxCtor();
-  pptx.layout = 'LAYOUT_16x9';
+
+  // Layout esplicito derivato da EOS_LAYOUT: i preset di pptxgenjs non
+  // corrispondono a queste misure ('LAYOUT_16x9' e' 10 x 5.625 pollici, non
+  // 13.333 x 7.5), e usare il preset sbagliato manda fuori slide logo, tile e
+  // grafici. Definendo il layout dalle stesse costanti che posizionano gli
+  // oggetti, geometria e slide non possono piu' divergere.
+  pptx.defineLayout({
+    name: EOS_LAYOUT_NAME,
+    width: EOS_LAYOUT.slideW,
+    height: EOS_LAYOUT.slideH
+  });
+  pptx.layout = EOS_LAYOUT_NAME;
   pptx.author = 'Update Lens';
   pptx.company = 'EOS Solutions';
   pptx.title = model.fileName.replace(/\.pptx$/, '');

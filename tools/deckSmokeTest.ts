@@ -12,7 +12,7 @@ import path from 'node:path';
 import JSZip from 'jszip';
 import { buildDeckModel, DEFAULT_DECK_SECTIONS } from '../src/exports/deckModel';
 import { buildPresentation } from '../src/exports/pptxRenderer';
-import { EOS_COLORS, EOS_FONTS } from '../src/exports/brandTokens';
+import { EOS_COLORS, EOS_FONTS, EOS_LAYOUT } from '../src/exports/brandTokens';
 import type { ReleaseItem } from '../src/models/ReleaseItem';
 import type { FilterState } from '../src/models/Filters';
 
@@ -194,6 +194,59 @@ const run = async (): Promise<void> => {
   assert(
     !/FF0000|0000FF|00FF00/.test(allSlidesXml),
     'nessun colore fuori palette (rosso/blu/verde puri)'
+  );
+
+  // Geometria: ogni oggetto deve stare dentro i bordi della slide.
+  // Questo controllo intercetta il caso in cui il layout dichiarato non
+  // corrisponde alle coordinate usate (es. preset 'LAYOUT_16x9' = 10 x 5.625
+  // pollici mentre gli oggetti sono posizionati per 13.333 x 7.5): logo, tile
+  // KPI e grafici finiscono fuori slide senza che il file risulti invalido.
+  const EMU_PER_INCH = 914400;
+  const presentationXml =
+    (await zip.file('ppt/presentation.xml')?.async('string')) ?? '';
+  const sldSz = presentationXml.match(/<p:sldSz[^>]*cx="(\d+)"[^>]*cy="(\d+)"/);
+  const slideW = Number(sldSz?.[1] ?? 0) / EMU_PER_INCH;
+  const slideH = Number(sldSz?.[2] ?? 0) / EMU_PER_INCH;
+  assert(
+    Math.abs(slideW - EOS_LAYOUT.slideW) < 0.01 &&
+      Math.abs(slideH - EOS_LAYOUT.slideH) < 0.01,
+    `dimensioni slide ${slideW.toFixed(2)}x${slideH.toFixed(2)}" = EOS_LAYOUT (${EOS_LAYOUT.slideW}x${EOS_LAYOUT.slideH}")`
+  );
+
+  const outOfBounds: string[] = [];
+  const targets = [...slideFiles, ...layoutFiles];
+  for (const name of targets) {
+    const xml = (await zip.file(name)?.async('string')) ?? '';
+    const frames = xml.matchAll(
+      /<a:off x="(-?\d+)" y="(-?\d+)"\/><a:ext cx="(\d+)" cy="(\d+)"\/>/g
+    );
+    for (const frame of frames) {
+      const x = Number(frame[1]) / EMU_PER_INCH;
+      const y = Number(frame[2]) / EMU_PER_INCH;
+      const w = Number(frame[3]) / EMU_PER_INCH;
+      const h = Number(frame[4]) / EMU_PER_INCH;
+      // Tolleranza di 0.02" per gli arrotondamenti EMU.
+      if (x < -0.02 || y < -0.02 || x + w > slideW + 0.02 || y + h > slideH + 0.02) {
+        outOfBounds.push(
+          `${path.basename(name)}: ${x.toFixed(2)},${y.toFixed(2)} ${w.toFixed(2)}x${h.toFixed(2)}"`
+        );
+      }
+    }
+  }
+  assert(
+    outOfBounds.length === 0,
+    `nessun oggetto fuori dai bordi della slide${
+      outOfBounds.length > 0 ? ` — trovati: ${outOfBounds.slice(0, 4).join(' | ')}` : ''
+    }`
+  );
+
+  const filterSlides = model.slides.filter((s) => s.kind === 'filters');
+  const longFilterSlides = filterSlides.filter(
+    (s) => s.kind === 'filters' && s.lines.length > 12
+  );
+  assert(
+    longFilterSlides.length === 0,
+    'la slide dei filtri riassume invece di elencare tutti i valori'
   );
 
   const bulletSlides = model.slides.filter((s) => s.kind === 'bullets');

@@ -1,13 +1,19 @@
 import { z } from 'zod';
 import type { ReleaseItem } from '../models/ReleaseItem';
 import type { FilterState } from '../models/Filters';
-import { groupByProduct, resolveItemLinks } from '../services/ExportService';
+import {
+  groupByProduct,
+  resolveItemDate,
+  resolveItemLinks,
+  resolveProductLabel
+} from '../services/ExportService';
+import { decodeHtmlEntities } from '../utils/html';
 import {
   DASHBOARD_KPI_DEFINITIONS,
   computeDashboardKpis
 } from '../services/KpiService';
 import { computeCountsBySourceAndProduct } from '../services/CountsService';
-import { describeActiveFilters } from '../services/FilterDescription';
+import { summarizeFilterState } from '../services/FilterDescription';
 import { EOS_CLAIM, EOS_CONTACT, EOS_DENSITY } from './brandTokens';
 
 /** Numero massimo di sezioni prodotto prima del collasso in "Altri prodotti". */
@@ -22,6 +28,8 @@ const MAX_SLIDES_PER_PRODUCT = 3;
 const MAX_OTHER_PRODUCTS_ROWS = 6;
 /** Prodotti mostrati nel grafico "Top prodotti". */
 const TOP_PRODUCTS_LIMIT = 10;
+/** Righe massime nella slide "Perimetro del report", per non sforare. */
+const MAX_FILTER_LINES = 12;
 const MAX_TITLE_CHARS = 90;
 const MAX_SUMMARY_CHARS = 320;
 
@@ -104,8 +112,12 @@ const chunk = <T,>(items: T[], size: number): T[][] => {
   return out;
 };
 
-const formatDate = (value: string | null | undefined): string =>
-  value && value.length > 0 ? value : 'data non disponibile';
+const formatDate = (item: ReleaseItem): string =>
+  resolveItemDate(item) ?? 'data non disponibile';
+
+/** Testo pronto per il documento: entita' HTML decodificate e troncato. */
+const cleanText = (text: string, max: number): string =>
+  truncate(decodeHtmlEntities(text).trim(), max);
 
 /** Nome file sicuro per il download, senza caratteri vietati da Windows. */
 const buildFileName = (customerName: string, generatedAt: Date): string => {
@@ -123,10 +135,9 @@ const buildFileName = (customerName: string, generatedAt: Date): string => {
 
 const buildItemBullet = (item: ReleaseItem): DeckBullet => {
   const links = resolveItemLinks(item);
-  const sub = [`${item.status} · ${formatDate(item.releaseDate)}`];
   return {
-    text: truncate(item.title, MAX_TITLE_CHARS),
-    sub,
+    text: cleanText(item.title, MAX_TITLE_CHARS),
+    sub: [`${item.status} · ${formatDate(item)}`],
     link: links.sourceUrl ?? undefined
   };
 };
@@ -198,10 +209,10 @@ const buildDetailSlides = (
     const bullets: DeckBullet[] = [];
 
     if (summary) {
-      bullets.push({ text: truncate(summary, MAX_SUMMARY_CHARS) });
+      bullets.push({ text: cleanText(summary, MAX_SUMMARY_CHARS) });
     }
     bullets.push({ text: `Stato: ${item.status}` });
-    bullets.push({ text: `Disponibilità: ${formatDate(item.releaseDate)}` });
+    bullets.push({ text: `Disponibilità: ${formatDate(item)}` });
     if (links.sourceUrl) {
       bullets.push({ text: 'Fonte ufficiale', link: links.sourceUrl });
     }
@@ -211,8 +222,8 @@ const buildDetailSlides = (
 
     return {
       kind: 'bullets',
-      title: truncate(item.title, MAX_TITLE_CHARS),
-      subtitle: `${item.source} · ${item.productName}`,
+      title: cleanText(item.title, MAX_TITLE_CHARS),
+      subtitle: `${item.source} · ${resolveProductLabel(item)}`,
       bullets
     };
   });
@@ -273,7 +284,9 @@ export const buildDeckModel = (
   }
 
   if (options.includeFilterContext) {
-    const active = describeActiveFilters(filters);
+    // Riepilogo compatto, non l'elenco puntuale: con i filtri di default
+    // i valori selezionati sono oltre cento e non starebbero nella slide.
+    const active = summarizeFilterState(filters);
     slides.push({
       kind: 'filters',
       title: 'Perimetro del report',
@@ -284,7 +297,7 @@ export const buildDeckModel = (
         ...(active.length > 0
           ? active
           : ['Nessun filtro applicato — vista completa'])
-      ]
+      ].slice(0, MAX_FILTER_LINES)
     });
   }
 

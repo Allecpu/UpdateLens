@@ -2,6 +2,7 @@ import type { ReleaseItem } from '../models/ReleaseItem';
 import { isValidHttpUrl } from '../utils/url';
 import { isReleasePlansUrl, isValidGuid } from '../utils/releaseplans';
 import { downloadBlob } from '../exports/downloadBlob';
+import { decodeHtmlEntities } from '../utils/html';
 
 export type ItemLinks = {
   /** URL della fonte, oppure null se assente o non valido. */
@@ -37,12 +38,37 @@ export const resolveItemLinks = (item: ReleaseItem): ItemLinks => {
   return { sourceUrl, docUrl };
 };
 
+/**
+ * Etichetta prodotto sempre valorizzata.
+ *
+ * 391 item su 3813 (le release plans Microsoft) hanno `product` ma non
+ * `productName`: usando direttamente `productName` i raggruppamenti finivano
+ * sotto la chiave letterale "undefined".
+ */
+export const resolveProductLabel = (item: ReleaseItem): string =>
+  item.productName || item.product || 'Altro';
+
+/**
+ * Data di disponibilita' con catena di fallback.
+ *
+ * Gli stessi item privi di `productName` sono anche privi di `releaseDate`, ma
+ * hanno `availabilityDateFull` valorizzata: senza fallback l'export mostrava
+ * "data non disponibile" su ogni riga.
+ */
+export const resolveItemDate = (item: ReleaseItem): string | null =>
+  item.releaseDate ||
+  item.availabilityDateFull ||
+  item.availabilityDate ||
+  item.firstAvailableDate ||
+  null;
+
 export const groupByProduct = (items: ReleaseItem[]): Record<string, ReleaseItem[]> => {
   return items.reduce((acc, item) => {
-    if (!acc[item.productName]) {
-      acc[item.productName] = [];
+    const label = resolveProductLabel(item);
+    if (!acc[label]) {
+      acc[label] = [];
     }
-    acc[item.productName].push(item);
+    acc[label].push(item);
     return acc;
   }, {} as Record<string, ReleaseItem[]>);
 };
@@ -62,10 +88,10 @@ export const buildMarkdown = (items: ReleaseItem[], customerName: string): strin
       const links = resolveItemLinks(item);
       const sourceUrl = links.sourceUrl ?? 'Fonte non disponibile';
       const docUrl = links.docUrl ?? 'Documentazione non disponibile';
-      lines.push(`- ${item.title}`);
+      lines.push(`- ${decodeHtmlEntities(item.title)}`);
       lines.push(`  - Stato: ${item.status}`);
-      lines.push(`  - Data: ${item.releaseDate}`);
-      lines.push(`  - Sintesi: ${item.description}`);
+      lines.push(`  - Data: ${resolveItemDate(item) ?? 'Data non disponibile'}`);
+      lines.push(`  - Sintesi: ${decodeHtmlEntities(item.description ?? '')}`);
       lines.push(`  - Link: ${sourceUrl}`);
       lines.push(`  - Documentazione: ${docUrl}`);
     });

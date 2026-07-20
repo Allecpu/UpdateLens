@@ -73,8 +73,15 @@ export const EOS_LAYOUT = {
   titleBandH: 0.95,
   /** Prima riga utile del contenuto, sotto la banda. */
   contentTop: 1.35,
-  /** Logo in angolo fisso sulle slide di contenuto. Area di rispetto inclusa. */
-  logo: { x: 11.45, y: 0.22, w: 1.35, h: 0.34 },
+  /**
+   * Logo sulle slide di contenuto: in basso a destra, su fondo bianco.
+   *
+   * Non sulla banda arancione: il PNG a colori ha fondo bianco (deriva dal JPG
+   * ufficiale, senza trasparenza) e sull'arancione si vedrebbe come un
+   * riquadro bianco. Il par. 3 del Brand Book indica per il template ufficiale
+   * proprio "in alto a sx / in basso a dx".
+   */
+  logo: { x: 11.35, y: 6.72, w: 1.4, h: 0.35 },
   /** Logo grande su cover e closing. */
   logoLarge: { x: 0.6, y: 0.6, w: 2.8, h: 0.7 },
   footerY: 7.0

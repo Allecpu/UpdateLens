@@ -109,3 +109,63 @@ export const describeFilterState = (filters: FilterState): FilterDescriptor[] =>
 /** Sole etichette dei filtri attivi, per gli export testuali. */
 export const describeActiveFilters = (filters: FilterState): string[] =>
   describeFilterState(filters).map((entry) => entry.label);
+
+/** Valori elencati per gruppo prima di passare al conteggio. */
+const MAX_VALUES_LISTED = 4;
+
+const summarizeGroup = (label: string, values: string[]): string | null => {
+  if (values.length === 0) {
+    return null;
+  }
+  if (values.length <= MAX_VALUES_LISTED) {
+    return `${label}: ${values.join(', ')}`;
+  }
+  return `${label}: ${values.slice(0, MAX_VALUES_LISTED).join(', ')} +${
+    values.length - MAX_VALUES_LISTED
+  } altri`;
+};
+
+/**
+ * Riepilogo compatto dei filtri attivi, una riga per gruppo.
+ *
+ * Serve dove lo spazio e' limitato, come la slide "Perimetro del report":
+ * `describeActiveFilters` produce una voce per ogni singolo valore e con i
+ * filtri di default (tutti i prodotti e tutti gli stati selezionati) genera
+ * oltre cento righe, che sforano la slide. E' lo stesso criterio con cui la
+ * Dashboard mostra i primi chip e poi "+101".
+ */
+export const summarizeFilterState = (filters: FilterState): string[] => {
+  const lines: (string | null)[] = [
+    summarizeGroup('Fonti', filters.sources),
+    summarizeGroup('Stati', filters.statuses),
+    summarizeGroup('Prodotti', filters.products),
+    summarizeGroup('Tag', filters.tags),
+    summarizeGroup('Mesi', filters.months),
+    summarizeGroup('Versioni BC', filters.bcVersions)
+  ];
+
+  if (filters.query) {
+    lines.push(`Ricerca: ${filters.query}`);
+  }
+  if (filters.periodNewDays > 0) {
+    lines.push(`Nuovi negli ultimi ${filters.periodNewDays} giorni`);
+  }
+  if (filters.periodChangedDays > 0) {
+    lines.push(`Modificati negli ultimi ${filters.periodChangedDays} giorni`);
+  }
+  if (filters.releaseInDays > 0) {
+    lines.push(`Release entro ${filters.releaseInDays} giorni`);
+  }
+  if (filters.bcVersions.length === 0 && filters.minBcVersionMin !== null) {
+    lines.push(`BC Min Version >= ${filters.minBcVersionMin}`);
+  }
+  if (filters.releaseDateFrom || filters.releaseDateTo) {
+    lines.push(
+      `Periodo: ${filters.releaseDateFrom || 'inizio'} → ${
+        filters.releaseDateTo || 'fine'
+      }`
+    );
+  }
+
+  return lines.filter((line): line is string => line !== null);
+};
