@@ -24,7 +24,6 @@
 
 ### Caratteristiche Principali
 
-✅ **Funziona Offline** - Nessuna connessione internet richiesta  
 ✅ **Multi-Cliente** - Configurazioni personalizzate per ogni cliente  
 ✅ **Filtri Avanzati** - Filtra per fonte, stato, prodotto, date  
 ✅ **Export Markdown** - Genera report personalizzati  
@@ -36,13 +35,6 @@
 
 ### Apertura del Portale
 
-#### Modalità Offline (File)
-1. Estrai il file ZIP ricevuto
-2. Apri la cartella estratta
-3. Fai doppio click su `index.html`
-4. Il portale si aprirà nel tuo browser predefinito
-
-#### Modalità Web (Server)
 1. Apri il browser
 2. Vai all'URL fornito (es. `https://updatelens.example.com`)
 3. Il portale si caricherà automaticamente
@@ -230,7 +222,7 @@ Quando sei in **modalità cliente** (hai selezionato un cliente specifico):
 
 ### Configurazione Iniziale
 
-#### Modalità Locale (Offline)
+#### Modalità Locale (browser)
 
 1. Vai su **Issues** dal menu
 2. Click su **"Configura Token"**
@@ -304,7 +296,7 @@ blocco di codice
 4. L'immagine viene caricata su GitHub
 5. Il link viene inserito automaticamente nella descrizione
 
-⚠️ **Nota**: Upload immagini **non disponibile** in modalità offline (limitazioni CORS).
+⚠️ **Nota**: Upload immagini disponibile solo in modalità Web (con backend attivo).
 
 ---
 
@@ -412,7 +404,7 @@ Il report riflette:
 ### Domande Generali
 
 **Q: UpdateLens funziona senza internet?**  
-A: Sì! La versione offline funziona completamente senza connessione (eccetto GitHub Issues in modalità locale).
+A: No. Il portale va raggiunto via rete; una volta caricato, i dati mostrati sono snapshot serviti insieme all'applicazione.
 
 **Q: I miei dati sono al sicuro?**  
 A: Sì. Tutti i dati (clienti, filtri) sono salvati **solo nel tuo browser** (localStorage). Nessun dato viene inviato a server esterni.
@@ -450,7 +442,7 @@ A: I filtri globali e per-cliente sono salvati. I filtri temporanei della Dashbo
 **Q: Il mio token GitHub è sicuro?**  
 A: In modalità locale, il token è salvato nel tuo browser (localStorage). Nessuno può accedervi tranne te. In modalità Web, il token è sul server e mai esposto al client.
 
-**Q: Posso usare GitHub Issues offline?**  
+**Q: Posso usare GitHub Issues senza il backend?**  
 A: Sì, ma devi configurare un token. Le chiamate API vengono fatte direttamente dal browser a GitHub.
 
 **Q: Perché non posso caricare immagini?**  
@@ -473,7 +465,7 @@ A: Al momento no. Il formato è fisso (Markdown con struttura standard).
 A: Controlla che:
 - I filtri non siano troppo restrittivi
 - Le fonti dati siano selezionate
-- I file snapshot siano presenti (modalità offline)
+- I file snapshot siano raggiungibili (cartella `data/`)
 
 **Q: I filtri non si salvano**  
 A: Verifica che il browser abbia localStorage abilitato. Controlla le impostazioni privacy.

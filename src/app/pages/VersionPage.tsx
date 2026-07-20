@@ -22,7 +22,6 @@ type RefreshInfo = {
   message?: string | null;
 };
 
-type ReleaseState = 'idle' | 'running' | 'success' | 'error';
 
 type ToastInfo = {
   type: 'success' | 'error' | 'info';
@@ -106,15 +105,11 @@ const parseFilename = (contentDisposition: string | null): string | null => {
   return match?.[1] ?? null;
 };
 
-const isFileProtocol =
-  typeof window !== 'undefined' && window.location.protocol === 'file:';
-
 const VersionPage = () => {
   const buildLabel = buildTime || 'N/D';
   const commitLabel = gitCommit || 'N/D';
   const [refreshInfo, setRefreshInfo] = useState<RefreshInfo>(() => loadRefreshInfo());
   const [toast, setToast] = useState<ToastInfo | null>(null);
-  const [releaseState, setReleaseState] = useState<ReleaseState>('idle');
   const [updateAllInfo, setUpdateAllInfo] = useState<UpdateAllInfo>({
     state: 'idle',
     results: null,
@@ -203,46 +198,6 @@ const VersionPage = () => {
         eosCount: refreshInfo.eosCount,
         message
       });
-      triggerToast({ type: 'error', message });
-    }
-  };
-
-  const handleReleaseDownload = async () => {
-    if (releaseState === 'running') {
-      return;
-    }
-    setReleaseState('running');
-    triggerToast({ type: 'info', message: 'Generazione release in corso...' });
-
-    try {
-      const response = await fetch('/api/release-zip', { method: 'POST' });
-      if (!response.ok) {
-        const errorPayload = await response.json().catch(() => null);
-        const errorMessage =
-          errorPayload?.error || `Errore release (${response.status}).`;
-        throw new Error(errorMessage);
-      }
-
-      const blob = await response.blob();
-      const contentDisposition = response.headers.get('content-disposition');
-      const filename =
-        parseFilename(contentDisposition) ??
-        `UpdateLens_release_${new Date().toISOString().replace(/[:.]/g, '-')}.zip`;
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      link.click();
-      window.URL.revokeObjectURL(url);
-
-      setReleaseState('success');
-      triggerToast({
-        type: 'success',
-        message: 'Release completa generata, download avviato.'
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Errore inatteso.';
-      setReleaseState('error');
       triggerToast({ type: 'error', message });
     }
   };
@@ -429,30 +384,21 @@ const VersionPage = () => {
               Esegue il refresh degli snapshot e genera lo ZIP con manifest.
             </p>
           </div>
-          {!isFileProtocol && (
-            <button
-              className="ul-button ul-button-primary"
-              onClick={handleRefresh}
-              disabled={refreshInfo.status === 'running'}
-            >
-              {refreshInfo.status === 'running' ? (
-                <span className="inline-flex items-center gap-2">
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                  Aggiornamento in corso...
-                </span>
-              ) : (
-                'Esegui ultimo aggiornamento + Scarica ZIP'
-              )}
-            </button>
-          )}
+          <button
+            className="ul-button ul-button-primary"
+            onClick={handleRefresh}
+            disabled={refreshInfo.status === 'running'}
+          >
+            {refreshInfo.status === 'running' ? (
+              <span className="inline-flex items-center gap-2">
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                Aggiornamento in corso...
+              </span>
+            ) : (
+              'Esegui ultimo aggiornamento + Scarica ZIP'
+            )}
+          </button>
         </div>
-
-        {isFileProtocol && (
-          <div className="mt-4 text-sm text-muted-foreground">
-            Funzione disponibile solo con server attivo (non in versione locale).
-          </div>
-        )}
-
       </section>
 
       <section className="ul-surface p-6">
@@ -463,29 +409,21 @@ const VersionPage = () => {
               Esegue l'aggiornamento di Microsoft, EOS, Fabric e M365 Roadmap in parallelo.
             </p>
           </div>
-          {!isFileProtocol && (
-            <button
-              className="ul-button ul-button-primary"
-              onClick={handleUpdateAll}
-              disabled={updateAllInfo.state === 'running'}
-            >
-              {updateAllInfo.state === 'running' ? (
-                <span className="inline-flex items-center gap-2">
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                  Aggiornamento in corso...
-                </span>
-              ) : (
-                'Aggiorna tutte le fonti'
-              )}
-            </button>
-          )}
+          <button
+            className="ul-button ul-button-primary"
+            onClick={handleUpdateAll}
+            disabled={updateAllInfo.state === 'running'}
+          >
+            {updateAllInfo.state === 'running' ? (
+              <span className="inline-flex items-center gap-2">
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                Aggiornamento in corso...
+              </span>
+            ) : (
+              'Aggiorna tutte le fonti'
+            )}
+          </button>
         </div>
-
-        {isFileProtocol && (
-          <div className="mt-4 text-sm text-muted-foreground">
-            Funzione disponibile solo con server attivo (non in versione locale).
-          </div>
-        )}
 
         {updateAllInfo.results && (
           <div className="mt-6">
@@ -562,33 +500,6 @@ const VersionPage = () => {
                 Completato: {new Date(updateAllInfo.completedAt).toLocaleString('it-IT')}
               </div>
             )}
-          </div>
-        )}
-      </section>
-
-      <section className="ul-surface p-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-semibold">Prima installazione</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Scarica la release completa con HTML, asset e dati.
-            </p>
-          </div>
-          {!isFileProtocol && (
-            <button
-              className="ul-button ul-button-ghost"
-              onClick={handleReleaseDownload}
-              disabled={releaseState === 'running'}
-            >
-              {releaseState === 'running'
-                ? 'Preparazione release...'
-                : 'Scarica release completa'}
-            </button>
-          )}
-        </div>
-        {isFileProtocol && (
-          <div className="mt-4 text-sm text-muted-foreground">
-            Funzione disponibile solo con server attivo (non in versione locale).
           </div>
         )}
       </section>

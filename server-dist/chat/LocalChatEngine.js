@@ -424,9 +424,9 @@ export const runLocalChatEngine = async (req) => {
     const queryTokens = tokenizeQuery(filterPatch.query ?? '');
     const sourceFilter = filterPatch.sources;
     const productFilter = new Set((filterPatch.products ?? []).map((value) => normalizeText(value)));
-    // Default temporal filters (same as frontend DEFAULT_FILTERS)
-    const DEFAULT_HORIZON_MONTHS = 12;
-    const DEFAULT_HISTORY_MONTHS = 6;
+    // Default temporal filters (aligned with rules.json configuration)
+    const DEFAULT_HORIZON_MONTHS = 120;
+    const DEFAULT_HISTORY_MONTHS = 120;
     const nowTs = Date.now();
     const horizonDate = new Date(nowTs);
     horizonDate.setMonth(horizonDate.getMonth() + DEFAULT_HORIZON_MONTHS);

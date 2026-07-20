@@ -14,7 +14,6 @@
         "ingest:releaseplans": "tsx server/ingest.ts",
         "refresh:microsoft": "tsx tools/refreshMicrosoft.ts",
         "dev": "vite",
-        "build:release": "npm run build && tsx tools/inlineReleaseAssets.ts",
         "build:server": "tsc -p server/tsconfig.json",
         "start:server": "node server-dist/index.js",
         "preview": "vite preview",

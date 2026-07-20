@@ -12,7 +12,7 @@ Benvenuto nella documentazione completa di **UpdateLens**!
 Guida completa all'uso del portale UpdateLens.
 
 **Contenuto**:
-- Primi passi (apertura portale offline/web)
+- Primi passi (apertura del portale)
 - Navigazione e menu principale
 - Dashboard (KPI, filtri, lista items)
 - Gestione clienti (CRUD, modalità filtri)
@@ -36,7 +36,7 @@ Guida completa per sviluppatori che lavorano sul progetto.
 - Comandi NPM (dev, build, refresh)
 - Workflow sviluppo
 - Testing (type checking, manual, future automated)
-- Build e deploy (web, offline, backend)
+- Build e deploy (web, backend)
 - Aggiungere nuove fonti dati
 - Convenzioni codice (TypeScript, React, naming)
 - Troubleshooting

@@ -1,6 +1,48 @@
 # UpdateLens - Changelog Dettagliato
 
-## v0.5.0 (Unreleased) - Export PowerPoint brandizzato EOS
+## v0.5.0 (Unreleased)
+
+### Parte 2 — Rimozione della modalità offline
+
+### 🗑️ Rimozioni (breaking)
+
+UpdateLens non è più distribuibile come ZIP da aprire con doppio click: è
+un'applicazione web che va servita via HTTP.
+
+- ❌ **`npm run build:release`** e `tools/inlineReleaseAssets.ts`
+- ❌ **Cartella `release/`** — rimossa dal tracking git (25 MB, di cui ~8 MB di asset
+  duplicati mai referenziati) e aggiunta a `.gitignore`
+- ❌ **`POST /api/release-zip`** e `server/releaseZip.ts`
+- ❌ **Sezione "Prima installazione"** nella pagina Versione, con il bottone
+  "Scarica release completa"
+- ❌ **Rilevamento `file://`** (`isFileProtocol`) in `VersionPage` e `IssuesPage`: i due
+  bottoni di refresh dati sono ora sempre visibili, spariscono i messaggi
+  "Funzione disponibile solo con server attivo"
+- ❌ Step `Build release package` e copia `release/` in `.github/workflows/deploy-api.yml`
+
+**Perché.** La modalità offline era già di fatto non funzionante: `DataLoader` carica i
+dati con `fetch('data/latest.json')` e i browser bloccano `fetch()` su `file://`, mentre
+`inlineReleaseAssets` inlinava solo CSS e JS lasciando i JSON come file separati. Un
+cliente che seguiva la guida vedeva una dashboard vuota. L'artefatto committato era
+inoltre fermo a snapshot di gennaio contro i dati di luglio.
+
+### ⚡ Prestazioni
+
+- ✅ **Code-splitting ripristinato** — rimosso `inlineDynamicImports` da `vite.config.ts`,
+  che esisteva solo per il bundle unico offline
+- ✅ **pptxgenjs caricato on-demand** con `import()` dinamico: **bundle iniziale da 957 KB
+  a 583 KB** (gzip da 302 KB a 176 KB). I 372 KB della libreria li scarica solo chi genera
+  davvero una presentazione — cosa che la modalità offline impediva
+
+### 📚 Documentazione
+
+Riscritti README, USER_GUIDE, ARCHITECTURE, DEVELOPER_GUIDE, AGENTS e docs/README: via i
+claim "offline-first" e "funziona senza internet", via le procedure di test e la checklist
+PR che citavano la build offline. I documenti storici (`implementation_plan.md`,
+`tasks.md`, `DOCUMENTATION_UPDATE_SUMMARY.md` e le voci di changelog delle versioni
+passate) sono lasciati intatti: registrano lo stato del progetto a quel momento.
+
+### Parte 1 — Export PowerPoint brandizzato EOS
 
 ### 🎉 Nuove Funzionalità
 
@@ -67,10 +109,8 @@
 
 ### 📦 Dipendenze
 
-- ➕ `pptxgenjs ^4.0.1` (bundle da 542 KB a 957 KB, gzip da 150 KB a 302 KB)
-- ⚙️ `vite.config.ts`: `build.rollupOptions.output.inlineDynamicImports = true` — obbligatorio
-  perché pptxgenjs introduce uno stub di builtin Node che altrimenti diventa un secondo
-  chunk e rompe la modalità offline di `npm run build:release`
+- ➕ `pptxgenjs ^4.0.1`, caricato con `import()` dinamico: sta in un chunk separato da
+  372 KB scaricato solo da chi genera davvero un deck
 
 ## v0.4.0 (2026-02-02) - Azure Migration \u0026 Cloud Deployment
 

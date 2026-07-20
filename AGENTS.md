@@ -6,12 +6,11 @@
 - `public/` holds static assets and production snapshots under `public/data/`.
 - `tools/` contains data refresh scripts (e.g., `refreshMicrosoft.ts`).
 - `server/` is the optional Express + SQLite backend (API + ingestion).
-- Build outputs go to `dist/` (web) and `release/` (offline ZIP).
+- Build output goes to `dist/`.
 
 ## Build, Test, and Development Commands
 - `npm run dev` starts the Vite dev server at http://localhost:5173.
 - `npm run build` builds the web bundle into `dist/`.
-- `npm run build:release` builds an offline bundle and inlines assets into `release/`.
 - `npm run preview` serves the production build locally.
 - `npm run typecheck` runs TypeScript type checking.
 - `npm run server:dev` starts the optional backend.
@@ -25,7 +24,7 @@
 
 ## Testing Guidelines
 - Primary checks are `npm run typecheck` and manual QA.
-- Smoke-test offline mode with `npm run build:release` and open `release/index.html`.
+- Smoke-test the production bundle with `npm run build` and `npm run preview`.
 - Release plans URL check: `npm run test:releaseplans`.
 - PowerPoint export: `npm run test:deck` validates the OOXML package, logo deduplication, brand colours and slide-density limits. It cannot check visual rendering — open the generated `tmp/*.pptx` in PowerPoint for that.
 - Follow the checklist in `PRESET_TEST_CHECKLIST.md` for preset changes.

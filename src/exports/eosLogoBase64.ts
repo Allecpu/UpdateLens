@@ -1,12 +1,11 @@
 /**
  * Logo EOS Solutions incorporati come data URI base64.
  *
- * Perche' base64 e non un import di asset: la build offline
- * (`npm run build:release` -> `tools/inlineReleaseAssets.ts`) inlina solo gli
- * asset referenziati in index.html. Un `import logo from '...png'` produrrebbe
- * un file separato in dist/assets/ con URL relativo, non raggiungibile aprendo
- * release/index.html da file://. Una stringa in un modulo TS finisce invece nel
- * bundle JS, che viene inlinato.
+ * Perche' base64 e non un import di asset: in origine serviva alla build
+ * offline, che inlinava un solo bundle. Quel vincolo non esiste piu', ma i due
+ * logo pesano ~28 KB complessivi e tenerli qui evita di gestire il percorso
+ * degli asset dentro il renderer pptxgenjs, che vuole comunque un data URI.
+ * Convertirli in asset importati e' un refactor possibile, non necessario.
  *
  * Sorgente: Brand Book EOS Solutions, cartella assets/
  *  - positivo  <- eos-logo-horizontal.jpg  (CMYK, ridotto a 700px, ICC rimosso)

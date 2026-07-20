@@ -1,4 +1,4 @@
-import PptxGenJS from 'pptxgenjs';
+import type PptxGenJS from 'pptxgenjs';
 import type { DeckModel, DeckSlide } from './deckModel';
 import {
   EOS_CLAIM,
@@ -10,13 +10,19 @@ import {
 } from './brandTokens';
 import { EOS_LOGO_COLOR, EOS_LOGO_NEGATIVE } from './eosLogoBase64';
 
+/** Costruttore di pptxgenjs, risolto a runtime. */
+export type PptxCtor = new () => PptxGenJS;
+
 /**
  * Interop ESM: il bundle ES di pptxgenjs espone il costruttore sotto
  * `.default`, mentre altri bundler lo restituiscono direttamente. Risolviamo
  * entrambi i casi, cosi' il modulo funziona sia in Vite sia in Node (tsx).
  */
-const PptxCtor = ((PptxGenJS as unknown as { default?: typeof PptxGenJS })
-  .default ?? PptxGenJS) as typeof PptxGenJS;
+export const resolvePptxCtor = (imported: unknown): PptxCtor => {
+  const candidate = imported as { default?: unknown };
+  const inner = (candidate?.default as { default?: unknown })?.default;
+  return (inner ?? candidate?.default ?? imported) as PptxCtor;
+};
 
 type Slide = ReturnType<PptxGenJS['addSlide']>;
 
@@ -432,8 +438,11 @@ const renderSlide = (pptx: PptxGenJS, data: DeckSlide, index: number, total: num
  * cosi' uno script Node puo' costruire lo stesso deck e salvarlo come
  * nodebuffer per il collaudo headless.
  */
-export const buildPresentation = (model: DeckModel): PptxGenJS => {
-  const pptx = new PptxCtor();
+export const buildPresentation = (
+  Ctor: PptxCtor,
+  model: DeckModel
+): PptxGenJS => {
+  const pptx = new Ctor();
 
   // Layout esplicito derivato da EOS_LAYOUT: i preset di pptxgenjs non
   // corrispondono a queste misure ('LAYOUT_16x9' e' 10 x 5.625 pollici, non
@@ -461,6 +470,12 @@ export const buildPresentation = (model: DeckModel): PptxGenJS => {
 
 /** Genera il file .pptx a partire dal modello del deck. */
 export const renderDeck = async (model: DeckModel): Promise<Blob> => {
-  const output = await buildPresentation(model).write({ outputType: 'blob' });
+  // Import dinamico: pptxgenjs pesa ~415 kB e serve solo a chi genera davvero
+  // un deck. Caricarlo qui lo tiene fuori dal bundle iniziale — cosa che la
+  // vecchia modalita' offline (bundle unico inlinato) impediva.
+  const Ctor = resolvePptxCtor(await import('pptxgenjs'));
+  const output = await buildPresentation(Ctor, model).write({
+    outputType: 'blob'
+  });
   return output as Blob;
 };

@@ -11,7 +11,11 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import JSZip from 'jszip';
 import { buildDeckModel, DEFAULT_DECK_SECTIONS } from '../src/exports/deckModel';
-import { buildPresentation } from '../src/exports/pptxRenderer';
+import PptxGenJS from 'pptxgenjs';
+import {
+  buildPresentation,
+  resolvePptxCtor
+} from '../src/exports/pptxRenderer';
 import { EOS_COLORS, EOS_FONTS, EOS_LAYOUT } from '../src/exports/brandTokens';
 import type { ReleaseItem } from '../src/models/ReleaseItem';
 import type { FilterState } from '../src/models/Filters';
@@ -88,9 +92,10 @@ const run = async (): Promise<void> => {
   console.log(`Slide generate: ${model.slides.length}`);
   console.log(`Nome file: ${model.fileName}\n`);
 
-  const buffer = (await buildPresentation(model).write({
-    outputType: 'nodebuffer'
-  })) as Buffer;
+  const buffer = (await buildPresentation(
+    resolvePptxCtor(PptxGenJS),
+    model
+  ).write({ outputType: 'nodebuffer' })) as Buffer;
 
   await mkdir(OUT_DIR, { recursive: true });
   const outPath = path.join(OUT_DIR, model.fileName);

@@ -1,16 +1,14 @@
 # UpdateLens
 
-**UpdateLens** è un portale web statico e offline-first per analizzare, filtrare e presentare gli aggiornamenti da **quattro fonti dati**: **Microsoft Release Plans**, **EOS Apps**, **Microsoft Fabric Roadmap** e **Microsoft 365 Roadmap**.
+**UpdateLens** è un portale web per analizzare, filtrare e presentare gli aggiornamenti da **quattro fonti dati**: **Microsoft Release Plans**, **EOS Apps**, **Microsoft Fabric Roadmap** e **Microsoft 365 Roadmap**.
 
-Funziona completamente offline con snapshot locali. In alternativa, è disponibile un backend opzionale per ingestione e API interne.
+I dati provengono da snapshot JSON versionati, serviti insieme all'applicazione. È disponibile un backend opzionale per ingestione e API interne.
 
 ---
 
 ## 🎯 Funzionalità Principali
 
 ### Core Features
-- ✅ **Web app offline-first** - Funziona senza connessione internet
-- ✅ **Distribuzione via ZIP** - Facile deployment e portabilità
 - ✅ **4 Fonti Dati Integrate** - Microsoft, EOS, Fabric, M365 Roadmap
 - ✅ **Gestione Multi-Cliente** - Configurazioni personalizzate per cliente
 - ✅ **Filtri Globali e Per-Cliente** - Sistema di filtri avanzato e granulare
@@ -48,23 +46,9 @@ Funziona completamente offline con snapshot locali. In alternativa, è disponibi
 
 ## 🌐 Modalità di Deployment
 
-UpdateLens supporta **tre modalità di deployment** per adattarsi a diverse esigenze:
+UpdateLens supporta **due modalità di deployment** per adattarsi a diverse esigenze:
 
-### 1. 📦 Offline Mode (ZIP Distribution)
-**Ideale per**: Distribuzione locale, demo, ambienti senza internet
-
-- ✅ Completamente offline (file:// protocol)
-- ✅ Nessun server richiesto
-- ✅ Snapshot embedded nel ZIP
-- ✅ Dati statici (refresh manuale)
-
-**Setup**:
-```bash
-npm run build:release
-# Distribuisci release/ come ZIP
-```
-
-### 2. 🖥️ Web Mode (Local Server)
+### 1. 🖥️ Web Mode (Local Server)
 **Ideale per**: Sviluppo, testing, deployment intranet
 
 - ✅ Backend Express locale
@@ -78,7 +62,7 @@ npm run build
 npm run server:dev
 ```
 
-### 3. ☁️ Azure Mode (Cloud Deployment)
+### 2. ☁️ Azure Mode (Cloud Deployment)
 **Ideale per**: Produzione, scalabilità, refresh automatico
 
 - ✅ **Azure Functions** per ingestion automatica
@@ -135,16 +119,6 @@ npm run dev
 ```bash
 npm run build
 ```
-
-### Build Offline (File System)
-
-Per aprire `index.html` direttamente da file system (senza server):
-
-```bash
-npm run build:release
-```
-
-Poi apri `release/index.html` nel browser.
 
 ---
 
@@ -264,7 +238,7 @@ GITHUB_REPO=your-repo
 
 La funzionalità **Issues** permette di leggere e creare segnalazioni GitHub direttamente dal portale.
 
-### Modalità Locale (Offline/Dev)
+### Modalità Locale (Dev)
 
 1. Vai su **Issues**
 2. Clicca **Configura Token**
@@ -386,7 +360,7 @@ UpdateLens/
 
 ### Workflow Base
 
-1. **Apri il portale** - `index.html` (offline) o URL web
+1. **Apri il portale** - URL web (o `npm run dev` in locale)
 2. **Seleziona cliente** - Dropdown in alto (default: "Tutti i clienti")
 3. **Applica filtri** - Fonte, stato, prodotto, date, etc.
 4. **Visualizza dashboard** - KPI cards + lista release items
@@ -421,32 +395,27 @@ npm run test:releaseplans
 
 ## 📦 Deployment
 
-### Build Release
+### Build
 
 ```bash
-npm run build:release
+npm run build
 ```
 
-Genera cartella `release/` con:
+Genera la cartella `dist/` con:
 ```
-release/
+dist/
 ├── index.html          # Entry point
-├── assets/             # JS/CSS bundled
-└── data/               # Snapshot JSON
+└── assets/             # JS/CSS bundled
 ```
 
-### Distribuzione ZIP
-
-1. Comprimi cartella `release/` → `UpdateLens_vX.X.X.zip`
-2. Distribuisci ZIP ai clienti
-3. Istruzioni: "Estrai ZIP → Apri index.html"
+I dati (`public/data/`) vanno serviti insieme al bundle. Il deploy su Azure
+avviene tramite GitHub Actions (`deploy-api.yml`, branch `Azure`).
 
 ---
 
 ## 🔒 Vincoli Runtime
 
-- ✅ **Offline-first** - Funziona senza internet (eccetto Issues in modalità locale)
-- ✅ **File Protocol** - Supporta `file://` protocol
+- ✅ **Server HTTP richiesto** - L'app carica gli snapshot via `fetch`, quindi va servita (non aperta da `file://`)
 - ✅ **No Backend Required** - Backend opzionale solo per ingestion/proxy
 - ✅ **Browser Moderni** - Chrome, Firefox, Edge, Safari (ES2020+)
 

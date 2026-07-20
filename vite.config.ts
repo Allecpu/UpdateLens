@@ -63,18 +63,5 @@ export default defineConfig({
     proxy: {
       '/api': 'http://localhost:4000'
     }
-  },
-  build: {
-    chunkSizeWarningLimit: 9000,
-    rollupOptions: {
-      output: {
-        // Bundle unico obbligatorio: tools/inlineReleaseAssets.ts inlina solo
-        // gli asset referenziati in index.html, quindi un chunk separato in
-        // dist/assets/ non verrebbe caricato aprendo release/index.html da
-        // file://. pptxgenjs introduce uno stub di builtin Node che senza
-        // questa opzione diventa un secondo chunk e rompe la modalita' offline.
-        inlineDynamicImports: true
-      }
-    }
   }
 });

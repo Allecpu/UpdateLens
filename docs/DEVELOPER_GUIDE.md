@@ -100,7 +100,6 @@ UpdateLens/
 │
 ├── docs/                         # Documentation
 ├── dist/                         # Build output (web)
-├── release/                      # Build output (offline)
 │
 ├── package.json
 ├── vite.config.ts
@@ -124,9 +123,6 @@ npm run typecheck
 
 # Build for production (web)
 npm run build
-
-# Build for offline (file://)
-npm run build:release
 
 # Preview production build
 npm run preview
@@ -286,13 +282,7 @@ mai scritti inline: è l'unico punto in cui il Brand Book EOS è codificato.
 
 ### Manual Testing
 
-1. **Offline Mode**
-   ```bash
-   npm run build:release
-   # Open release/index.html in browser
-   ```
-
-2. **Web Mode**
+1. **Web Mode**
    ```bash
    npm run build
    npm run preview
@@ -338,19 +328,6 @@ Deploy su:
 - **Vercel**: `vercel deploy`
 - **Netlify**: `netlify deploy`
 - **Nginx/Apache**: Copia `dist/` su server
-
-### Build Offline (Release)
-
-```bash
-npm run build:release
-```
-
-Output: `release/` folder
-
-Distribuzione:
-1. Comprimi `release/` → `UpdateLens_v0.3.0.zip`
-2. Distribuisci ZIP
-3. Utente: Estrai → Apri `index.html`
 
 ### Backend Deploy
 
@@ -693,7 +670,7 @@ Seguiamo **Semantic Versioning** (semver):
 
 - [ ] Code follows conventions
 - [ ] TypeScript compiles without errors
-- [ ] Build succeeds (web + offline)
+- [ ] Build succeeds (`npm run build`)
 - [ ] Manual testing completed
 - [ ] Documentation updated (if needed)
 - [ ] Changelog updated (if user-facing change)

@@ -328,7 +328,7 @@ customEvents
 
 ## Panoramica
 
-UpdateLens è un'applicazione **offline-first** costruita con:
+UpdateLens è un'applicazione web costruita con:
 - **Frontend**: React + TypeScript + Vite
 - **State Management**: Zustand
 - **Styling**: Tailwind CSS
@@ -337,8 +337,6 @@ UpdateLens è un'applicazione **offline-first** costruita con:
 
 ### Caratteristiche Architetturali
 
-- ✅ **Offline-first**: Funziona senza connessione internet
-- ✅ **File Protocol Support**: Può essere aperto direttamente da `file://`
 - ✅ **Zero Dependencies Runtime**: Nessun backend obbligatorio
 - ✅ **LocalStorage Persistence**: Tutti i dati utente in localStorage
 - ✅ **Multi-Source**: 4 fonti dati integrate (Microsoft, EOS, Fabric, M365)
@@ -486,7 +484,6 @@ UpdateLens/
 │   └── ARCHITECTURE.md (questo file)
 │
 ├── dist/                         # Build output (web)
-├── release/                      # Build output (offline)
 ├── package.json
 ├── vite.config.ts
 ├── tailwind.config.js
@@ -502,7 +499,7 @@ UpdateLens/
 
 **Responsabilità**:
 - Carica `latest.json` per determinare quali snapshot usare
-- Fetcha i file snapshot (supporta `file://` e `http://`)
+- Fetcha i file snapshot via HTTP
 - Valida i dati con Zod schema
 - Normalizza i dati tra le diverse fonti
 - Gestisce errori e fallback
@@ -832,22 +829,7 @@ npm run build
 - Optimized assets
 - Requires HTTP server
 
-#### 3. Release (Offline)
-```bash
-npm run build:release
-```
-- Output: `release/`
-- Inlined assets (for `file://`)
-- Self-contained
-- No server required
-
 ### Deployment Strategies
-
-#### Offline (ZIP Distribution)
-1. `npm run build:release`
-2. Comprimi `release/` → `UpdateLens_v0.3.0.zip`
-3. Distribuisci ZIP
-4. Utente: Estrai → Apri `index.html`
 
 #### Web (HTTP Server)
 1. `npm run build`
@@ -941,48 +923,9 @@ pm2 start server/index.ts --name updatelens-server
 
 ## Build e Deployment
 
-UpdateLens supporta **tre modalità di deployment** per adattarsi a diverse esigenze:
+UpdateLens supporta **due modalità di deployment** per adattarsi a diverse esigenze:
 
-### 1. Offline Mode (ZIP Distribution)
-
-**Ideale per**: Distribuzione locale, demo, ambienti senza internet
-
-#### Build
-```bash
-npm run build:release
-```
-
-#### Output
-```
-release/
-├── index.html          # Entry point
-├── assets/             # JS/CSS bundled (con hash)
-│   ├── index-[hash].js
-│   └── index-[hash].css
-└── data/               # Snapshot JSON embedded
-    ├── snapshots/
-    │   ├── microsoft_releaseplans_latest.json
-    │   ├── eos_whatsnew_latest.json
-    │   ├── fabric_roadmap_latest.json
-    │   └── m365_roadmap_latest.json
-    └── latest.json
-```
-
-#### Distribuzione
-1. Comprimi cartella `release/` → `UpdateLens_v0.4.0.zip`
-2. Distribuisci ZIP ai clienti
-3. Istruzioni: "Estrai ZIP → Apri `index.html`"
-
-#### Caratteristiche
-- ✅ Funziona con `file://` protocol
-- ✅ Nessun server richiesto
-- ✅ Snapshot embedded (dati statici)
-- ✅ Refresh manuale (sostituire JSON files)
-- ⚠️ GitHub Issues non disponibile (CORS)
-
----
-
-### 2. Web Mode (Local Server)
+### 1. Web Mode (Local Server)
 
 **Ideale per**: Sviluppo, testing, deployment intranet
 
@@ -1039,7 +982,7 @@ GITHUB_REPO=UpdateLens
 
 ---
 
-### 3. Azure Mode (Cloud Deployment)
+### 2. Azure Mode (Cloud Deployment)
 
 **Ideale per**: Produzione, scalabilità, refresh automatico
 
@@ -1122,17 +1065,16 @@ jobs:
 
 ### Comparison Matrix
 
-| Feature | Offline | Web (Local) | Azure (Cloud) |
-|---------|---------|-------------|---------------|
-| **Internet Required** | ❌ No | ⚠️ Optional | ✅ Yes |
-| **Server Required** | ❌ No | ✅ Yes (local) | ✅ Yes (cloud) |
-| **Automated Refresh** | ❌ Manual | ⚠️ Script | ✅ Automatic |
-| **GitHub Issues** | ❌ No (CORS) | ✅ Yes (proxy) | ✅ Yes (proxy) |
-| **Scalability** | ❌ Single user | ⚠️ Limited | ✅ High |
-| **Monitoring** | ❌ No | ⚠️ Basic logs | ✅ App Insights |
-| **Cost** | Free | Free (hosting) | ~25 €/month |
-| **Deployment** | ZIP file | npm run | GitHub Actions |
-| **Best For** | Demo, offline | Dev, intranet | Production |
+| Feature | Web (Local) | Azure (Cloud) |
+|---------|-------------|---------------|
+| **Server Required** | ✅ Yes (local) | ✅ Yes (cloud) |
+| **Automated Refresh** | ⚠️ Script | ✅ Automatic |
+| **GitHub Issues** | ✅ Yes (proxy) | ✅ Yes (proxy) |
+| **Scalability** | ⚠️ Limited | ✅ High |
+| **Monitoring** | ⚠️ Basic logs | ✅ App Insights |
+| **Cost** | Free (hosting) | ~25 €/month |
+| **Deployment** | npm run | GitHub Actions |
+| **Best For** | Dev, intranet | Production |
 
 ---
 
@@ -1154,11 +1096,6 @@ jobs:
 **Sintomo**: 401 Unauthorized  
 **Causa**: Invalid or expired token  
 **Soluzione**: Re-configure token with correct permissions
-
-#### 4. Offline mode not working
-**Sintomo**: App requires internet  
-**Causa**: Using `npm run build` instead of `npm run build:release`  
-**Soluzione**: Use `npm run build:release` for offline build
 
 ---
 
