@@ -16,13 +16,17 @@ I dati provengono da snapshot JSON versionati, serviti insieme all'applicazione.
 - ✅ **Export Markdown** - Esportazione report personalizzati
 - ✅ **Export PowerPoint** - Deck cliente con l'identità visiva EOS Solutions, sezioni configurabili
 - ✅ **GitHub Issues Integration** - Gestione bug/feature direttamente dal portale
+- ✅ **Manuale Integrato** - Procedure, glossario, ruoli, checklist e troubleshooting
 - ✅ **Snapshot Locali** - Dati versionati e tracciabili
 
 ### Pagine Disponibili
 - **Dashboard** - Vista aggregata con KPI e filtri
 - **Clienti** - Gestione configurazioni cliente
 - **Filtri Globali** - Definizione regole di filtro globali
-- **Issues** - Integrazione GitHub per bug tracking
+- **Learn** - Risorse formative Microsoft collegate ai prodotti
+- **Segnalazioni** - Integrazione GitHub per bug tracking
+- **Condivisioni** - Preset inviati e ricevuti
+- **Manuale** - Guida operativa interna all'app
 - **Versione** - Changelog e informazioni release
 
 ---
@@ -162,7 +166,7 @@ npm run refresh:fabric
 npm run refresh:m365roadmap
 
 # Refresh tutte le fonti
-npm run refresh:microsoft && npm run refresh:eos && npm run refresh:fabric && npm run refresh:m365roadmap
+npm run refresh:all
 ```
 
 #### Modalità Automatica (Azure Functions)
@@ -210,7 +214,7 @@ Modifica `src/version.ts`:
 
 ```typescript
 export const lastUpdateTitle = 'Titolo aggiornamento';
-export const lastUpdateDate = '2026-01-23';
+export const lastUpdateDate = '2026-07-20';
 export const lastUpdateNotes = [
   'Nota 1',
   'Nota 2'
@@ -426,6 +430,7 @@ avviene tramite GitHub Actions (`deploy-api.yml`, branch `Azure`).
 
 ### Per Utenti
 - **[Guida Utente](./docs/USER_GUIDE.md)** - Guida completa all'uso del portale (Dashboard, Clienti, Filtri, Issues, Export)
+- **Manuale nell'app** - Apri `#/manuale` per procedure operative, glossario, ruoli, checklist e FAQ
 
 ### Per Sviluppatori
 - **[Developer Guide](./docs/DEVELOPER_GUIDE.md)** - Setup ambiente, workflow, convenzioni di codice
@@ -442,6 +447,13 @@ avviene tramite GitHub Actions (`deploy-api.yml`, branch `Azure`).
 ---
 
 ## 📝 Changelog
+
+### v0.5.0 (2026-07-20) - Manuale operativo e applicazione web
+- ✅ **Manuale integrato** - Procedure, glossario, ruoli, checklist e problemi comuni
+- ✅ **Export PowerPoint** - Deck cliente brandizzato EOS generato dalla Dashboard
+- ✅ **Applicazione web** - Rimossa la distribuzione offline e il relativo download ZIP
+- ✅ **Aggiornamento fonti** - Unico comando operativo nella pagina Versione
+- ✅ **Prestazioni** - Caricamento differito di `pptxgenjs`
 
 ### v0.4.0 (2026-02-02) - Azure Migration \u0026 Cloud Deployment
 - ✅ **Azure Functions** - Ingestion automatica con Timer Triggers (ogni 6 ore)

@@ -1,4 +1,4 @@
-ho mefatto# Runbook Operativo - Porting Issue da Source a Target
+# Runbook Operativo - Porting Issue da Source a Target
 
 Questo documento e un template operativo per portare un'issue da un progetto `source` a un progetto `target` in modo tracciabile e ripetibile.
 

@@ -17,7 +17,12 @@ Guida completa all'uso del portale UpdateLens.
 - Dashboard (KPI, filtri, lista items)
 - Gestione clienti (CRUD, modalità filtri)
 - Filtri globali (configurazione, bulk apply)
+- Learn e risorse formative
 - GitHub Issues (configurazione, creazione, upload)
+- Condivisione preset e ruoli
+- Manuale integrato
+- Versione e aggiornamento fonti
+- Export PowerPoint
 - Export Markdown
 - FAQ (20+ domande frequenti)
 
@@ -58,7 +63,7 @@ Documentazione dettagliata dell'architettura del progetto.
 - Gestione stato (Zustand stores)
 - Persistenza (LocalStorage schema)
 - Integrazione fonti dati (4 fonti)
-- Build e deployment (3 modalità)
+- Build e deployment (locale e Azure)
 - Sicurezza e performance
 - Troubleshooting
 
@@ -121,10 +126,12 @@ Task list, roadmap e stato progetto.
 Storico versioni dettagliato.
 
 **Contenuto**:
+- v0.5.0 - Manuale operativo, export PowerPoint e rimozione offline
+- v0.4.0 - Azure Migration & Cloud Deployment
 - v0.3.0 - GitHub Issues Integration
 - v0.2.0 - Multi-Client & Global Filters
 - v0.1.0 - MVP Release
-- Roadmap futura (v0.4.0, v0.5.0, v1.0.0)
+- Roadmap futura e limiti noti
 - Breaking changes
 - Known issues per versione
 
@@ -155,11 +162,13 @@ docs/
 ├── USER_GUIDE.md                                # Guida utente
 ├── DEVELOPER_GUIDE.md                           # Guida sviluppatore
 ├── ARCHITECTURE.md                              # Architettura
+├── AZURE_DEPLOYMENT.md                          # Deploy CI/CD e verifica Azure
+├── AZURE_TAGS.md                                # Governance risorse Azure
 ├── DATA_SOURCE_INTEGRATION_TEMPLATE.md          # Template integrazione
 ├── DOCUMENTATION_UPDATE_SUMMARY.md              # Riepilogo aggiornamento
+├── archive/                                     # Piani storici non operativi
+├── runbooks/                                    # Procedure operative specialistiche
 └── issues/                                      # Immagini per issues GitHub
-    ├── 16/
-    └── 17/
 
 ../                                              # Root progetto
 ├── README.md                                    # Overview progetto
@@ -174,8 +183,10 @@ docs/
 
 ### Inizia Qui
 - **Nuovo utente?** → [User Guide](./USER_GUIDE.md)
+- **Cerchi una procedura rapida?** → Apri la voce **Manuale** nell'app
 - **Nuovo sviluppatore?** → [Developer Guide](./DEVELOPER_GUIDE.md)
 - **Vuoi capire l'architettura?** → [Architecture](./ARCHITECTURE.md)
+- **Devi distribuire su Azure?** → [Azure Deployment](./AZURE_DEPLOYMENT.md)
 - **Vuoi aggiungere una fonte dati?** → [Integration Template](./DATA_SOURCE_INTEGRATION_TEMPLATE.md)
 
 ### Riferimenti Rapidi
@@ -296,7 +307,7 @@ Proprietario - **Alessandro Levantini**
 ---
 
 **Versione Documentazione**: 1.0.0  
-**Versione Progetto**: 0.3.0  
+**Versione Progetto**: 0.5.0
 **Ultimo Aggiornamento**: 2026-01-23
 
 **Buona lettura! 📚**

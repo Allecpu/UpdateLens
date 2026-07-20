@@ -8,10 +8,14 @@
 4. [Dashboard](#dashboard)
 5. [Gestione Clienti](#gestione-clienti)
 6. [Filtri Globali](#filtri-globali)
-7. [GitHub Issues](#github-issues)
-8. [Export PowerPoint](#export-powerpoint-report-cliente)
-9. [Export Markdown](#export-markdown)
-10. [FAQ](#faq)
+7. [Learn](#learn)
+8. [GitHub Issues](#github-issues)
+9. [Condivisioni](#condivisioni)
+10. [Versione e aggiornamento dati](#versione-e-aggiornamento-dati)
+11. [Manuale integrato](#manuale-integrato)
+12. [Export PowerPoint](#export-powerpoint-report-cliente)
+13. [Export Markdown](#export-markdown)
+14. [FAQ](#faq)
 
 ---
 
@@ -30,6 +34,7 @@
 ✅ **Export Markdown** - Genera report personalizzati  
 ✅ **Export PowerPoint** - Deck cliente con l'identità visiva EOS Solutions  
 ✅ **GitHub Issues** - Segnala bug e richieste direttamente dal portale
+✅ **Manuale Integrato** - Procedure, glossario, checklist e troubleshooting
 
 ---
 
@@ -54,17 +59,21 @@ Al primo avvio:
 
 ### Menu Principale
 
-Il menu di navigazione si trova nella barra laterale sinistra:
+Il menu di navigazione si trova nella barra orizzontale in alto:
 
-- **📊 Dashboard** - Vista principale con KPI e lista aggiornamenti
-- **👥 Clienti** - Gestione clienti e configurazioni
-- **🔧 Filtri Globali** - Definizione regole di filtro globali
-- **🐛 Issues** - Segnalazioni GitHub (bug, richieste)
-- **ℹ️ Versione** - Informazioni versione e changelog
+- **Dashboard** - Vista principale con KPI e lista aggiornamenti
+- **Clienti** - Gestione clienti, gruppi, prodotti e Owner CSS
+- **Filtri globali** - Target, regole e preset persistenti
+- **Learn** - Catalogo delle risorse formative Microsoft
+- **Versione** - Build, note di rilascio e aggiornamento delle fonti
+- **Segnalazioni** - Issue GitHub per bug e richieste
+- **Condivisioni** - Preset condivisi tra utenti
+- **Manuale** - Guida operativa consultabile nell'app
 
 ### Selettore Cliente
 
 In alto a destra trovi il **selettore cliente**:
+- Campo di ricerca per trovare rapidamente il cliente
 - Dropdown per cambiare cliente attivo
 - Default: "Tutti i clienti"
 - Cambiando cliente, i filtri si aggiornano automaticamente
@@ -222,6 +231,20 @@ Quando sei in **modalità cliente** (hai selezionato un cliente specifico):
 
 ---
 
+## Learn
+
+La pagina **Learn** raccoglie risorse formative Microsoft collegate ai prodotti
+monitorati.
+
+1. Cerca una parola chiave oppure apri Learn da un prodotto della Dashboard.
+2. Filtra per prodotto, tipo di risorsa, livello, durata e lingua.
+3. Ordina i risultati e apri la risorsa Microsoft originale.
+4. Salva la combinazione corrente come preset Learn personale.
+
+I preset Learn sono separati dai preset dei Filtri globali.
+
+---
+
 ## GitHub Issues
 
 ### Configurazione Iniziale
@@ -301,6 +324,56 @@ blocco di codice
 5. Il link viene inserito automaticamente nella descrizione
 
 ⚠️ **Nota**: Upload immagini disponibile solo in modalità Web (con backend attivo).
+
+---
+
+## Condivisioni
+
+La pagina **Condivisioni** distingue:
+
+- **Condivisi da me** - preset inviati ad altri utenti;
+- **Condivisi con me** - preset ricevuti da altri utenti;
+- **Utenti** - gestione accessi, visibile a Manager e Admin.
+
+Un preset ricevuto non è modificabile direttamente. Duplicalo per crearne una
+copia personale indipendente.
+
+### Ruoli
+
+| Ruolo | Gestione utenti | Assegnazione Admin |
+|---|---|---|
+| Viewer | No | No |
+| Manager | Utenti non Admin | No |
+| Admin | Completa | Sì |
+
+---
+
+## Versione e aggiornamento dati
+
+La pagina **Versione** mostra versione applicativa, ambiente, build, commit e note
+dell'ultimo rilascio.
+
+Il comando **"Aggiorna tutte le fonti"** aggiorna Microsoft, EOS, Fabric e M365
+Roadmap. Attendi la conclusione e controlla lo stato di ogni fonte: un risultato
+parziale indica che almeno una sorgente usa ancora lo snapshot precedente.
+
+Il vecchio download ZIP non è più disponibile perché UpdateLens è
+un'applicazione web e non supporta l'esecuzione offline.
+
+---
+
+## Manuale integrato
+
+La voce **Manuale** apre la guida operativa interna all'applicazione. Include:
+
+- priorità tra cliente, Filtri globali, Dashboard e chat;
+- procedure numerate per ogni pagina;
+- glossario, tipi di preset e ruoli;
+- checklist prima dell'esportazione;
+- sicurezza del GitHub PAT e qualità degli snapshot;
+- problemi comuni e relative soluzioni.
+
+L'indice **"In questa pagina"** scorre tra le sezioni senza cambiare route.
 
 ---
 
@@ -411,13 +484,15 @@ Il report riflette:
 A: No. Il portale va raggiunto via rete; una volta caricato, i dati mostrati sono snapshot serviti insieme all'applicazione.
 
 **Q: I miei dati sono al sicuro?**  
-A: Sì. Tutti i dati (clienti, filtri) sono salvati **solo nel tuo browser** (localStorage). Nessun dato viene inviato a server esterni.
+A: Clienti e preset possono essere persistiti dal backend web; alcune preferenze
+personali restano nel browser. Non inserire token o dati riservati nelle issue.
 
 **Q: Posso usare UpdateLens su più dispositivi?**  
 A: I dati sono locali al browser. Per sincronizzare tra dispositivi, usa la versione Web con backend.
 
 **Q: Quanto spesso vengono aggiornati i dati?**  
-A: I dati vengono aggiornati manualmente dagli amministratori. Controlla la pagina "Versione" per l'ultima data di aggiornamento.
+A: In Azure il refresh è schedulato; gli amministratori possono inoltre avviare
+"Aggiorna tutte le fonti" dalla pagina Versione.
 
 ### Clienti
 
@@ -502,7 +577,7 @@ Oppure contatta:
 
 ---
 
-**Versione**: 0.3.0  
-**Ultimo Aggiornamento**: 2026-01-23
+**Versione**: 0.5.0
+**Ultimo Aggiornamento**: 2026-07-20
 
 **Buon lavoro con UpdateLens! 🚀**

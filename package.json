@@ -15,6 +15,7 @@
         "refresh:microsoft": "tsx tools/refreshMicrosoft.ts",
         "dev": "vite",
         "build:server": "tsc -p server/tsconfig.json",
+        "prestart:server": "npm run build:server",
         "start:server": "node server-dist/index.js",
         "preview": "vite preview",
         "typecheck": "tsc -b --pretty false",

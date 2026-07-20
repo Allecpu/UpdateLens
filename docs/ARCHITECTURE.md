@@ -12,7 +12,7 @@
 8. [Persistenza](#persistenza)
 9. [Integrazione Fonti Dati](#integrazione-fonti-dati)
 10. [Build e Deployment](#build-e-deployment)
-11. [Azure Tagging Strategy](file:///c:/Github/UpdateLens/docs/AZURE_TAGS.md) ⭐ NEW
+11. [Azure Tagging Strategy](./AZURE_TAGS.md)
 
 ---
 
@@ -27,7 +27,7 @@ UpdateLens è deployato su **Azure** con un'architettura **cloud-native** che su
 - ✅ **Managed Hosting** - Azure App Service per Web App
 - ✅ **Monitoring** - Application Insights per telemetry
 - ✅ **CI/CD** - GitHub Actions per deployment automatico
-- ✅ **Governance** - [Tagging standardizzato](file:///c:/Github/UpdateLens/docs/AZURE_TAGS.md) per tutte le risorse
+- ✅ **Governance** - [Tagging standardizzato](./AZURE_TAGS.md) per tutte le risorse
 
 ### Architettura Completa Azure
 
@@ -1120,5 +1120,5 @@ Sviluppato per **CSS S.r.l.**
 
 ---
 
-**Versione**: 0.4.0  
-**Ultimo Aggiornamento**: 2026-02-02
+**Versione**: 0.5.0
+**Ultimo Aggiornamento**: 2026-07-20

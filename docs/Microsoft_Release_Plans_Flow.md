@@ -126,6 +126,5 @@ Retrieves the history of changes for a feed or "What's New" view.
 ---
 
 ## 4. Updates & Scheduling
-*   **Azure Environment**: Updates are handled via **GitHub Actions** which run the ingestion script and commit/push the updated `data.db` (or trigger a specialized update mechanism). The API prevents manual refresh triggers in production (`/api/refresh-zip` returns 501 on Azure).
-*   **Local/Dev**: Developers can run `npm run ingest:releaseplans` to trigger `server/ingest.ts` locally.
-
+*   **Azure Environment**: gli snapshot vengono aggiornati dalle **Azure Functions** e dai workflow GitHub Actions configurati. La pagina **Versione** espone il comando "Aggiorna tutte le fonti" e mostra l'esito separato di ogni sorgente.
+*   **Local/Dev**: gli sviluppatori possono eseguire `npm run ingest:releaseplans` per l'ingestion SQLite oppure `npm run refresh:microsoft` per rigenerare lo snapshot JSON.

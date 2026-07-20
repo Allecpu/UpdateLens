@@ -625,14 +625,14 @@ Seguiamo **Semantic Versioning** (semver):
 1. **Modifica `package.json`**
    ```json
    {
-     "version": "0.4.0"
+     "version": "0.5.0"
    }
    ```
 
 2. **Modifica `src/version.ts`**
    ```typescript
    export const lastUpdateTitle = 'Titolo aggiornamento';
-   export const lastUpdateDate = '2026-01-23';
+   export const lastUpdateDate = '2026-07-20';
    export const lastUpdateNotes = [
      'Feature 1',
      'Feature 2',
@@ -642,7 +642,7 @@ Seguiamo **Semantic Versioning** (semver):
 
 3. **Aggiorna README.md (Changelog)**
    ```markdown
-   ### v0.4.0 (2026-01-23)
+   ### v0.5.0 (2026-07-20)
    - ✅ Feature 1
    - ✅ Feature 2
    - 🐛 Bug fix 3
@@ -651,8 +651,8 @@ Seguiamo **Semantic Versioning** (semver):
 4. **Commit e Tag**
    ```bash
    git add .
-   git commit -m "chore: bump version to 0.4.0"
-   git tag v0.4.0
+   git commit -m "chore: bump version to 0.5.0"
+   git tag v0.5.0
    git push origin main --tags
    ```
 
@@ -710,7 +710,7 @@ Sviluppato per **CSS S.r.l.**
 
 ---
 
-**Versione**: 0.3.0  
-**Ultimo Aggiornamento**: 2026-01-23
+**Versione**: 0.5.0
+**Ultimo Aggiornamento**: 2026-07-20
 
 **Happy coding! 🚀**

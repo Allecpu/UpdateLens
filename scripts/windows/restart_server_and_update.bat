@@ -1,7 +1,7 @@
 @echo off
 setlocal
 
-cd /d "%~dp0"
+cd /d "%~dp0\..\.."
 
 echo [1/6] Stopping server on port 4000 (if running)...
 for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":4000"') do (
