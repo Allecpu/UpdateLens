@@ -258,6 +258,31 @@ type RawMicrosoftItem = {
 type RawMicrosoftResponse = {
   results: RawMicrosoftItem[];
   totalrecords?: string;
+  morerecords?: boolean;
+};
+
+const fetchAllReleasePlans = async (): Promise<RawMicrosoftItem[]> => {
+  const allResults: RawMicrosoftItem[] = [];
+  let page = 1;
+  let morerecords = true;
+
+  while (morerecords) {
+    const response = await fetch(`${SOURCE_URL}?page=${page}`, {
+      headers: {
+        'User-Agent': 'UpdateLens/1.0 (+offline snapshot generator)'
+      }
+    });
+    if (!response.ok) {
+      throw new Error(`Release plans fetch error: ${response.status} (page ${page})`);
+    }
+    const rawText = await response.text();
+    const payload = JSON.parse(rawText) as RawMicrosoftResponse;
+    allResults.push(...payload.results);
+    morerecords = payload.morerecords === true;
+    page += 1;
+  }
+
+  return allResults;
 };
 
 const buildStatus = (raw: RawMicrosoftItem): ReleaseItem['status'] => {
@@ -375,16 +400,8 @@ const extractItems = (
 };
 
 const run = async (): Promise<void> => {
-  const response = await fetch(SOURCE_URL, {
-    headers: {
-      'User-Agent': 'UpdateLens/1.0 (+offline snapshot generator)'
-    }
-  });
-  if (!response.ok) {
-    throw new Error(`Release plans fetch error: ${response.status}`);
-  }
-  const rawText = await response.text();
-  const payload = JSON.parse(rawText) as RawMicrosoftResponse;
+  const results = await fetchAllReleasePlans();
+  const payload: RawMicrosoftResponse = { results };
   const snapshotIndex = await fetchSnapshotIndex();
   const items = extractItems(payload, snapshotIndex);
   const enrichment = await enrichReleaseItemsWithLearn(items);
