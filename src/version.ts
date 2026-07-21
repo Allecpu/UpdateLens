@@ -26,16 +26,16 @@ export const buildTime =
 export const gitCommit =
   typeof __GIT_COMMIT__ === 'string' ? __GIT_COMMIT__ : '';
 
-export const lastUpdateTitle = 'Integrazione GitHub Issues e persistenza Token';
+export const lastUpdateTitle = 'Manuale operativo e semplificazione aggiornamenti';
 
-export const lastUpdateDate = '2026-01-23';
+export const lastUpdateDate = '2026-07-20';
 
 export const lastUpdateNotes = [
-  'Nuova sezione Issues per la gestione diretta dei bug/richieste.',
-  'Configurazione persistente del GitHub PAT in locale (LocalStorage).',
-  'Interfaccia di validazione token con test preventivo.',
-  'Supporto Web: proxy server-side con GITHUB_ISSUES_TOKEN.',
-  'Supporto Web: upload immagini via GitHub Content API (main/public/uploads).'
+  'Nuova sezione Manuale con procedure, glossario, ruoli, checklist e risoluzione problemi.',
+  'Navigazione interna del manuale compatibile con HashRouter.',
+  'Rimosso dalla pagina Versione il download ZIP legato al precedente flusso offline.',
+  'Il comando "Aggiorna tutte le fonti" diventa l\'unica azione principale per il refresh dei dati.',
+  'Documentati sicurezza del GitHub PAT, snapshot e aggiornamenti parziali.'
 ];
 
 export const appEnvironment = resolveAppEnvironment();

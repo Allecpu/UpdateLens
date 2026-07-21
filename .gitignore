@@ -2,6 +2,10 @@ node_modules
 .DS_Store
 /dist
 /dist-ssr
+/server-dist
+/release
+# Output di npm run test:deck
+/tmp
 *.local
 .env
 .env.local
@@ -15,6 +19,9 @@ pnpm-debug.log*
 # Editor
 .vscode
 .idea
+.azure/
+.azure-chat-settings.txt
+.claude/settings.local.json
 
 # TypeScript
 *.tsbuildinfo
@@ -22,3 +29,9 @@ pnpm-debug.log*
 # Local migration/artifact folders
 _migration/
 _tools/
+
+# Local Azure CLI exports and diagnostics
+rg-updatelens*.json
+subid*.txt
+tagging_log.txt
+verify_log.txt

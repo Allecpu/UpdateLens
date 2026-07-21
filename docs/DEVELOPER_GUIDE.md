@@ -77,6 +77,7 @@ UpdateLens/
 │   │   └── snapshots/            # Data snapshots (dev)
 │   ├── models/                   # Zod schemas & types
 │   ├── services/                 # Business logic
+│   ├── exports/                  # PowerPoint deck generation
 │   ├── utils/                    # Utility functions
 │   ├── App.tsx                   # Root component
 │   ├── main.tsx                  # Entry point
@@ -87,7 +88,7 @@ UpdateLens/
 │   ├── refreshEos.ts
 │   ├── refreshFabric.ts
 │   ├── refreshM365Roadmap.ts
-│   └── inlineReleaseAssets.ts
+│   └── deckSmokeTest.ts
 │
 ├── server/                       # Backend (optional)
 │   ├── api.ts
@@ -100,7 +101,6 @@ UpdateLens/
 │
 ├── docs/                         # Documentation
 ├── dist/                         # Build output (web)
-├── release/                      # Build output (offline)
 │
 ├── package.json
 ├── vite.config.ts
@@ -124,9 +124,6 @@ npm run typecheck
 
 # Build for production (web)
 npm run build
-
-# Build for offline (file://)
-npm run build:release
 
 # Preview production build
 npm run preview
@@ -246,28 +243,61 @@ npm run typecheck
 
 Verifica errori TypeScript senza build.
 
+### Export PowerPoint
+
+```bash
+npm run test:deck
+```
+
+Genera un deck da uno snapshot reale in `tmp/` e verifica il pacchetto OOXML:
+parti obbligatorie, numero di slide, deduplicazione dei logo negli slide master,
+colori di brand, limite dei 6 bullet per slide e tetto complessivo del deck.
+
+Il test verifica anche che le **dimensioni della slide** corrispondano a
+`EOS_LAYOUT` e che **nessun oggetto esca dai bordi**: i preset di pptxgenjs non
+corrispondono a queste misure (`LAYOUT_16x9` è 10 × 5.625 pollici) e con il
+preset sbagliato logo, tile e grafici finiscono fuori slide senza che il file
+risulti invalido.
+
+Il test **non verifica la resa tipografica**. Per quella, esporta le slide in
+PNG con PowerPoint e guardale:
+
+```powershell
+$ppt = New-Object -ComObject PowerPoint.Application
+$pres = $ppt.Presentations.Open("C:\...\deck.pptx", $true, $false, $false)
+$pres.SaveCopyAs("C:\out\s", 18)   # 18 = ppSaveAsPNG
+$pres.Close(); $ppt.Quit()
+```
+
+#### Aggiungere un tipo di slide
+
+1. Aggiungi la variante alla union `DeckSlide` in `src/exports/deckModel.ts`
+2. Componila dentro `buildDeckModel` (funzione pura, nessuna dipendenza da pptxgenjs)
+3. Aggiungi il `case` corrispondente in `renderSlide` (`src/exports/pptxRenderer.ts`) —
+   lo `switch` è esaustivo, quindi senza il case il typecheck fallisce
+4. Se la sezione è opzionale, aggiungi il flag a `DeckOptionsSchema` e la checkbox
+   in `src/app/components/exports/ExportDeckModal.tsx`
+
+Colori, font e geometria vanno presi **sempre** da `src/exports/brandTokens.ts`,
+mai scritti inline: è l'unico punto in cui il Brand Book EOS è codificato.
+
 ### Manual Testing
 
-1. **Offline Mode**
-   ```bash
-   npm run build:release
-   # Open release/index.html in browser
-   ```
-
-2. **Web Mode**
+1. **Web Mode**
    ```bash
    npm run build
    npm run preview
    # Open http://localhost:4173
    ```
 
-3. **Test Checklist**
+2. **Test Checklist**
    - [ ] Dashboard loads without errors
    - [ ] All 4 sources display data
    - [ ] Filters work correctly
    - [ ] Customer management CRUD works
    - [ ] Global filters apply correctly
    - [ ] Export Markdown downloads
+   - [ ] Export PPTX opens the modal and downloads a valid deck
    - [ ] GitHub Issues integration works
    - [ ] LocalStorage persists data
 
@@ -300,19 +330,6 @@ Deploy su:
 - **Vercel**: `vercel deploy`
 - **Netlify**: `netlify deploy`
 - **Nginx/Apache**: Copia `dist/` su server
-
-### Build Offline (Release)
-
-```bash
-npm run build:release
-```
-
-Output: `release/` folder
-
-Distribuzione:
-1. Comprimi `release/` → `UpdateLens_v0.3.0.zip`
-2. Distribuisci ZIP
-3. Utente: Estrai → Apri `index.html`
 
 ### Backend Deploy
 
@@ -458,7 +475,7 @@ interface Props {
 
 ### Naming
 
-- **Files**: PascalCase per componenti (`DashboardPage.tsx`), camelCase per utils (`dateUtils.ts`)
+- **Files**: PascalCase per componenti (`DashboardPage.tsx`), camelCase per utils (`date.ts`, `html.ts`)
 - **Components**: PascalCase (`CustomerSelector`)
 - **Functions**: camelCase (`loadData`, `applyFilters`)
 - **Constants**: UPPER_SNAKE_CASE (`ALL_RELEASE_SOURCES`)
@@ -471,7 +488,7 @@ interface Props {
 import React, { useState } from 'react';
 import { z } from 'zod';
 import { useDataStore } from '../services/DataStore';
-import { formatDate } from '../utils/dateUtils';
+import { formatDate } from '../utils/date';
 ```
 
 ### Comments
@@ -608,14 +625,14 @@ Seguiamo **Semantic Versioning** (semver):
 1. **Modifica `package.json`**
    ```json
    {
-     "version": "0.4.0"
+     "version": "0.5.0"
    }
    ```
 
 2. **Modifica `src/version.ts`**
    ```typescript
    export const lastUpdateTitle = 'Titolo aggiornamento';
-   export const lastUpdateDate = '2026-01-23';
+   export const lastUpdateDate = '2026-07-20';
    export const lastUpdateNotes = [
      'Feature 1',
      'Feature 2',
@@ -625,7 +642,7 @@ Seguiamo **Semantic Versioning** (semver):
 
 3. **Aggiorna README.md (Changelog)**
    ```markdown
-   ### v0.4.0 (2026-01-23)
+   ### v0.5.0 (2026-07-20)
    - ✅ Feature 1
    - ✅ Feature 2
    - 🐛 Bug fix 3
@@ -634,8 +651,8 @@ Seguiamo **Semantic Versioning** (semver):
 4. **Commit e Tag**
    ```bash
    git add .
-   git commit -m "chore: bump version to 0.4.0"
-   git tag v0.4.0
+   git commit -m "chore: bump version to 0.5.0"
+   git tag v0.5.0
    git push origin main --tags
    ```
 
@@ -655,7 +672,7 @@ Seguiamo **Semantic Versioning** (semver):
 
 - [ ] Code follows conventions
 - [ ] TypeScript compiles without errors
-- [ ] Build succeeds (web + offline)
+- [ ] Build succeeds (`npm run build`)
 - [ ] Manual testing completed
 - [ ] Documentation updated (if needed)
 - [ ] Changelog updated (if user-facing change)
@@ -693,7 +710,7 @@ Sviluppato per **CSS S.r.l.**
 
 ---
 
-**Versione**: 0.3.0  
-**Ultimo Aggiornamento**: 2026-01-23
+**Versione**: 0.5.0
+**Ultimo Aggiornamento**: 2026-07-20
 
 **Happy coding! 🚀**

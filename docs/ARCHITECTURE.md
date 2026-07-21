@@ -12,7 +12,7 @@
 8. [Persistenza](#persistenza)
 9. [Integrazione Fonti Dati](#integrazione-fonti-dati)
 10. [Build e Deployment](#build-e-deployment)
-11. [Azure Tagging Strategy](file:///c:/Github/UpdateLens/docs/AZURE_TAGS.md) ⭐ NEW
+11. [Azure Tagging Strategy](./AZURE_TAGS.md)
 
 ---
 
@@ -27,7 +27,7 @@ UpdateLens è deployato su **Azure** con un'architettura **cloud-native** che su
 - ✅ **Managed Hosting** - Azure App Service per Web App
 - ✅ **Monitoring** - Application Insights per telemetry
 - ✅ **CI/CD** - GitHub Actions per deployment automatico
-- ✅ **Governance** - [Tagging standardizzato](file:///c:/Github/UpdateLens/docs/AZURE_TAGS.md) per tutte le risorse
+- ✅ **Governance** - [Tagging standardizzato](./AZURE_TAGS.md) per tutte le risorse
 
 ### Architettura Completa Azure
 
@@ -328,7 +328,7 @@ customEvents
 
 ## Panoramica
 
-UpdateLens è un'applicazione **offline-first** costruita con:
+UpdateLens è un'applicazione web costruita con:
 - **Frontend**: React + TypeScript + Vite
 - **State Management**: Zustand
 - **Styling**: Tailwind CSS
@@ -337,8 +337,6 @@ UpdateLens è un'applicazione **offline-first** costruita con:
 
 ### Caratteristiche Architetturali
 
-- ✅ **Offline-first**: Funziona senza connessione internet
-- ✅ **File Protocol Support**: Può essere aperto direttamente da `file://`
 - ✅ **Zero Dependencies Runtime**: Nessun backend obbligatorio
 - ✅ **LocalStorage Persistence**: Tutti i dati utente in localStorage
 - ✅ **Multi-Source**: 4 fonti dati integrate (Microsoft, EOS, Fabric, M365)
@@ -404,7 +402,8 @@ UpdateLens/
 │   │   │   ├── CustomerSelector.tsx
 │   │   │   ├── FilterSidebar.tsx
 │   │   │   ├── ReleaseCard.tsx
-│   │   │   ├── ExportModal.tsx
+│   │   │   ├── exports/
+│   │   │   │   └── ExportDeckModal.tsx    # Modal export PowerPoint
 │   │   │   ├── GitHubTokenModal.tsx
 │   │   │   ├── IssueCreateModal.tsx
 │   │   │   └── ...
@@ -426,6 +425,14 @@ UpdateLens/
 │   │       ├── fabric_roadmap_*.json
 │   │       └── m365roadmap_data_*.json
 │   │
+│   ├── exports/                  # Generazione PowerPoint brandizzato EOS
+│   │   ├── brandTokens.ts        # Palette, font, layout dal Brand Book
+│   │   ├── eosLogoBase64.ts      # Logo (positivo + negativo) come data URI
+│   │   ├── deckModel.ts          # Modello del deck (puro, testabile)
+│   │   ├── pptxRenderer.ts       # Rendering pptxgenjs + slide master
+│   │   ├── downloadBlob.ts       # Download di contenuti binari
+│   │   └── index.ts
+│   │
 │   ├── models/                   # Zod schemas e TypeScript types
 │   │   ├── ReleaseItem.ts
 │   │   ├── Customer.ts
@@ -436,15 +443,19 @@ UpdateLens/
 │   │   ├── DataLoader.ts         # Caricamento snapshot
 │   │   ├── FilterService.ts      # Logica filtri
 │   │   ├── FilterDefinitions.ts  # Definizioni filtri per fonte
-│   │   ├── ExportService.ts      # Export Markdown
+│   │   ├── FilterDescription.ts  # Etichette filtri attivi (chip + export)
+│   │   ├── ExportService.ts      # Export Markdown + helper condivisi
+│   │   ├── KpiService.ts         # Conteggi KPI dashboard
+│   │   ├── CountsService.ts      # Conteggi per fonte e prodotto
 │   │   ├── StorageService.ts     # Persistenza LocalStorage
 │   │   ├── GitHubService.ts      # Integrazione GitHub
 │   │   └── ...
 │   │
 │   ├── utils/                    # Utility functions
 │   │   ├── productColors.ts
-│   │   ├── dateUtils.ts
-│   │   ├── textUtils.ts
+│   │   ├── date.ts
+│   │   ├── html.ts               # Decodifica entità HTML
+│   │   ├── url.ts
 │   │   └── ...
 │   │
 │   ├── App.tsx                   # Root component
@@ -457,7 +468,8 @@ UpdateLens/
 │   ├── refreshEos.ts
 │   ├── refreshFabric.ts
 │   ├── refreshM365Roadmap.ts
-│   ├── inlineReleaseAssets.ts    # Build release
+│   ├── deckSmokeTest.ts          # Collaudo export PowerPoint
+│   ├── releaseplansUrlCheck.ts
 │   └── ...
 │
 ├── server/                       # Backend opzionale
@@ -477,7 +489,6 @@ UpdateLens/
 │   └── ARCHITECTURE.md (questo file)
 │
 ├── dist/                         # Build output (web)
-├── release/                      # Build output (offline)
 ├── package.json
 ├── vite.config.ts
 ├── tailwind.config.js
@@ -493,7 +504,7 @@ UpdateLens/
 
 **Responsabilità**:
 - Carica `latest.json` per determinare quali snapshot usare
-- Fetcha i file snapshot (supporta `file://` e `http://`)
+- Fetcha i file snapshot via HTTP
 - Valida i dati con Zod schema
 - Normalizza i dati tra le diverse fonti
 - Gestisce errori e fallback
@@ -597,15 +608,22 @@ User selects customer
   → Re-render Dashboard
 ```
 
-### 4. Export Markdown
+### 4. Export
 
+**Markdown**
 ```
-User clicks Export
-  → ExportService.generateMarkdown(items, filters)
-  → Group by product
-  → Format as Markdown
-  → Add metadata (date, filters)
-  → Trigger download
+Click "Esporta Markdown"
+  → buildMarkdown(items, customerName)      // ExportService.ts
+  → groupByProduct + resolveItemLinks
+  → downloadBlob(blob, 'update-lens-export.md')
+```
+
+**PowerPoint**
+```
+Click "Esporta PPTX" → ExportDeckModal
+  → buildDeckModel(items, filters, options) // puro, stima le slide
+  → renderDeck(model)                       // import() dinamico di pptxgenjs
+  → downloadBlob(blob, 'UpdateLens-<cliente>-<data>.pptx')
 ```
 
 ### 5. GitHub Issues
@@ -823,22 +841,7 @@ npm run build
 - Optimized assets
 - Requires HTTP server
 
-#### 3. Release (Offline)
-```bash
-npm run build:release
-```
-- Output: `release/`
-- Inlined assets (for `file://`)
-- Self-contained
-- No server required
-
 ### Deployment Strategies
-
-#### Offline (ZIP Distribution)
-1. `npm run build:release`
-2. Comprimi `release/` → `UpdateLens_v0.3.0.zip`
-3. Distribuisci ZIP
-4. Utente: Estrai → Apri `index.html`
 
 #### Web (HTTP Server)
 1. `npm run build`
@@ -932,48 +935,9 @@ pm2 start server/index.ts --name updatelens-server
 
 ## Build e Deployment
 
-UpdateLens supporta **tre modalità di deployment** per adattarsi a diverse esigenze:
+UpdateLens supporta **due modalità di deployment** per adattarsi a diverse esigenze:
 
-### 1. Offline Mode (ZIP Distribution)
-
-**Ideale per**: Distribuzione locale, demo, ambienti senza internet
-
-#### Build
-```bash
-npm run build:release
-```
-
-#### Output
-```
-release/
-├── index.html          # Entry point
-├── assets/             # JS/CSS bundled (con hash)
-│   ├── index-[hash].js
-│   └── index-[hash].css
-└── data/               # Snapshot JSON embedded
-    ├── snapshots/
-    │   ├── microsoft_releaseplans_latest.json
-    │   ├── eos_whatsnew_latest.json
-    │   ├── fabric_roadmap_latest.json
-    │   └── m365_roadmap_latest.json
-    └── latest.json
-```
-
-#### Distribuzione
-1. Comprimi cartella `release/` → `UpdateLens_v0.4.0.zip`
-2. Distribuisci ZIP ai clienti
-3. Istruzioni: "Estrai ZIP → Apri `index.html`"
-
-#### Caratteristiche
-- ✅ Funziona con `file://` protocol
-- ✅ Nessun server richiesto
-- ✅ Snapshot embedded (dati statici)
-- ✅ Refresh manuale (sostituire JSON files)
-- ⚠️ GitHub Issues non disponibile (CORS)
-
----
-
-### 2. Web Mode (Local Server)
+### 1. Web Mode (Local Server)
 
 **Ideale per**: Sviluppo, testing, deployment intranet
 
@@ -988,7 +952,7 @@ npm run build
 npm run server:dev
 
 # Production
-npm run server:start
+npm run start:server
 ```
 
 #### Architettura
@@ -1030,7 +994,7 @@ GITHUB_REPO=UpdateLens
 
 ---
 
-### 3. Azure Mode (Cloud Deployment)
+### 2. Azure Mode (Cloud Deployment)
 
 **Ideale per**: Produzione, scalabilità, refresh automatico
 
@@ -1113,17 +1077,16 @@ jobs:
 
 ### Comparison Matrix
 
-| Feature | Offline | Web (Local) | Azure (Cloud) |
-|---------|---------|-------------|---------------|
-| **Internet Required** | ❌ No | ⚠️ Optional | ✅ Yes |
-| **Server Required** | ❌ No | ✅ Yes (local) | ✅ Yes (cloud) |
-| **Automated Refresh** | ❌ Manual | ⚠️ Script | ✅ Automatic |
-| **GitHub Issues** | ❌ No (CORS) | ✅ Yes (proxy) | ✅ Yes (proxy) |
-| **Scalability** | ❌ Single user | ⚠️ Limited | ✅ High |
-| **Monitoring** | ❌ No | ⚠️ Basic logs | ✅ App Insights |
-| **Cost** | Free | Free (hosting) | ~25 €/month |
-| **Deployment** | ZIP file | npm run | GitHub Actions |
-| **Best For** | Demo, offline | Dev, intranet | Production |
+| Feature | Web (Local) | Azure (Cloud) |
+|---------|-------------|---------------|
+| **Server Required** | ✅ Yes (local) | ✅ Yes (cloud) |
+| **Automated Refresh** | ⚠️ Script | ✅ Automatic |
+| **GitHub Issues** | ✅ Yes (proxy) | ✅ Yes (proxy) |
+| **Scalability** | ⚠️ Limited | ✅ High |
+| **Monitoring** | ⚠️ Basic logs | ✅ App Insights |
+| **Cost** | Free (hosting) | ~25 €/month |
+| **Deployment** | npm run | GitHub Actions |
+| **Best For** | Dev, intranet | Production |
 
 ---
 
@@ -1146,11 +1109,6 @@ jobs:
 **Causa**: Invalid or expired token  
 **Soluzione**: Re-configure token with correct permissions
 
-#### 4. Offline mode not working
-**Sintomo**: App requires internet  
-**Causa**: Using `npm run build` instead of `npm run build:release`  
-**Soluzione**: Use `npm run build:release` for offline build
-
 ---
 
 ## 👤 Autore
@@ -1162,5 +1120,5 @@ Sviluppato per **CSS S.r.l.**
 
 ---
 
-**Versione**: 0.4.0  
-**Ultimo Aggiornamento**: 2026-02-02
+**Versione**: 0.5.0
+**Ultimo Aggiornamento**: 2026-07-20

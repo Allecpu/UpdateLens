@@ -1,16 +1,16 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- `src/` contains the React + TypeScript app (`app/components`, `app/pages`, `services`, `models`, `utils`).
+- `src/` contains the React + TypeScript app (`app/components`, `app/pages`, `services`, `models`, `utils`, `exports`).
+- `src/exports/` builds branded PowerPoint decks: `brandTokens.ts` (EOS Brand Book values), `deckModel.ts` (pure model builder), `pptxRenderer.ts` (pptxgenjs + slide masters).
 - `public/` holds static assets and production snapshots under `public/data/`.
 - `tools/` contains data refresh scripts (e.g., `refreshMicrosoft.ts`).
 - `server/` is the optional Express + SQLite backend (API + ingestion).
-- Build outputs go to `dist/` (web) and `release/` (offline ZIP).
+- Build output goes to `dist/`.
 
 ## Build, Test, and Development Commands
 - `npm run dev` starts the Vite dev server at http://localhost:5173.
 - `npm run build` builds the web bundle into `dist/`.
-- `npm run build:release` builds an offline bundle and inlines assets into `release/`.
 - `npm run preview` serves the production build locally.
 - `npm run typecheck` runs TypeScript type checking.
 - `npm run server:dev` starts the optional backend.
@@ -18,14 +18,15 @@
 
 ## Coding Style & Naming Conventions
 - TypeScript + React function components; avoid `any`, prefer explicit types and Zod schemas.
-- File naming: PascalCase for components (`DashboardPage.tsx`), camelCase for utilities (`dateUtils.ts`).
+- File naming: PascalCase for components (`DashboardPage.tsx`), camelCase for utilities (`date.ts`, `html.ts`).
 - Symbols: components/types in PascalCase, functions in camelCase, constants in `UPPER_SNAKE_CASE`.
 - Keep imports ordered: React, libraries, then local modules.
 
 ## Testing Guidelines
 - Primary checks are `npm run typecheck` and manual QA.
-- Smoke-test offline mode with `npm run build:release` and open `release/index.html`.
+- Smoke-test the production bundle with `npm run build` and `npm run preview`.
 - Release plans URL check: `npm run test:releaseplans`.
+- PowerPoint export: `npm run test:deck` validates the OOXML package, logo deduplication, brand colours and slide-density limits. It cannot check visual rendering — open the generated `tmp/*.pptx` in PowerPoint for that.
 - Follow the checklist in `PRESET_TEST_CHECKLIST.md` for preset changes.
 
 ## Commit & Pull Request Guidelines

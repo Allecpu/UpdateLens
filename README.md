@@ -1,29 +1,32 @@
 # UpdateLens
 
-**UpdateLens** è un portale web statico e offline-first per analizzare, filtrare e presentare gli aggiornamenti da **quattro fonti dati**: **Microsoft Release Plans**, **EOS Apps**, **Microsoft Fabric Roadmap** e **Microsoft 365 Roadmap**.
+**UpdateLens** è un portale web per analizzare, filtrare e presentare gli aggiornamenti da **quattro fonti dati**: **Microsoft Release Plans**, **EOS Apps**, **Microsoft Fabric Roadmap** e **Microsoft 365 Roadmap**.
 
-Funziona completamente offline con snapshot locali. In alternativa, è disponibile un backend opzionale per ingestione e API interne.
+I dati provengono da snapshot JSON versionati, serviti insieme all'applicazione. È disponibile un backend opzionale per ingestione e API interne.
 
 ---
 
 ## 🎯 Funzionalità Principali
 
 ### Core Features
-- ✅ **Web app offline-first** - Funziona senza connessione internet
-- ✅ **Distribuzione via ZIP** - Facile deployment e portabilità
 - ✅ **4 Fonti Dati Integrate** - Microsoft, EOS, Fabric, M365 Roadmap
 - ✅ **Gestione Multi-Cliente** - Configurazioni personalizzate per cliente
 - ✅ **Filtri Globali e Per-Cliente** - Sistema di filtri avanzato e granulare
 - ✅ **Dashboard Interattiva** - Visualizzazione KPI e drill-down
 - ✅ **Export Markdown** - Esportazione report personalizzati
+- ✅ **Export PowerPoint** - Deck cliente con l'identità visiva EOS Solutions, sezioni configurabili
 - ✅ **GitHub Issues Integration** - Gestione bug/feature direttamente dal portale
+- ✅ **Manuale Integrato** - Procedure, glossario, ruoli, checklist e troubleshooting
 - ✅ **Snapshot Locali** - Dati versionati e tracciabili
 
 ### Pagine Disponibili
 - **Dashboard** - Vista aggregata con KPI e filtri
 - **Clienti** - Gestione configurazioni cliente
 - **Filtri Globali** - Definizione regole di filtro globali
-- **Issues** - Integrazione GitHub per bug tracking
+- **Learn** - Risorse formative Microsoft collegate ai prodotti
+- **Segnalazioni** - Integrazione GitHub per bug tracking
+- **Condivisioni** - Preset inviati e ricevuti
+- **Manuale** - Guida operativa interna all'app
 - **Versione** - Changelog e informazioni release
 
 ---
@@ -48,23 +51,9 @@ Funziona completamente offline con snapshot locali. In alternativa, è disponibi
 
 ## 🌐 Modalità di Deployment
 
-UpdateLens supporta **tre modalità di deployment** per adattarsi a diverse esigenze:
+UpdateLens supporta **due modalità di deployment** per adattarsi a diverse esigenze:
 
-### 1. 📦 Offline Mode (ZIP Distribution)
-**Ideale per**: Distribuzione locale, demo, ambienti senza internet
-
-- ✅ Completamente offline (file:// protocol)
-- ✅ Nessun server richiesto
-- ✅ Snapshot embedded nel ZIP
-- ✅ Dati statici (refresh manuale)
-
-**Setup**:
-```bash
-npm run build:release
-# Distribuisci release/ come ZIP
-```
-
-### 2. 🖥️ Web Mode (Local Server)
+### 1. 🖥️ Web Mode (Local Server)
 **Ideale per**: Sviluppo, testing, deployment intranet
 
 - ✅ Backend Express locale
@@ -78,7 +67,7 @@ npm run build
 npm run server:dev
 ```
 
-### 3. ☁️ Azure Mode (Cloud Deployment)
+### 2. ☁️ Azure Mode (Cloud Deployment)
 **Ideale per**: Produzione, scalabilità, refresh automatico
 
 - ✅ **Azure Functions** per ingestion automatica
@@ -136,16 +125,6 @@ npm run dev
 npm run build
 ```
 
-### Build Offline (File System)
-
-Per aprire `index.html` direttamente da file system (senza server):
-
-```bash
-npm run build:release
-```
-
-Poi apri `release/index.html` nel browser.
-
 ---
 
 ## 📊 Fonti Dati
@@ -187,7 +166,7 @@ npm run refresh:fabric
 npm run refresh:m365roadmap
 
 # Refresh tutte le fonti
-npm run refresh:microsoft && npm run refresh:eos && npm run refresh:fabric && npm run refresh:m365roadmap
+npm run refresh:all
 ```
 
 #### Modalità Automatica (Azure Functions)
@@ -235,7 +214,7 @@ Modifica `src/version.ts`:
 
 ```typescript
 export const lastUpdateTitle = 'Titolo aggiornamento';
-export const lastUpdateDate = '2026-01-23';
+export const lastUpdateDate = '2026-07-20';
 export const lastUpdateNotes = [
   'Nota 1',
   'Nota 2'
@@ -264,7 +243,7 @@ GITHUB_REPO=your-repo
 
 La funzionalità **Issues** permette di leggere e creare segnalazioni GitHub direttamente dal portale.
 
-### Modalità Locale (Offline/Dev)
+### Modalità Locale (Dev)
 
 1. Vai su **Issues**
 2. Clicca **Configura Token**
@@ -386,7 +365,7 @@ UpdateLens/
 
 ### Workflow Base
 
-1. **Apri il portale** - `index.html` (offline) o URL web
+1. **Apri il portale** - URL web (o `npm run dev` in locale)
 2. **Seleziona cliente** - Dropdown in alto (default: "Tutti i clienti")
 3. **Applica filtri** - Fonte, stato, prodotto, date, etc.
 4. **Visualizza dashboard** - KPI cards + lista release items
@@ -421,32 +400,27 @@ npm run test:releaseplans
 
 ## 📦 Deployment
 
-### Build Release
+### Build
 
 ```bash
-npm run build:release
+npm run build
 ```
 
-Genera cartella `release/` con:
+Genera la cartella `dist/` con:
 ```
-release/
+dist/
 ├── index.html          # Entry point
-├── assets/             # JS/CSS bundled
-└── data/               # Snapshot JSON
+└── assets/             # JS/CSS bundled
 ```
 
-### Distribuzione ZIP
-
-1. Comprimi cartella `release/` → `UpdateLens_vX.X.X.zip`
-2. Distribuisci ZIP ai clienti
-3. Istruzioni: "Estrai ZIP → Apri index.html"
+I dati (`public/data/`) vanno serviti insieme al bundle. Il deploy su Azure
+avviene tramite GitHub Actions (`deploy-api.yml`, branch `Azure`).
 
 ---
 
 ## 🔒 Vincoli Runtime
 
-- ✅ **Offline-first** - Funziona senza internet (eccetto Issues in modalità locale)
-- ✅ **File Protocol** - Supporta `file://` protocol
+- ✅ **Server HTTP richiesto** - L'app carica gli snapshot via `fetch`, quindi va servita (non aperta da `file://`)
 - ✅ **No Backend Required** - Backend opzionale solo per ingestion/proxy
 - ✅ **Browser Moderni** - Chrome, Firefox, Edge, Safari (ES2020+)
 
@@ -456,6 +430,7 @@ release/
 
 ### Per Utenti
 - **[Guida Utente](./docs/USER_GUIDE.md)** - Guida completa all'uso del portale (Dashboard, Clienti, Filtri, Issues, Export)
+- **Manuale nell'app** - Apri `#/manuale` per procedure operative, glossario, ruoli, checklist e FAQ
 
 ### Per Sviluppatori
 - **[Developer Guide](./docs/DEVELOPER_GUIDE.md)** - Setup ambiente, workflow, convenzioni di codice
@@ -472,6 +447,13 @@ release/
 ---
 
 ## 📝 Changelog
+
+### v0.5.0 (2026-07-20) - Manuale operativo e applicazione web
+- ✅ **Manuale integrato** - Procedure, glossario, ruoli, checklist e problemi comuni
+- ✅ **Export PowerPoint** - Deck cliente brandizzato EOS generato dalla Dashboard
+- ✅ **Applicazione web** - Rimossa la distribuzione offline e il relativo download ZIP
+- ✅ **Aggiornamento fonti** - Unico comando operativo nella pagina Versione
+- ✅ **Prestazioni** - Caricamento differito di `pptxgenjs`
 
 ### v0.4.0 (2026-02-02) - Azure Migration \u0026 Cloud Deployment
 - ✅ **Azure Functions** - Ingestion automatica con Timer Triggers (ogni 6 ore)

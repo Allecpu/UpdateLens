@@ -1,7 +1,6 @@
 import express from 'express';
 import { createDb } from "./db.js";
 import { buildRefreshZip, type RefreshSource } from "./refreshZip.js";
-import { buildReleaseZip } from "./releaseZip.js";
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -458,28 +457,6 @@ export const createApi = () => {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Errore durante refresh ZIP.';
-      res.status(500).json({ error: message });
-    }
-  });
-
-  app.post('/api/release-zip', async (_req, res) => {
-    try {
-      const result = await buildReleaseZip();
-      const filename = `UpdateLens_release_${result.generatedAt.replace(/[:.]/g, '-')}.zip`;
-
-      res.setHeader('Content-Type', 'application/zip');
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      res.setHeader('X-UpdateLens-Release-At', result.generatedAt);
-      res.setHeader('X-UpdateLens-Result', 'success');
-      res.setHeader(
-        'Access-Control-Expose-Headers',
-        'X-UpdateLens-Release-At, X-UpdateLens-Result, Content-Disposition'
-      );
-
-      res.send(result.zipBuffer);
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Errore durante build release ZIP.';
       res.status(500).json({ error: message });
     }
   });

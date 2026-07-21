@@ -59,7 +59,7 @@ Implementare un sistema di **tagging standardizzato** per tutte le risorse Azure
 | `CostCenter` | Codice centro di costo | Per chargeback | `IT-INFRA-001` |
 | `ManagedBy` | `Terraform`, `ARM`, `Manual`, `GitHub-Actions` | Modalità gestione | `GitHub-Actions` |
 | `DeployedBy` | `CI/CD`, `Manual`, `Script` | Modalità deployment | `CI/CD` |
-| `Version` | Semantic version | Versione applicazione | `0.4.0` |
+| `Version` | Semantic version | Versione applicazione | `0.5.0` |
 
 ### Tags Opzionali (Consigliati)
 
@@ -87,7 +87,7 @@ Implementare un sistema di **tagging standardizzato** per tutte le risorse Azure
   "CostCenter": "IT-INFRA-001",
   "ManagedBy": "GitHub-Actions",
   "DeployedBy": "CI/CD",
-  "Version": "0.4.0",
+  "Version": "0.5.0",
   "Application": "UpdateLens-Runtime",
   "Criticality": "High"
 }
@@ -102,7 +102,7 @@ Implementare un sistema di **tagging standardizzato** per tutte le risorse Azure
   "CostCenter": "IT-INFRA-001",
   "ManagedBy": "GitHub-Actions",
   "DeployedBy": "CI/CD",
-  "Version": "0.4.0",
+  "Version": "0.5.0",
   "Application": "UpdateLens-Shared",
   "Criticality": "High"
 }
@@ -169,7 +169,7 @@ $commonTags = @{
     "CostCenter" = "IT-INFRA-001"
     "ManagedBy" = "GitHub-Actions"
     "DeployedBy" = "CI/CD"
-    "Version" = "0.4.0"
+    "Version" = "0.5.0"
 }
 
 # Tag Resource Group - Runtime
@@ -307,7 +307,7 @@ $commonTags = @{
     "CostCenter" = "IT-INFRA-001"
     "ManagedBy" = "GitHub-Actions"
     "DeployedBy" = "CI/CD"
-    "Version" = "0.4.0"
+    "Version" = "0.5.0"
 }
 
 Write-Host "Starting Azure Resource Tagging for UpdateLens..." -ForegroundColor Cyan

@@ -8,9 +8,14 @@
 4. [Dashboard](#dashboard)
 5. [Gestione Clienti](#gestione-clienti)
 6. [Filtri Globali](#filtri-globali)
-7. [GitHub Issues](#github-issues)
-8. [Export Markdown](#export-markdown)
-9. [FAQ](#faq)
+7. [Learn](#learn)
+8. [GitHub Issues](#github-issues)
+9. [Condivisioni](#condivisioni)
+10. [Versione e aggiornamento dati](#versione-e-aggiornamento-dati)
+11. [Manuale integrato](#manuale-integrato)
+12. [Export PowerPoint](#export-powerpoint-report-cliente)
+13. [Export Markdown](#export-markdown)
+14. [FAQ](#faq)
 
 ---
 
@@ -24,11 +29,12 @@
 
 ### Caratteristiche Principali
 
-✅ **Funziona Offline** - Nessuna connessione internet richiesta  
 ✅ **Multi-Cliente** - Configurazioni personalizzate per ogni cliente  
 ✅ **Filtri Avanzati** - Filtra per fonte, stato, prodotto, date  
 ✅ **Export Markdown** - Genera report personalizzati  
+✅ **Export PowerPoint** - Deck cliente con l'identità visiva EOS Solutions  
 ✅ **GitHub Issues** - Segnala bug e richieste direttamente dal portale
+✅ **Manuale Integrato** - Procedure, glossario, checklist e troubleshooting
 
 ---
 
@@ -36,13 +42,6 @@
 
 ### Apertura del Portale
 
-#### Modalità Offline (File)
-1. Estrai il file ZIP ricevuto
-2. Apri la cartella estratta
-3. Fai doppio click su `index.html`
-4. Il portale si aprirà nel tuo browser predefinito
-
-#### Modalità Web (Server)
 1. Apri il browser
 2. Vai all'URL fornito (es. `https://updatelens.example.com`)
 3. Il portale si caricherà automaticamente
@@ -60,17 +59,21 @@ Al primo avvio:
 
 ### Menu Principale
 
-Il menu di navigazione si trova nella barra laterale sinistra:
+Il menu di navigazione si trova nella barra orizzontale in alto:
 
-- **📊 Dashboard** - Vista principale con KPI e lista aggiornamenti
-- **👥 Clienti** - Gestione clienti e configurazioni
-- **🔧 Filtri Globali** - Definizione regole di filtro globali
-- **🐛 Issues** - Segnalazioni GitHub (bug, richieste)
-- **ℹ️ Versione** - Informazioni versione e changelog
+- **Dashboard** - Vista principale con KPI e lista aggiornamenti
+- **Clienti** - Gestione clienti, gruppi, prodotti e Owner CSS
+- **Filtri globali** - Target, regole e preset persistenti
+- **Learn** - Catalogo delle risorse formative Microsoft
+- **Versione** - Build, note di rilascio e aggiornamento delle fonti
+- **Segnalazioni** - Issue GitHub per bug e richieste
+- **Condivisioni** - Preset condivisi tra utenti
+- **Manuale** - Guida operativa consultabile nell'app
 
 ### Selettore Cliente
 
 In alto a destra trovi il **selettore cliente**:
+- Campo di ricerca per trovare rapidamente il cliente
 - Dropdown per cambiare cliente attivo
 - Default: "Tutti i clienti"
 - Cambiando cliente, i filtri si aggiornano automaticamente
@@ -108,8 +111,10 @@ Card per ogni aggiornamento con:
 - **Data disponibilità**
 - **Link** alla fonte originale
 
-#### 4. Pulsante Export (in alto a destra)
-Genera report Markdown degli aggiornamenti filtrati.
+#### 4. Pulsanti Export (in alto a destra)
+- **Esporta Markdown** - report testuale degli aggiornamenti filtrati
+- **Esporta PPTX** - presentazione PowerPoint brandizzata EOS (apre un modal
+  per scegliere titolo e sezioni)
 
 ### Workflow Tipico
 
@@ -226,11 +231,25 @@ Quando sei in **modalità cliente** (hai selezionato un cliente specifico):
 
 ---
 
+## Learn
+
+La pagina **Learn** raccoglie risorse formative Microsoft collegate ai prodotti
+monitorati.
+
+1. Cerca una parola chiave oppure apri Learn da un prodotto della Dashboard.
+2. Filtra per prodotto, tipo di risorsa, livello, durata e lingua.
+3. Ordina i risultati e apri la risorsa Microsoft originale.
+4. Salva la combinazione corrente come preset Learn personale.
+
+I preset Learn sono separati dai preset dei Filtri globali.
+
+---
+
 ## GitHub Issues
 
 ### Configurazione Iniziale
 
-#### Modalità Locale (Offline)
+#### Modalità Locale (browser)
 
 1. Vai su **Issues** dal menu
 2. Click su **"Configura Token"**
@@ -304,7 +323,98 @@ blocco di codice
 4. L'immagine viene caricata su GitHub
 5. Il link viene inserito automaticamente nella descrizione
 
-⚠️ **Nota**: Upload immagini **non disponibile** in modalità offline (limitazioni CORS).
+⚠️ **Nota**: Upload immagini disponibile solo in modalità Web (con backend attivo).
+
+---
+
+## Condivisioni
+
+La pagina **Condivisioni** distingue:
+
+- **Condivisi da me** - preset inviati ad altri utenti;
+- **Condivisi con me** - preset ricevuti da altri utenti;
+- **Utenti** - gestione accessi, visibile a Manager e Admin.
+
+Un preset ricevuto non è modificabile direttamente. Duplicalo per crearne una
+copia personale indipendente.
+
+### Ruoli
+
+| Ruolo | Gestione utenti | Assegnazione Admin |
+|---|---|---|
+| Viewer | No | No |
+| Manager | Utenti non Admin | No |
+| Admin | Completa | Sì |
+
+---
+
+## Versione e aggiornamento dati
+
+La pagina **Versione** mostra versione applicativa, ambiente, build, commit e note
+dell'ultimo rilascio.
+
+Il comando **"Aggiorna tutte le fonti"** aggiorna Microsoft, EOS, Fabric e M365
+Roadmap. Attendi la conclusione e controlla lo stato di ogni fonte: un risultato
+parziale indica che almeno una sorgente usa ancora lo snapshot precedente.
+
+Il vecchio download ZIP non è più disponibile perché UpdateLens è
+un'applicazione web e non supporta l'esecuzione offline.
+
+---
+
+## Manuale integrato
+
+La voce **Manuale** apre la guida operativa interna all'applicazione. Include:
+
+- priorità tra cliente, Filtri globali, Dashboard e chat;
+- procedure numerate per ogni pagina;
+- glossario, tipi di preset e ruoli;
+- checklist prima dell'esportazione;
+- sicurezza del GitHub PAT e qualità degli snapshot;
+- problemi comuni e relative soluzioni.
+
+L'indice **"In questa pagina"** scorre tra le sezioni senza cambiare route.
+
+---
+
+## Export PowerPoint (report cliente)
+
+Genera una presentazione con l'identità visiva EOS Solutions a partire dagli
+aggiornamenti attualmente filtrati.
+
+### Come si genera
+
+1. Applica i filtri desiderati nella Dashboard (e seleziona il cliente, se serve)
+2. Click su **"Esporta PPTX"** (in alto a destra)
+3. Nel modal imposta **Titolo** e **Sottotitolo** della copertina
+4. Spunta le sezioni da includere — in basso vedi la stima delle slide che verranno prodotte
+5. Click **"Genera PPTX"**: il file viene scaricato dal browser
+
+Il nome del file è `UpdateLens-<Cliente>-<data>.pptx`.
+
+### Sezioni disponibili
+
+| Sezione | Contenuto |
+|---|---|
+| Copertina e chiusura | Sempre incluse: richieste dal brand book EOS |
+| Sintesi KPI | Totale aggiornamenti e ripartizione per fonte |
+| Perimetro del report | Filtri applicati, numero di aggiornamenti, data di generazione |
+| Prodotti più interessati | Grafico a barre con i primi 10 prodotti |
+| Novità per prodotto | Una o più slide per prodotto, max 6 voci per slide |
+| Dettaglio aggiornamenti | Una slide per aggiornamento, con sintesi e link |
+
+### Cosa aspettarsi
+
+- Il deck resta **compatto per scelta**: massimo 15 prodotti e 3 slide per prodotto.
+  Quando qualcosa viene omesso, la slide lo dichiara sempre (es. *"+42 altri
+  aggiornamenti per Dynamics 365 Sales non elencati"*) — non ci sono tagli silenziosi.
+- Con **Dettaglio aggiornamenti** attivo puoi scegliere quante slide di dettaglio
+  produrre (1-60, default 20).
+- Il testo usa il font **Calibri**: i font brand EOS (Humble, Open Sans) non possono
+  essere incorporati in un file PowerPoint, e Calibri è il ripiego previsto dal brand
+  book. Il deck si vede quindi identico su qualsiasi PC senza font aggiuntivi.
+- Prima di inviare il deck a un cliente, **aprilo in PowerPoint** e dai una scorsa:
+  è il controllo finale sulla resa grafica.
 
 ---
 
@@ -314,10 +424,7 @@ blocco di codice
 
 1. Applica i filtri desiderati nella Dashboard
 2. Click su **"Esporta Markdown"** (in alto a destra)
-3. Si apre un'anteprima del report
-4. Verifica il contenuto
-5. Click **"Scarica Markdown"**
-6. Il file `.md` viene scaricato nel tuo browser
+3. Il file `.md` viene scaricato subito dal browser, senza anteprima
 
 ### Struttura Report
 
@@ -374,16 +481,18 @@ Il report riflette:
 ### Domande Generali
 
 **Q: UpdateLens funziona senza internet?**  
-A: Sì! La versione offline funziona completamente senza connessione (eccetto GitHub Issues in modalità locale).
+A: No. Il portale va raggiunto via rete; una volta caricato, i dati mostrati sono snapshot serviti insieme all'applicazione.
 
 **Q: I miei dati sono al sicuro?**  
-A: Sì. Tutti i dati (clienti, filtri) sono salvati **solo nel tuo browser** (localStorage). Nessun dato viene inviato a server esterni.
+A: Clienti e preset possono essere persistiti dal backend web; alcune preferenze
+personali restano nel browser. Non inserire token o dati riservati nelle issue.
 
 **Q: Posso usare UpdateLens su più dispositivi?**  
 A: I dati sono locali al browser. Per sincronizzare tra dispositivi, usa la versione Web con backend.
 
 **Q: Quanto spesso vengono aggiornati i dati?**  
-A: I dati vengono aggiornati manualmente dagli amministratori. Controlla la pagina "Versione" per l'ultima data di aggiornamento.
+A: In Azure il refresh è schedulato; gli amministratori possono inoltre avviare
+"Aggiorna tutte le fonti" dalla pagina Versione.
 
 ### Clienti
 
@@ -412,7 +521,7 @@ A: I filtri globali e per-cliente sono salvati. I filtri temporanei della Dashbo
 **Q: Il mio token GitHub è sicuro?**  
 A: In modalità locale, il token è salvato nel tuo browser (localStorage). Nessuno può accedervi tranne te. In modalità Web, il token è sul server e mai esposto al client.
 
-**Q: Posso usare GitHub Issues offline?**  
+**Q: Posso usare GitHub Issues senza il backend?**  
 A: Sì, ma devi configurare un token. Le chiamate API vengono fatte direttamente dal browser a GitHub.
 
 **Q: Perché non posso caricare immagini?**  
@@ -420,14 +529,16 @@ A: Upload immagini è disponibile solo in modalità Web (limitazioni CORS del br
 
 ### Export
 
-**Q: Posso esportare in PDF?**  
-A: Al momento solo Markdown. Puoi convertire il Markdown in PDF con strumenti esterni (es. Pandoc, Typora).
+**Q: In quali formati posso esportare?**  
+A: Markdown e PowerPoint (.pptx). Per il PDF puoi convertire il Markdown con strumenti
+esterni (es. Pandoc, Typora) oppure salvare il deck come PDF da PowerPoint.
 
 **Q: L'export include tutti gli aggiornamenti?**  
 A: L'export include solo gli aggiornamenti **filtrati** visibili nella Dashboard.
 
 **Q: Posso personalizzare il formato export?**  
-A: Al momento no. Il formato è fisso (Markdown con struttura standard).
+A: Il Markdown ha una struttura fissa. Il deck PowerPoint è configurabile: puoi scegliere
+titolo, sottotitolo e quali sezioni includere.
 
 ### Problemi Comuni
 
@@ -435,7 +546,7 @@ A: Al momento no. Il formato è fisso (Markdown con struttura standard).
 A: Controlla che:
 - I filtri non siano troppo restrittivi
 - Le fonti dati siano selezionate
-- I file snapshot siano presenti (modalità offline)
+- I file snapshot siano raggiungibili (cartella `data/`)
 
 **Q: I filtri non si salvano**  
 A: Verifica che il browser abbia localStorage abilitato. Controlla le impostazioni privacy.
@@ -466,7 +577,7 @@ Oppure contatta:
 
 ---
 
-**Versione**: 0.3.0  
-**Ultimo Aggiornamento**: 2026-01-23
+**Versione**: 0.5.0
+**Ultimo Aggiornamento**: 2026-07-20
 
 **Buon lavoro con UpdateLens! 🚀**

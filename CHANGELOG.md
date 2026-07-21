@@ -1,5 +1,117 @@
 # UpdateLens - Changelog Dettagliato
 
+## v0.5.0 (2026-07-20) - Manuale operativo e applicazione web
+
+### Parte 2 — Rimozione della modalità offline
+
+### 🗑️ Rimozioni (breaking)
+
+UpdateLens non è più distribuibile come ZIP da aprire con doppio click: è
+un'applicazione web che va servita via HTTP.
+
+- ❌ **`npm run build:release`** e `tools/inlineReleaseAssets.ts`
+- ❌ **Cartella `release/`** — rimossa dal tracking git (25 MB, di cui ~8 MB di asset
+  duplicati mai referenziati) e aggiunta a `.gitignore`
+- ❌ **`POST /api/release-zip`** e `server/releaseZip.ts`
+- ❌ **Sezione "Prima installazione"** nella pagina Versione, con il bottone
+  "Scarica release completa"
+- ❌ **Rilevamento `file://`** (`isFileProtocol`) in `VersionPage` e `IssuesPage`: i due
+  bottoni di refresh dati sono ora sempre visibili, spariscono i messaggi
+  "Funzione disponibile solo con server attivo"
+- ❌ Step `Build release package` e copia `release/` in `.github/workflows/deploy-api.yml`
+
+**Perché.** La modalità offline era già di fatto non funzionante: `DataLoader` carica i
+dati con `fetch('data/latest.json')` e i browser bloccano `fetch()` su `file://`, mentre
+`inlineReleaseAssets` inlinava solo CSS e JS lasciando i JSON come file separati. Un
+cliente che seguiva la guida vedeva una dashboard vuota. L'artefatto committato era
+inoltre fermo a snapshot di gennaio contro i dati di luglio.
+
+### ⚡ Prestazioni
+
+- ✅ **Code-splitting ripristinato** — rimosso `inlineDynamicImports` da `vite.config.ts`,
+  che esisteva solo per il bundle unico offline
+- ✅ **pptxgenjs caricato on-demand** con `import()` dinamico: **bundle iniziale da 957 KB
+  a 583 KB** (gzip da 302 KB a 176 KB). I 372 KB della libreria li scarica solo chi genera
+  davvero una presentazione — cosa che la modalità offline impediva
+
+### 📚 Documentazione
+
+Riscritti README, USER_GUIDE, ARCHITECTURE, DEVELOPER_GUIDE, AGENTS e docs/README: via i
+claim "offline-first" e "funziona senza internet", via le procedure di test e la checklist
+PR che citavano la build offline. I documenti storici (`implementation_plan.md`,
+`tasks.md`, `DOCUMENTATION_UPDATE_SUMMARY.md` e le voci di changelog delle versioni
+passate) sono lasciati intatti: registrano lo stato del progetto a quel momento.
+
+### Parte 1 — Export PowerPoint brandizzato EOS
+
+### 🎉 Nuove Funzionalità
+
+#### Generazione presentazioni dalla Dashboard
+- ✅ **Bottone "Esporta PPTX"** - Genera un deck PowerPoint dagli aggiornamenti filtrati
+  - Modal `ExportDeckModal` con titolo, sottotitolo e sezioni selezionabili
+  - Stima live del numero di slide prima della generazione
+  - Generazione interamente client-side con `pptxgenjs` (nessuna chiamata server)
+- ✅ **Identità visiva EOS Solutions** applicata dai token del Brand Book
+  - Palette ufficiale: arancione `#F08019`, marrone `#382F2D`, accenti `#00B0E8` / `#485870`
+  - Logo negli slide master: versione a colori su fondo chiaro, **versione negativa su
+    fondo scuro** (cover e closing), come richiesto dal Brand Book
+  - Copertina e chiusura con claim "Digital Systems | Human Feelings" e contatti
+  - Max 6 voci per slide, corpo >= 16 pt, palette grafici a 4 serie
+- ✅ **Sezioni configurabili**: sintesi KPI, perimetro del report (filtri applicati),
+  prodotti più interessati (grafico a barre), novità per prodotto, dettaglio aggiornamenti
+- ✅ **Perimetro del report nel deck** - i filtri applicati sono documentati nelle slide,
+  informazione che l'export Markdown non riportava
+
+### 🔧 Miglioramenti Tecnici
+
+- ✅ `describeFilterState` (`src/services/FilterDescription.ts`) - descrizione dei filtri
+  attivi estratta dalla Dashboard e condivisa con l'export: una sola fonte di verità per
+  le etichette dei chip e per le slide
+- ✅ `resolveItemLinks` e `groupByProduct` esportati da `ExportService` e riusati dal deck
+  (output Markdown verificato byte-identico su 3813 item)
+- ✅ `downloadBlob` - download generalizzato ai contenuti binari; `downloadMarkdown` vi delega
+- ✅ Logo incorporati come data URI base64 e inseriti negli **slide master**: una sola copia
+  per file invece di una per slide (media da 419 KB a 18 KB)
+- ✅ `tools/deckSmokeTest.ts` - collaudo headless che valida il pacchetto OOXML, la
+  deduplicazione dei logo, i colori di brand e i limiti di densità
+- ✅ Tetto di 3 slide per prodotto e 15 sezioni prodotto: sull'intero dataset il deck resta
+  a ~51 slide invece di ~480. Le omissioni sono sempre dichiarate nella slide
+
+### 🐛 Correzioni emerse dal QA visivo
+
+- ✅ **Layout slide** - `pptx.defineLayout` esplicito derivato da `EOS_LAYOUT`: il preset
+  `LAYOUT_16x9` di pptxgenjs è 10 x 5.625 pollici, non 13.333 x 7.5, e mandava fuori slide
+  la quinta tile KPI, il logo e parte del grafico
+- ✅ **Etichetta prodotto** - `resolveProductLabel`: 391 item su 3813 hanno `product` ma non
+  `productName` e finivano sotto il titolo letterale "undefined" (difetto presente anche
+  nell'export Markdown, dove produceva `## undefined`)
+- ✅ **Date** - `resolveItemDate` con fallback su `availabilityDateFull` / `availabilityDate` /
+  `firstAvailableDate`: gli stessi 391 item mostravano "data non disponibile" ovunque
+- ✅ **Entità HTML** - `decodeHtmlEntities` (`src/utils/html.ts`): 48 titoli contengono entità
+  già codificate dalla sorgente (`l&#39;agente`) che finivano letterali nel documento
+- ✅ **Logo sulle slide di contenuto** spostato in basso a destra su fondo bianco: il PNG a
+  colori ha fondo bianco e sulla banda arancione si vedeva come un riquadro
+- ✅ **Slide "Perimetro del report"** - `summarizeFilterState` riassume per gruppo con "+N altri"
+  invece di elencare ogni valore: con i filtri di default produceva oltre cento righe fuori slide
+- ✅ **Grafico** - altezza proporzionale al numero di barre e serie unica in arancione
+- ✅ Il test `test:deck` ora verifica le **dimensioni della slide** e che **nessun oggetto esca
+  dai bordi**: entrambi i controlli falliscono sul codice pre-correzione
+
+### ⚠️ Limiti Noti
+
+- I font brand (Humble, Open Sans) **non sono incorporabili** in un .pptx: il deck usa
+  `Calibri`, che è il fallback previsto dal Brand Book ed è presente su ogni Office
+- Il template ufficiale `eos-template.potx` non viene usato: pptxgenjs non sa leggerlo,
+  quindi il deck è una ricostruzione che ne applica i token
+- Il collaudo automatico verifica struttura, geometria e colori del pacchetto, ma non la
+  resa tipografica: per quella si esportano le slide in PNG con PowerPoint
+  (`$ppt.Presentations.Open(...).SaveCopyAs($dir, 18)` via COM) e si guardano
+
+### 📦 Dipendenze
+
+- ➕ `pptxgenjs ^4.0.1`, caricato con `import()` dinamico: sta in un chunk separato da
+  372 KB scaricato solo da chi genera davvero un deck
+
 ## v0.4.0 (2026-02-02) - Azure Migration \u0026 Cloud Deployment
 
 ### 🎉 Nuove Funzionalità

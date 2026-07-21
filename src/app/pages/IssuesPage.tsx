@@ -3,7 +3,6 @@ import { useGitHubStore } from '../store/useGitHubStore';
 import { GitHubIssuesClient, type GitHubIssue, type GitHubLabel, type GitHubComment } from '../../services/GitHubService';
 import { getAttachments, saveAttachments, removeAttachment as removeStoredAttachment, clearAttachments } from '../../utils/attachmentStorage';
 
-const isFileProtocol = typeof window !== 'undefined' && window.location.protocol === 'file:';
 const MAX_ATTACHMENT_SIZE_BYTES = 1 * 1024 * 1024;
 
 const encodePathSegments = (path: string) => path.split('/').map((segment) => encodeURIComponent(segment)).join('/');
@@ -225,11 +224,7 @@ const IssuesPage = () => {
                 setIsWeb(false);
             }
         };
-        if (!isFileProtocol) {
-            checkProxy();
-        } else {
-            setIsWeb(false);
-        }
+        checkProxy();
     }, []);
 
     const handleCreateIssue = async (e: React.FormEvent) => {
@@ -491,7 +486,7 @@ const IssuesPage = () => {
         );
     }, [issues, filterState, search]);
 
-    const envType = isWeb ? 'WEB (SERVER)' : isFileProtocol ? 'LOCAL (OFFLINE)' : 'LOCAL (BROWSER)';
+    const envType = isWeb ? 'WEB (SERVER)' : 'LOCAL (BROWSER)';
     const isTokenMissing = !isWeb && !token;
 
     return (

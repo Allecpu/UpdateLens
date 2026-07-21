@@ -37,9 +37,6 @@ jobs:
       - name: Build server (TypeScript)
         run: npm run build:server
 
-      - name: Build release package
-        run: npm run build:release
-
       - name: Create deploy package
         run: |
           mkdir -p deploy
@@ -55,9 +52,6 @@ jobs:
 
           # Copy public folder (for data storage)
           cp -R public deploy/public
-
-          # Copy pre-built release folder
-          cp -R release deploy/release
 
           # Copy source files needed for builds
           cp -R src deploy/src
