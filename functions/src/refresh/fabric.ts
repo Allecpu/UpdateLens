@@ -149,7 +149,7 @@ function extractItems(rawItems: RawFabricItem[]): FabricReleaseItem[] {
       const availabilityDateFull = parseFabricDateFull(raw.release_date);
       const releaseDate = availabilityDateFull ?? `${availabilityDate}-01`;
 
-      const releasePage = `https://fabric-gps.com/releases/${raw.release_item_id}`;
+      const releasePage = `https://www.fabric-gps.com/release/${raw.release_item_id}`;
       const blogUrl = raw.blog_url ?? null;
 
       const item: FabricReleaseItem = {
