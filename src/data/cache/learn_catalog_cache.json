@@ -1093,34 +1093,6 @@
       ]
     },
     {
-      "uid": "learn-dynamics.post-go-live-dynamics-365",
-      "title": "Strategia post go-live per soluzioni Dynamics 365",
-      "url": "https://learn.microsoft.com/it-it/training/modules/post-go-live-dynamics-365/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "advanced",
-      "products": [
-        "dynamics-365",
-        "dynamics-sales",
-        "customer-insights-journeys",
-        "dynamics-customer-service",
-        "dynamics-field-service",
-        "dynamics-finance",
-        "dynamics-scm",
-        "dynamics-project-operations",
-        "dynamics-commerce",
-        "dynamics-human-resources"
-      ],
-      "durationMinutes": 38,
-      "moduleCount": 7,
-      "roles": [
-        "solution-architect",
-        "functional-consultant"
-      ],
-      "subjects": [
-        "process-workflow"
-      ]
-    },
-    {
       "uid": "learn-dynamics.set-up-inventory-planning-dynamics-365-business-central",
       "title": "Impostazione della pianificazione magazzino in Dynamics 365 Business Central",
       "url": "https://learn.microsoft.com/it-it/training/modules/set-up-inventory-planning-dynamics-365-business-central/?WT.mc_id=api_CatalogApi",
@@ -2099,25 +2071,6 @@
       ]
     },
     {
-      "uid": "learn-dynamics.configure-lean-manufacturing",
-      "title": "Impostazione della lean manufacturing in Dynamics 365 Supply Chain Management",
-      "url": "https://learn.microsoft.com/it-it/training/modules/configure-lean-manufacturing-dyn365-supply-chain-mgmt/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "intermediate",
-      "products": [
-        "dynamics-365",
-        "dynamics-scm"
-      ],
-      "durationMinutes": 90,
-      "moduleCount": 8,
-      "roles": [
-        "functional-consultant"
-      ],
-      "subjects": [
-        "manufacturing-processes"
-      ]
-    },
-    {
       "uid": "learn-dynamics.access-rest-services",
       "title": "Accesso ai servizi REST dall'interno di Dynamics 365 Business Central",
       "url": "https://learn.microsoft.com/it-it/training/modules/access-rest-services/?WT.mc_id=api_CatalogApi",
@@ -2235,26 +2188,6 @@
       ],
       "subjects": [
         "marketing-sales"
-      ]
-    },
-    {
-      "uid": "learn-dynamics.get-started-discrete-manufacturing-in-dynamics-365-finance-ops",
-      "title": "Introduzione alla produzione discreta in Dynamics 365 Supply Chain Management",
-      "url": "https://learn.microsoft.com/it-it/training/modules/get-started-discrete-manufacturing-dyn365-supply-chain-mgmt/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "intermediate",
-      "products": [
-        "dynamics-365",
-        "dynamics-scm"
-      ],
-      "durationMinutes": 130,
-      "moduleCount": 13,
-      "roles": [
-        "business-user",
-        "functional-consultant"
-      ],
-      "subjects": [
-        "manufacturing-processes"
       ]
     },
     {
@@ -2394,27 +2327,6 @@
       ],
       "subjects": [
         "finance-accounting"
-      ]
-    },
-    {
-      "uid": "learn-dynamics.set-up-use-discrete-manufacturing-routes",
-      "title": "Impostazione e uso di cicli di lavorazione produzione discreti in Dynamics 365 Supply Chain Management",
-      "url": "https://learn.microsoft.com/it-it/training/modules/set-up-use-discrete-manufacturing-routes/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "intermediate",
-      "products": [
-        "dynamics-365",
-        "dynamics-scm"
-      ],
-      "durationMinutes": 37,
-      "moduleCount": 11,
-      "roles": [
-        "functional-consultant",
-        "business-user",
-        "administrator"
-      ],
-      "subjects": [
-        "supply-chain-management"
       ]
     },
     {
@@ -2883,26 +2795,6 @@
       "subjects": []
     },
     {
-      "uid": "learn-dynamics.manage-changes-formulas-ingredients",
-      "title": "Gestire le modifiche nelle formule e negli ingredienti di Dynamics 365 Supply Chain Management",
-      "url": "https://learn.microsoft.com/it-it/training/modules/manage-changes-formulas-ingredients/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "intermediate",
-      "products": [
-        "dynamics-365",
-        "dynamics-scm"
-      ],
-      "durationMinutes": 47,
-      "moduleCount": 14,
-      "roles": [
-        "administrator",
-        "business-user"
-      ],
-      "subjects": [
-        "supply-chain-management"
-      ]
-    },
-    {
       "uid": "learn-dynamics.manage-customer-returns-dynamics-365-business-central",
       "title": "Gestione dei resi dei clienti in Dynamics 365 Business Central",
       "url": "https://learn.microsoft.com/it-it/training/modules/manage-customer-returns-dynamics-365-business-central/?WT.mc_id=api_CatalogApi",
@@ -3170,29 +3062,6 @@
       ]
     },
     {
-      "uid": "learn-dynamics.plan-and-implement-security-in-dynamics-365-finance-ops",
-      "title": "Pianificazione e implementazione della sicurezza nelle app per la finanza e le operazioni",
-      "url": "https://learn.microsoft.com/it-it/training/modules/plan-implement-security-finance-operations/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "intermediate",
-      "products": [
-        "dynamics-365",
-        "dynamics-finance",
-        "dynamics-scm"
-      ],
-      "durationMinutes": 116,
-      "moduleCount": 13,
-      "roles": [
-        "solution-architect",
-        "functional-consultant",
-        "administrator"
-      ],
-      "subjects": [
-        "security",
-        "business-applications"
-      ]
-    },
-    {
       "uid": "learn-dynamics.project-team-dynamics-365-implementation",
       "title": "Come conoscere il team di progetto per le implementazioni di Dynamics 365",
       "url": "https://learn.microsoft.com/it-it/training/modules/project-team-dynamics-365-implementation/?WT.mc_id=api_CatalogApi",
@@ -3224,36 +3093,6 @@
         "maker"
       ],
       "subjects": [
-        "business-applications"
-      ]
-    },
-    {
-      "uid": "learn-dynamics.solution-blueprint",
-      "title": "Creazione del progetto iniziale di una soluzione per soluzioni Dynamics 365",
-      "url": "https://learn.microsoft.com/it-it/training/modules/solution-blueprint/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "advanced",
-      "products": [
-        "dynamics-365",
-        "dynamics-sales",
-        "customer-insights-journeys",
-        "dynamics-customer-service",
-        "dynamics-field-service",
-        "dynamics-finance",
-        "dynamics-scm",
-        "dynamics-project-operations",
-        "dynamics-commerce",
-        "dynamics-human-resources"
-      ],
-      "durationMinutes": 64,
-      "moduleCount": 8,
-      "roles": [
-        "solution-architect",
-        "functional-consultant"
-      ],
-      "subjects": [
-        "process-workflow",
-        "data-visualization",
         "business-applications"
       ]
     },
@@ -3350,27 +3189,6 @@
       ],
       "subjects": [
         "data-visualization"
-      ]
-    },
-    {
-      "uid": "learn-dynamics.set-up-products-production-discrete-manufacturing",
-      "title": "Impostazione di prodotti per la produzione discreta in Dynamics 365 Supply Chain Management",
-      "url": "https://learn.microsoft.com/it-it/training/modules/set-up-products-production-discrete-manufacturing/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "intermediate",
-      "products": [
-        "dynamics-365",
-        "dynamics-scm"
-      ],
-      "durationMinutes": 22,
-      "moduleCount": 7,
-      "roles": [
-        "functional-consultant",
-        "business-user",
-        "administrator"
-      ],
-      "subjects": [
-        "supply-chain-management"
       ]
     },
     {
@@ -3514,33 +3332,6 @@
       ],
       "subjects": [
         "business-applications"
-      ]
-    },
-    {
-      "uid": "learn-dynamics.gap-solution-design-dynamics-365",
-      "title": "Progettazione di una soluzione di gestione degli scarti per soluzioni Dynamics 365",
-      "url": "https://learn.microsoft.com/it-it/training/modules/gap-solution-design-dynamics-365/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "advanced",
-      "products": [
-        "dynamics-365",
-        "dynamics-sales",
-        "customer-insights-journeys",
-        "dynamics-customer-service",
-        "dynamics-field-service",
-        "dynamics-finance",
-        "dynamics-scm",
-        "dynamics-project-operations",
-        "dynamics-commerce",
-        "dynamics-human-resources"
-      ],
-      "durationMinutes": 37,
-      "moduleCount": 7,
-      "roles": [
-        "solution-architect"
-      ],
-      "subjects": [
-        "custom-app-development"
       ]
     },
     {
@@ -4297,28 +4088,6 @@
       ]
     },
     {
-      "uid": "learn-dynamics.use-inventory-reports-in-dynamics-365-finance-ops",
-      "title": "Uso dei report magazzino in Dynamics 365 Supply Chain Management",
-      "url": "https://learn.microsoft.com/it-it/training/modules/use-inventory-reports-dyn365-supply-chain-mgmt/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "intermediate",
-      "products": [
-        "dynamics-365",
-        "dynamics-scm"
-      ],
-      "durationMinutes": 67,
-      "moduleCount": 11,
-      "roles": [
-        "business-user",
-        "functional-consultant"
-      ],
-      "subjects": [
-        "supply-chain-management",
-        "finance-accounting",
-        "process-workflow"
-      ]
-    },
-    {
       "uid": "learn-dynamics.set-up-service-management",
       "title": "Impostazione di Gestione dei servizi in Dynamics 365 Supply Chain Management",
       "url": "https://learn.microsoft.com/it-it/training/modules/set-up-service-management/?WT.mc_id=api_CatalogApi",
@@ -4813,26 +4582,6 @@
       "subjects": [
         "architecture",
         "devops"
-      ]
-    },
-    {
-      "uid": "learn-dynamics.setup-work-orders-asset-management",
-      "title": "Configurazione degli ordini di lavoro in Gestione cespiti per Dynamics 365 Supply Chain Management",
-      "url": "https://learn.microsoft.com/it-it/training/modules/setup-work-orders-asset-management/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "intermediate",
-      "products": [
-        "dynamics-365",
-        "dynamics-scm"
-      ],
-      "durationMinutes": 122,
-      "moduleCount": 18,
-      "roles": [
-        "functional-consultant"
-      ],
-      "subjects": [
-        "supply-chain-management",
-        "field-management"
       ]
     },
     {
@@ -5866,27 +5615,6 @@
       ]
     },
     {
-      "uid": "learn-dynamics.manage-work-orders-asset-management",
-      "title": "Creazione e gestione degli ordini di lavoro in Gestione cespiti per Dynamics 365 Supply Chain Management",
-      "url": "https://learn.microsoft.com/it-it/training/modules/manage-work-orders-asset-management/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "intermediate",
-      "products": [
-        "dynamics-365",
-        "dynamics-scm"
-      ],
-      "durationMinutes": 118,
-      "moduleCount": 17,
-      "roles": [
-        "functional-consultant",
-        "business-user"
-      ],
-      "subjects": [
-        "process-workflow",
-        "supply-chain-management"
-      ]
-    },
-    {
       "uid": "learn-dynamics.create-use-workflows-in-dynamics-365-finance-ops",
       "title": "Uso dei flussi di lavoro nelle app per la finanza e le operazioni",
       "url": "https://learn.microsoft.com/it-it/training/modules/create-use-workflows-finance-operations/?WT.mc_id=api_CatalogApi",
@@ -6066,28 +5794,6 @@
       ],
       "subjects": [
         "business-applications"
-      ]
-    },
-    {
-      "uid": "learn-dynamics.design-plan-implementation-in-f-and-o",
-      "title": "Progettazione e pianificazione di un'implementazione delle app per la finanza e le operazioni",
-      "url": "https://learn.microsoft.com/it-it/training/modules/design-plan-implementation-finance-operations/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "advanced",
-      "products": [
-        "dynamics-365",
-        "dynamics-finance",
-        "dynamics-scm"
-      ],
-      "durationMinutes": 42,
-      "moduleCount": 13,
-      "roles": [
-        "functional-consultant",
-        "solution-architect",
-        "administrator"
-      ],
-      "subjects": [
-        "process-workflow"
       ]
     },
     {
@@ -7825,26 +7531,6 @@
       ]
     },
     {
-      "uid": "learn-dynamics.request-changes-products-engineering-change-management-scm",
-      "title": "Richiesta e follow-up di modifiche prodotto in Dynamics 365 Supply Chain Management",
-      "url": "https://learn.microsoft.com/it-it/training/modules/request-changes-products-engineering-change-management-supply-chain-management/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "intermediate",
-      "products": [
-        "dynamics-365",
-        "dynamics-scm"
-      ],
-      "durationMinutes": 37,
-      "moduleCount": 6,
-      "roles": [
-        "functional-consultant",
-        "business-user"
-      ],
-      "subjects": [
-        "supply-chain-management"
-      ]
-    },
-    {
       "uid": "learn-dynamics.manage-customers",
       "title": "Gestione dei clienti in Dynamics 365 Customer Insights - Journeys",
       "url": "https://learn.microsoft.com/it-it/training/modules/manage-customers/?WT.mc_id=api_CatalogApi",
@@ -7904,27 +7590,6 @@
         "business-user"
       ],
       "subjects": []
-    },
-    {
-      "uid": "learn-dynamics.set-up-use-discrete-manufacturing-resources",
-      "title": "Impostazione e uso di risorse di produzione discreta in Dynamics 365 Supply Chain Management",
-      "url": "https://learn.microsoft.com/it-it/training/modules/set-up-use-discrete-manufacturing-resources/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "intermediate",
-      "products": [
-        "dynamics-365",
-        "dynamics-scm"
-      ],
-      "durationMinutes": 34,
-      "moduleCount": 8,
-      "roles": [
-        "functional-consultant",
-        "business-user",
-        "administrator"
-      ],
-      "subjects": [
-        "supply-chain-management"
-      ]
     },
     {
       "uid": "learn-dynamics.put-items-away",
@@ -8301,34 +7966,6 @@
         "developer"
       ],
       "subjects": []
-    },
-    {
-      "uid": "learn-dynamics.integration",
-      "title": "Progettazione delle integrazioni per soluzioni Dynamics 365",
-      "url": "https://learn.microsoft.com/it-it/training/modules/integration/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "advanced",
-      "products": [
-        "dynamics-365",
-        "dynamics-sales",
-        "customer-insights-journeys",
-        "dynamics-customer-service",
-        "dynamics-field-service",
-        "dynamics-finance",
-        "dynamics-scm",
-        "dynamics-project-operations",
-        "dynamics-commerce",
-        "dynamics-human-resources"
-      ],
-      "durationMinutes": 54,
-      "moduleCount": 7,
-      "roles": [
-        "solution-architect",
-        "functional-consultant"
-      ],
-      "subjects": [
-        "architecture"
-      ]
     },
     {
       "uid": "learn-dynamics.ocr-vendor-invoices-finance",
@@ -9130,35 +8767,6 @@
       ]
     },
     {
-      "uid": "learn-dynamics.solution-performance",
-      "title": "Implementazione di una strategia sulle prestazioni per soluzioni Dynamics 365",
-      "url": "https://learn.microsoft.com/it-it/training/modules/solution-performance/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "advanced",
-      "products": [
-        "dynamics-365",
-        "dynamics-sales",
-        "customer-insights-journeys",
-        "dynamics-customer-service",
-        "dynamics-field-service",
-        "dynamics-finance",
-        "dynamics-scm",
-        "dynamics-project-operations",
-        "dynamics-commerce",
-        "dynamics-human-resources"
-      ],
-      "durationMinutes": 76,
-      "moduleCount": 8,
-      "roles": [
-        "solution-architect",
-        "functional-consultant"
-      ],
-      "subjects": [
-        "business-applications",
-        "process-workflow"
-      ]
-    },
-    {
       "uid": "learn.wwl.challenge-manage-customers-business-central",
       "title": "Progetto di richiesta di verifica - Gestione dei clienti in Business Central",
       "url": "https://learn.microsoft.com/it-it/training/modules/challenge-manage-customers-business-central/?WT.mc_id=api_CatalogApi",
@@ -9739,26 +9347,6 @@
       ]
     },
     {
-      "uid": "learn-dynamics.warranties-asset-management",
-      "title": "Uso delle garanzie in Gestione cespiti per Dynamics 365 Supply Chain Management",
-      "url": "https://learn.microsoft.com/it-it/training/modules/warranties-asset-management/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "intermediate",
-      "products": [
-        "dynamics-365",
-        "dynamics-scm"
-      ],
-      "durationMinutes": 40,
-      "moduleCount": 6,
-      "roles": [
-        "functional-consultant",
-        "business-user"
-      ],
-      "subjects": [
-        "supply-chain-management"
-      ]
-    },
-    {
       "uid": "learn-dynamics.create-process-journal-entries-dynamics-365-business-central",
       "title": "Creazione ed elaborazione delle scritture contabili in Dynamics 365 Business Central",
       "url": "https://learn.microsoft.com/it-it/training/modules/create-process-journal-entries-dynamics-365-business-central/?WT.mc_id=api_CatalogApi",
@@ -10075,26 +9663,6 @@
       ],
       "subjects": [
         "data-management"
-      ]
-    },
-    {
-      "uid": "learn-dynamics.get-started-with-lean-manufacturing",
-      "title": "Introduzione alla lean manufacturing in Dynamics 365 Supply Chain Management",
-      "url": "https://learn.microsoft.com/it-it/training/modules/get-started-lean-manufacturing-dyn365-supply-chain-mgmt/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "intermediate",
-      "products": [
-        "dynamics-365",
-        "dynamics-scm"
-      ],
-      "durationMinutes": 22,
-      "moduleCount": 5,
-      "roles": [
-        "business-user",
-        "functional-consultant"
-      ],
-      "subjects": [
-        "manufacturing-processes"
       ]
     },
     {
@@ -10541,34 +10109,6 @@
       ]
     },
     {
-      "uid": "learn-dynamics.cutover-strategy-dynamics-365",
-      "title": "Strategia di cutover per soluzioni Dynamics 365",
-      "url": "https://learn.microsoft.com/it-it/training/modules/cutover-strategy-dynamics-365/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "advanced",
-      "products": [
-        "dynamics-365",
-        "dynamics-sales",
-        "customer-insights-journeys",
-        "dynamics-customer-service",
-        "dynamics-field-service",
-        "dynamics-finance",
-        "dynamics-scm",
-        "dynamics-project-operations",
-        "dynamics-commerce",
-        "dynamics-human-resources"
-      ],
-      "durationMinutes": 50,
-      "moduleCount": 8,
-      "roles": [
-        "solution-architect",
-        "functional-consultant"
-      ],
-      "subjects": [
-        "business-applications"
-      ]
-    },
-    {
       "uid": "learn-dynamics.create-custom-functions",
       "title": "Creazione di procedure personalizzate in Dynamics 365 Business Central",
       "url": "https://learn.microsoft.com/it-it/training/modules/create-custom-functions/?WT.mc_id=api_CatalogApi",
@@ -10786,27 +10326,6 @@
       ],
       "subjects": [
         "finance-accounting"
-      ]
-    },
-    {
-      "uid": "learn-dynamics.maintenance-budget-asset-management",
-      "title": "Uso dei budget di manutenzione in Gestione cespiti per Dynamics 365 Supply Chain Management",
-      "url": "https://learn.microsoft.com/it-it/training/modules/maintenance-budget-asset-management/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "intermediate",
-      "products": [
-        "dynamics-365",
-        "dynamics-scm"
-      ],
-      "durationMinutes": 44,
-      "moduleCount": 6,
-      "roles": [
-        "functional-consultant",
-        "business-user"
-      ],
-      "subjects": [
-        "finance-accounting",
-        "supply-chain-management"
       ]
     },
     {
@@ -11474,27 +10993,6 @@
       ]
     },
     {
-      "uid": "learn-dynamics.production-costing-discrete-manufacturing",
-      "title": "Determinazione dei costi di produzione per la produzione discreta in Dynamics 365 Supply Chain Management",
-      "url": "https://learn.microsoft.com/it-it/training/modules/production-costing-discrete-manufacturing/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "intermediate",
-      "products": [
-        "dynamics-365",
-        "dynamics-scm"
-      ],
-      "durationMinutes": 36,
-      "moduleCount": 10,
-      "roles": [
-        "functional-consultant",
-        "business-user",
-        "administrator"
-      ],
-      "subjects": [
-        "supply-chain-management"
-      ]
-    },
-    {
       "uid": "learn-dynamics.fit-gap-analysis",
       "title": "Analisi corrispondenza-scarto",
       "url": "https://learn.microsoft.com/it-it/training/modules/fit-gap-analysis/?WT.mc_id=api_CatalogApi",
@@ -11601,26 +11099,6 @@
       ],
       "subjects": [
         "finance-accounting"
-      ]
-    },
-    {
-      "uid": "learn-dynamics.identify-configure-batch-attributes-for-process-manufacturing",
-      "title": "Identificazione e configurazione degli attributi batch per la produzione di processo in Dynamics 365 Supply Chain Management",
-      "url": "https://learn.microsoft.com/it-it/training/modules/identify-configure-batch-attributes-process-manufacturing-dyn365-supply-chain-mgmt/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "intermediate",
-      "products": [
-        "dynamics-365",
-        "dynamics-scm"
-      ],
-      "durationMinutes": 145,
-      "moduleCount": 11,
-      "roles": [
-        "functional-consultant",
-        "business-user"
-      ],
-      "subjects": [
-        "manufacturing-processes"
       ]
     },
     {
@@ -12072,27 +11550,6 @@
       ],
       "subjects": [
         "data-modeling"
-      ]
-    },
-    {
-      "uid": "learn-dynamics.manage-discrete-bom-route-versioned-products-scm",
-      "title": "Gestione di una DBA del prodotto discreta e ciclo di lavorazione per i prodotti con versione in Dynamics 365 Supply Chain Management",
-      "url": "https://learn.microsoft.com/it-it/training/modules/manage-discrete-bom-route-versioned-products-supply-chain-management/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "intermediate",
-      "products": [
-        "dynamics-365",
-        "dynamics-scm"
-      ],
-      "durationMinutes": 75,
-      "moduleCount": 11,
-      "roles": [
-        "functional-consultant",
-        "business-user"
-      ],
-      "subjects": [
-        "supply-chain-management",
-        "manufacturing-processes"
       ]
     },
     {
@@ -12858,26 +12315,6 @@
       ]
     },
     {
-      "uid": "learn-dynamics.work-assets-management",
-      "title": "Uso dei cespiti in Gestione cespiti per Dynamics 365 Supply Chain Management",
-      "url": "https://learn.microsoft.com/it-it/training/modules/work-assets-management/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "intermediate",
-      "products": [
-        "dynamics-365",
-        "dynamics-scm"
-      ],
-      "durationMinutes": 92,
-      "moduleCount": 14,
-      "roles": [
-        "functional-consultant",
-        "business-user"
-      ],
-      "subjects": [
-        "supply-chain-management"
-      ]
-    },
-    {
       "uid": "learn.wwl.explore-microsoft-dynamics-365-finance-core-capabilities",
       "title": "Descrizione delle funzionalità di base di Dynamics 365 Finance",
       "url": "https://learn.microsoft.com/it-it/training/modules/explore-microsoft-dynamics-365-finance-core-capabilities/?WT.mc_id=api_CatalogApi",
@@ -13551,34 +12988,6 @@
       ]
     },
     {
-      "uid": "learn-dynamics.bi-analytics-design-dynamics-365",
-      "title": "Progettazione delle funzionalità di business intelligence e analisi per soluzioni Dynamics 365",
-      "url": "https://learn.microsoft.com/it-it/training/modules/bi-analytics-design-dynamics-365/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "advanced",
-      "products": [
-        "dynamics-365",
-        "dynamics-sales",
-        "customer-insights-journeys",
-        "dynamics-customer-service",
-        "dynamics-field-service",
-        "dynamics-finance",
-        "dynamics-scm",
-        "dynamics-project-operations",
-        "dynamics-commerce",
-        "dynamics-human-resources"
-      ],
-      "durationMinutes": 37,
-      "moduleCount": 7,
-      "roles": [
-        "solution-architect",
-        "functional-consultant"
-      ],
-      "subjects": [
-        "data-analytics"
-      ]
-    },
-    {
       "uid": "learn-dynamics.set-up-non-stocked-material-track-usage",
       "title": "Impostazione dei materiali non stoccati e monitoraggio dell'utilizzo sui progetti con Dynamics 365 Project Operations",
       "url": "https://learn.microsoft.com/it-it/training/modules/set-up-non-stocked-material-track-usage/?WT.mc_id=api_CatalogApi",
@@ -13955,35 +13364,6 @@
       ],
       "subjects": [
         "finance-accounting"
-      ]
-    },
-    {
-      "uid": "learn-dynamics.test-strategy",
-      "title": "Pianificazione di una strategia di test per una soluzione Dynamics 365",
-      "url": "https://learn.microsoft.com/it-it/training/modules/test-strategy/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "advanced",
-      "products": [
-        "dynamics-365",
-        "dynamics-sales",
-        "customer-insights-journeys",
-        "dynamics-customer-service",
-        "dynamics-field-service",
-        "dynamics-finance",
-        "dynamics-scm",
-        "dynamics-project-operations",
-        "dynamics-commerce",
-        "dynamics-human-resources"
-      ],
-      "durationMinutes": 55,
-      "moduleCount": 6,
-      "roles": [
-        "solution-architect",
-        "functional-consultant"
-      ],
-      "subjects": [
-        "architecture",
-        "process-workflow"
       ]
     },
     {
@@ -14537,34 +13917,6 @@
       "subjects": []
     },
     {
-      "uid": "learn-dynamics.dual-write-dynamics-365",
-      "title": "Implementazione di Doppia scrittura per soluzioni Dynamics 365",
-      "url": "https://learn.microsoft.com/it-it/training/modules/dual-write-dynamics-365/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "advanced",
-      "products": [
-        "dynamics-365",
-        "dynamics-sales",
-        "customer-insights-journeys",
-        "dynamics-customer-service",
-        "dynamics-field-service",
-        "dynamics-finance",
-        "dynamics-scm",
-        "dynamics-project-operations",
-        "dynamics-commerce",
-        "dynamics-human-resources"
-      ],
-      "durationMinutes": 33,
-      "moduleCount": 6,
-      "roles": [
-        "solution-architect",
-        "functional-consultant"
-      ],
-      "subjects": [
-        "cross-development"
-      ]
-    },
-    {
       "uid": "learn-dynamics.ship-invoice-items-dynamics-365-business-central",
       "title": "Spedizione e fatturazione degli articoli in Dynamics 365 Business Central",
       "url": "https://learn.microsoft.com/it-it/training/modules/ship-invoice-items-dynamics-365-business-central/?WT.mc_id=api_CatalogApi",
@@ -15068,28 +14420,6 @@
       ]
     },
     {
-      "uid": "learn-dynamics.controls-reports-asset-management",
-      "title": "Uso di controlli e report in Gestione cespiti per Dynamics 365 Supply Chain Management",
-      "url": "https://learn.microsoft.com/it-it/training/modules/controls-reports-asset-management/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "intermediate",
-      "products": [
-        "dynamics-365",
-        "dynamics-scm"
-      ],
-      "durationMinutes": 56,
-      "moduleCount": 12,
-      "roles": [
-        "functional-consultant",
-        "business-user"
-      ],
-      "subjects": [
-        "data-analytics",
-        "supply-chain-management",
-        "finance-accounting"
-      ]
-    },
-    {
       "uid": "learn-dynamics.set-up-work-inbound-inventory-management",
       "title": "Impostazione e uso delle operazioni in entrata di gestione articoli in Dynamics 365 Supply Chain Management",
       "url": "https://learn.microsoft.com/it-it/training/modules/set-up-work-inbound-inventory-management/?WT.mc_id=api_CatalogApi",
@@ -15432,35 +14762,6 @@
       ]
     },
     {
-      "uid": "learn-dynamics.success-by-design",
-      "title": "Introduzione a Success by Design for Dynamics 365",
-      "url": "https://learn.microsoft.com/it-it/training/modules/success-by-design/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "intermediate",
-      "products": [
-        "dynamics-365",
-        "dynamics-sales",
-        "customer-insights-journeys",
-        "dynamics-customer-service",
-        "dynamics-field-service",
-        "dynamics-finance",
-        "dynamics-scm",
-        "dynamics-project-operations",
-        "dynamics-commerce",
-        "dynamics-human-resources"
-      ],
-      "durationMinutes": 61,
-      "moduleCount": 8,
-      "roles": [
-        "solution-architect",
-        "functional-consultant"
-      ],
-      "subjects": [
-        "business-applications",
-        "process-workflow"
-      ]
-    },
-    {
       "uid": "learn-dynamics.sms-channels",
       "title": "Distribuzione di un canale SMS in Multicanale per Dynamics 365 Customer Service",
       "url": "https://learn.microsoft.com/it-it/training/modules/sms-channels/?WT.mc_id=api_CatalogApi",
@@ -15556,25 +14857,6 @@
       ],
       "subjects": [
         "customer-relationship-management"
-      ]
-    },
-    {
-      "uid": "learn-dynamics.setup-assets-asset-management",
-      "title": "Impostazione dei cespiti in Gestione cespiti per Dynamics 365 Supply Chain Management",
-      "url": "https://learn.microsoft.com/it-it/training/modules/setup-assets-asset-management/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "intermediate",
-      "products": [
-        "dynamics-365",
-        "dynamics-scm"
-      ],
-      "durationMinutes": 111,
-      "moduleCount": 17,
-      "roles": [
-        "functional-consultant"
-      ],
-      "subjects": [
-        "supply-chain-management"
       ]
     },
     {
@@ -16395,8 +15677,8 @@
         "power-automate",
         "ms-copilot"
       ],
-      "durationMinutes": 488,
-      "moduleCount": 12,
+      "durationMinutes": 349,
+      "moduleCount": 9,
       "roles": [
         "solution-architect"
       ],
@@ -16758,7 +16040,7 @@
     },
     {
       "uid": "learn-dynamics.configure-and-use-process-manufacturing-in-d365-finance-ops",
-      "title": "Configurazione e uso dalla produzione di processo in Dynamics 365 Supply Chain Management",
+      "title": "Configurare e usare la produzione di processo in Dynamics 365 Sales",
       "url": "https://learn.microsoft.com/it-it/training/paths/configure-use-process-manufacturing-dyn365-supply-chain-mgmt/?WT.mc_id=api_CatalogApi",
       "type": "learningPath",
       "level": "beginner",
@@ -16766,8 +16048,8 @@
         "dynamics-365",
         "dynamics-scm"
       ],
-      "durationMinutes": 693,
-      "moduleCount": 5,
+      "durationMinutes": 548,
+      "moduleCount": 4,
       "roles": [
         "functional-consultant",
         "business-user"
@@ -16963,7 +16245,7 @@
     },
     {
       "uid": "learn-dynamics.configure-and-use-discrete-manufacturing-in-d365-finance-ops",
-      "title": "Configurazione e uso della produzione discreta in Dynamics 365 Supply Chain Management",
+      "title": "Configurazione e uso della produzione discreta in Dynamics 365 Sales",
       "url": "https://learn.microsoft.com/it-it/training/paths/configure-use-discrete-manufacturing-dyn365-supply-chain-mgmt/?WT.mc_id=api_CatalogApi",
       "type": "learningPath",
       "level": "beginner",
@@ -16971,8 +16253,8 @@
         "dynamics-365",
         "dynamics-scm"
       ],
-      "durationMinutes": 1023,
-      "moduleCount": 13,
+      "durationMinutes": 764,
+      "moduleCount": 8,
       "roles": [
         "functional-consultant",
         "business-user"
@@ -17225,8 +16507,8 @@
         "dynamics-365",
         "dynamics-finance"
       ],
-      "durationMinutes": 836,
-      "moduleCount": 9,
+      "durationMinutes": 720,
+      "moduleCount": 8,
       "roles": [
         "business-user",
         "functional-consultant",
@@ -17453,8 +16735,8 @@
         "dynamics-commerce",
         "dynamics-human-resources"
       ],
-      "durationMinutes": 784,
-      "moduleCount": 14,
+      "durationMinutes": 163,
+      "moduleCount": 3,
       "roles": [
         "solution-architect",
         "functional-consultant"
@@ -17743,8 +17025,8 @@
         "dynamics-365",
         "dynamics-finance"
       ],
-      "durationMinutes": 155,
-      "moduleCount": 2,
+      "durationMinutes": 113,
+      "moduleCount": 1,
       "roles": [
         "functional-consultant",
         "administrator",
@@ -17757,7 +17039,7 @@
     },
     {
       "uid": "learn-dynamics.configure-asset-management-dyn365-supply-chain-mgmt",
-      "title": "Configurazione di Gestione cespiti per Dynamics 365 Supply Chain Management",
+      "title": "Configurazione di Gestione cespiti per Dynamics 365 Sales",
       "url": "https://learn.microsoft.com/it-it/training/paths/configure-asset-management-dyn365-supply-chain-mgmt/?WT.mc_id=api_CatalogApi",
       "type": "learningPath",
       "level": "beginner",
@@ -17766,8 +17048,8 @@
         "dynamics-scm",
         "dynamics-finance"
       ],
-      "durationMinutes": 446,
-      "moduleCount": 5,
+      "durationMinutes": 213,
+      "moduleCount": 3,
       "roles": [
         "functional-consultant",
         "business-user"
@@ -18133,7 +17415,7 @@
     },
     {
       "uid": "learn-dynamics.manage-product-version-engineering-change-management",
-      "title": "Gestione delle informazioni sulla versione del prodotto in Dynamics 365 Supply Chain Management",
+      "title": "Gestione delle informazioni sulla versione del prodotto in Dynamics 365 Sales",
       "url": "https://learn.microsoft.com/it-it/training/paths/manage-product-version-engineering-change-management/?WT.mc_id=api_CatalogApi",
       "type": "learningPath",
       "level": "intermediate",
@@ -18141,8 +17423,8 @@
         "dynamics-365",
         "dynamics-scm"
       ],
-      "durationMinutes": 269,
-      "moduleCount": 4,
+      "durationMinutes": 110,
+      "moduleCount": 1,
       "roles": [
         "functional-consultant",
         "business-user"
@@ -18282,8 +17564,8 @@
         "dynamics-365",
         "dynamics-finance"
       ],
-      "durationMinutes": 959,
-      "moduleCount": 14,
+      "durationMinutes": 801,
+      "moduleCount": 12,
       "roles": [
         "functional-consultant",
         "solution-architect",
@@ -19411,7 +18693,7 @@
     },
     {
       "uid": "learn-dynamics.configure-manage-products-inventory-d365-finance-ops",
-      "title": "Configurazione e gestione di prodotti e articoli in Dynamics 365 Supply Chain Management",
+      "title": "Configurazione e gestione di prodotti e articoli in Dynamics 365 Sales",
       "url": "https://learn.microsoft.com/it-it/training/paths/configure-manage-products-inventory-dyn365-supply-chain-mgmt/?WT.mc_id=api_CatalogApi",
       "type": "learningPath",
       "level": "beginner",
@@ -19419,8 +18701,8 @@
         "dynamics-365",
         "dynamics-scm"
       ],
-      "durationMinutes": 661,
-      "moduleCount": 9,
+      "durationMinutes": 594,
+      "moduleCount": 8,
       "roles": [
         "functional-consultant",
         "business-user"
@@ -19599,7 +18881,7 @@
     },
     {
       "uid": "learn-dynamics.configure-and-use-lean-manufacturing-in-d365-finance-ops",
-      "title": "Configurazione e uso della lean manufacturing in Dynamics 365 Supply Chain Management",
+      "title": "Configurare e usare la produzione snella in Dynamics 365 Sales",
       "url": "https://learn.microsoft.com/it-it/training/paths/configure-use-lean-manufacturing-dyn365-supply-chain-mgmt/?WT.mc_id=api_CatalogApi",
       "type": "learningPath",
       "level": "beginner",
@@ -19607,8 +18889,8 @@
         "dynamics-365",
         "dynamics-scm"
       ],
-      "durationMinutes": 786,
-      "moduleCount": 7,
+      "durationMinutes": 674,
+      "moduleCount": 5,
       "roles": [
         "functional-consultant",
         "business-user"
@@ -19842,7 +19124,7 @@
     },
     {
       "uid": "learn-dynamics.work-asset-management-dyn365-supply-chain-mgmt",
-      "title": "Uso di Gestione cespiti per Dynamics 365 Supply Chain Management",
+      "title": "Lavorare con Gestione beni per Dynamics 365 Sales",
       "url": "https://learn.microsoft.com/it-it/training/paths/work-asset-management-dyn365-supply-chain-mgmt/?WT.mc_id=api_CatalogApi",
       "type": "learningPath",
       "level": "beginner",
@@ -19850,8 +19132,8 @@
         "dynamics-365",
         "dynamics-scm"
       ],
-      "durationMinutes": 782,
-      "moduleCount": 12,
+      "durationMinutes": 432,
+      "moduleCount": 7,
       "roles": [
         "functional-consultant",
         "business-user"
@@ -20134,7 +19416,7 @@
     },
     {
       "uid": "course.mb-310t00",
-      "title": "Gestire le operazioni finanziarie con Dynamics 365 Finance",
+      "title": "Gestire le operazioni finanziarie con Dynamics 365 Field Service",
       "url": "https://learn.microsoft.com/it-it/training/courses/mb-310t00/?WT.mc_id=api_CatalogApi",
       "type": "course",
       "level": "intermediate",
@@ -20904,6 +20186,22 @@
       "subjects": [
         "custom-app-development"
       ]
+    },
+    {
+      "uid": "learn.wwl.extend-alm-git-cicd",
+      "title": "Estendi ALM con Git e CI/CD in Power Platform",
+      "url": "https://learn.microsoft.com/it-it/training/modules/extend-alm-git-cicd/?WT.mc_id=api_CatalogApi",
+      "type": "module",
+      "level": "intermediate",
+      "products": [
+        "power-platform"
+      ],
+      "durationMinutes": 76,
+      "moduleCount": 7,
+      "roles": [
+        "administrator"
+      ],
+      "subjects": []
     },
     {
       "uid": "learn-dynamics.get-started-with-form-processing",
@@ -22693,6 +21991,22 @@
       ]
     },
     {
+      "uid": "learn.wwl.manage-power-platform-environments",
+      "title": "Gestire gli ambienti in Power Platform",
+      "url": "https://learn.microsoft.com/it-it/training/modules/manage-power-platform-environments/?WT.mc_id=api_CatalogApi",
+      "type": "module",
+      "level": "intermediate",
+      "products": [
+        "power-platform"
+      ],
+      "durationMinutes": 66,
+      "moduleCount": 9,
+      "roles": [
+        "administrator"
+      ],
+      "subjects": []
+    },
+    {
       "uid": "learn-bizapps.integrate-cloud-flows-online-workshop",
       "title": "Integrazione con flussi cloud - Workshop online",
       "url": "https://learn.microsoft.com/it-it/training/modules/integrate-cloud-flows-online-workshop/?WT.mc_id=api_CatalogApi",
@@ -23332,6 +22646,22 @@
       ]
     },
     {
+      "uid": "learn.wwl.configure-dataverse-security-model",
+      "title": "Configurare il modello di sicurezza Dataverse in Power Platform",
+      "url": "https://learn.microsoft.com/it-it/training/modules/configure-dataverse-security-model/?WT.mc_id=api_CatalogApi",
+      "type": "module",
+      "level": "intermediate",
+      "products": [
+        "power-platform"
+      ],
+      "durationMinutes": 89,
+      "moduleCount": 8,
+      "roles": [
+        "administrator"
+      ],
+      "subjects": []
+    },
+    {
       "uid": "learn-bizapps.pad-mouse-keyboard",
       "title": "Simulazione delle azioni del mouse e della tastiera con Power Automate per desktop",
       "url": "https://learn.microsoft.com/it-it/training/modules/pad-mouse-keyboard/?WT.mc_id=api_CatalogApi",
@@ -23494,25 +22824,20 @@
       ]
     },
     {
-      "uid": "learn-bizapps.power-apps-architecture",
-      "title": "Serie per architetti di soluzioni - Esplorazione dell'architettura di Power Apps",
-      "url": "https://learn.microsoft.com/it-it/training/modules/power-apps-architecture/?WT.mc_id=api_CatalogApi",
+      "uid": "learn.wwl.ensure-availability-resilience",
+      "title": "Garantire disponibilità e resilienza in Power Platform",
+      "url": "https://learn.microsoft.com/it-it/training/modules/ensure-availability-resilience/?WT.mc_id=api_CatalogApi",
       "type": "module",
-      "level": "advanced",
+      "level": "intermediate",
       "products": [
-        "power-apps",
-        "power-platform",
-        "dataverse"
+        "power-platform"
       ],
-      "durationMinutes": 40,
-      "moduleCount": 9,
+      "durationMinutes": 68,
+      "moduleCount": 7,
       "roles": [
-        "solution-architect"
+        "administrator"
       ],
-      "subjects": [
-        "custom-app-development",
-        "architecture"
-      ]
+      "subjects": []
     },
     {
       "uid": "learn-bizapps.build-mobile-optimized",
@@ -23554,6 +22879,22 @@
       "roles": [
         "developer",
         "functional-consultant"
+      ],
+      "subjects": []
+    },
+    {
+      "uid": "learn.wwl.manage-operations-monitoring",
+      "title": "Gestire operazioni e monitoraggio in Power Platform",
+      "url": "https://learn.microsoft.com/it-it/training/modules/manage-operations-monitoring/?WT.mc_id=api_CatalogApi",
+      "type": "module",
+      "level": "intermediate",
+      "products": [
+        "power-platform"
+      ],
+      "durationMinutes": 74,
+      "moduleCount": 8,
+      "roles": [
+        "administrator"
       ],
       "subjects": []
     },
@@ -23761,25 +23102,6 @@
       ],
       "subjects": [
         "data-management"
-      ]
-    },
-    {
-      "uid": "learn-bizapps.integrations",
-      "title": "Serie per architetti di soluzioni - Implementazione di integrazioni con Power Platform",
-      "url": "https://learn.microsoft.com/it-it/training/modules/integrations/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "advanced",
-      "products": [
-        "power-platform",
-        "dataverse"
-      ],
-      "durationMinutes": 27,
-      "moduleCount": 6,
-      "roles": [
-        "solution-architect"
-      ],
-      "subjects": [
-        "custom-app-development"
       ]
     },
     {
@@ -24127,27 +23449,6 @@
       ],
       "subjects": [
         "process-workflow"
-      ]
-    },
-    {
-      "uid": "learn-bizapps.data-modeling",
-      "title": "Serie per architetti di soluzioni - Creazione di modelli di dati per le soluzioni Power Platform",
-      "url": "https://learn.microsoft.com/it-it/training/modules/data-modeling/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "intermediate",
-      "products": [
-        "power-platform",
-        "dataverse",
-        "dynamics-customer-engagement"
-      ],
-      "durationMinutes": 72,
-      "moduleCount": 13,
-      "roles": [
-        "solution-architect"
-      ],
-      "subjects": [
-        "data-modeling",
-        "business-applications"
       ]
     },
     {
@@ -24577,6 +23878,22 @@
       "subjects": [
         "process-workflow"
       ]
+    },
+    {
+      "uid": "learn.wwl.audit-retain-dataverse-data",
+      "title": "Controllare e conservare i dati di Dataverse in Power Platform",
+      "url": "https://learn.microsoft.com/it-it/training/modules/audit-retain-dataverse-data/?WT.mc_id=api_CatalogApi",
+      "type": "module",
+      "level": "intermediate",
+      "products": [
+        "power-platform"
+      ],
+      "durationMinutes": 68,
+      "moduleCount": 7,
+      "roles": [
+        "administrator"
+      ],
+      "subjects": []
     },
     {
       "uid": "learn-bizapps.get-started-with-ai-builder-language-detection",
@@ -25204,6 +24521,22 @@
       ]
     },
     {
+      "uid": "learn.wwl.govern-data-policies",
+      "title": "Gestire i criteri per i dati in Power Platform",
+      "url": "https://learn.microsoft.com/it-it/training/modules/govern-data-policies/?WT.mc_id=api_CatalogApi",
+      "type": "module",
+      "level": "intermediate",
+      "products": [
+        "power-platform"
+      ],
+      "durationMinutes": 82,
+      "moduleCount": 8,
+      "roles": [
+        "administrator"
+      ],
+      "subjects": []
+    },
+    {
       "uid": "learn-bizapps.powerapps.transform-biz-software-auth-fusion-dev",
       "title": "Trasformazione della creazione di software aziendale con i team di sviluppo con fusione",
       "url": "https://learn.microsoft.com/it-it/training/modules/transform-business-software-authoring-with-fusion-dev/?WT.mc_id=api_CatalogApi",
@@ -25247,23 +24580,20 @@
       ]
     },
     {
-      "uid": "learn-bizapps.optimize-model-power-bi",
-      "title": "Ottimizzazione di un modello per le prestazioni in Power BI",
-      "url": "https://learn.microsoft.com/it-it/training/modules/optimize-model-power-bi/?WT.mc_id=api_CatalogApi",
+      "uid": "learn.wwl.secure-tenant-environments",
+      "title": "Proteggere tenant e ambienti in Power Platform",
+      "url": "https://learn.microsoft.com/it-it/training/modules/secure-tenant-environments/?WT.mc_id=api_CatalogApi",
       "type": "module",
       "level": "intermediate",
       "products": [
-        "power-bi",
         "power-platform"
       ],
-      "durationMinutes": 69,
-      "moduleCount": 9,
+      "durationMinutes": 64,
+      "moduleCount": 7,
       "roles": [
-        "data-analyst"
+        "administrator"
       ],
-      "subjects": [
-        "data-modeling"
-      ]
+      "subjects": []
     },
     {
       "uid": "learn-bizapps.business-process-optimization-process-advisor",
@@ -26078,6 +25408,22 @@
       ]
     },
     {
+      "uid": "learn.wwl.deliver-solutions-pipelines",
+      "title": "Deliver solutions with pipelines in Power Platform",
+      "url": "https://learn.microsoft.com/it-it/training/modules/deliver-solutions-pipelines/?WT.mc_id=api_CatalogApi",
+      "type": "module",
+      "level": "intermediate",
+      "products": [
+        "power-platform"
+      ],
+      "durationMinutes": 76,
+      "moduleCount": 7,
+      "roles": [
+        "administrator"
+      ],
+      "subjects": []
+    },
+    {
       "uid": "learn.wwl.describe-business-value-microsoft-power-platform",
       "title": "Describe the business value of Microsoft Power Platform",
       "url": "https://learn.microsoft.com/it-it/training/modules/describe-business-value-microsoft-power-platform/?WT.mc_id=api_CatalogApi",
@@ -26101,6 +25447,38 @@
       "subjects": [
         "app-development"
       ]
+    },
+    {
+      "uid": "learn.wwl.govern-ai-enabled-resources",
+      "title": "Govern AI-enabled resources in Power Platform",
+      "url": "https://learn.microsoft.com/it-it/training/modules/govern-ai-enabled-resources/?WT.mc_id=api_CatalogApi",
+      "type": "module",
+      "level": "intermediate",
+      "products": [
+        "power-platform"
+      ],
+      "durationMinutes": 70,
+      "moduleCount": 8,
+      "roles": [
+        "administrator"
+      ],
+      "subjects": []
+    },
+    {
+      "uid": "learn.wwl.drive-adoption-transform-culture",
+      "title": "Drive adoption and transform culture in Power Platform",
+      "url": "https://learn.microsoft.com/it-it/training/modules/drive-adoption-transform-culture/?WT.mc_id=api_CatalogApi",
+      "type": "module",
+      "level": "intermediate",
+      "products": [
+        "power-platform"
+      ],
+      "durationMinutes": 73,
+      "moduleCount": 7,
+      "roles": [
+        "administrator"
+      ],
+      "subjects": []
     },
     {
       "uid": "learn.wwl.architect-agentic-ai-business-solutions",
@@ -26418,6 +25796,32 @@
       ]
     },
     {
+      "uid": "learn.wwl.pl-900-power-platform-fundamentals",
+      "title": "Esplorare i concetti fondamentali di Microsoft Power Platform",
+      "url": "https://learn.microsoft.com/it-it/training/paths/pl-900-power-platform-fundamentals/?WT.mc_id=api_CatalogApi",
+      "type": "learningPath",
+      "level": "beginner",
+      "products": [
+        "power-apps",
+        "power-automate",
+        "power-pages",
+        "power-platform"
+      ],
+      "durationMinutes": 312,
+      "moduleCount": 6,
+      "roles": [
+        "business-owner",
+        "business-user",
+        "maker",
+        "student"
+      ],
+      "subjects": [
+        "app-development",
+        "artificial-intelligence",
+        "business-applications"
+      ]
+    },
+    {
       "uid": "learn-bizapps.integrate-dataverse-power-automate",
       "title": "Integrazione dei flussi di Power Automate e Dataverse",
       "url": "https://learn.microsoft.com/it-it/training/paths/integrate-dataverse-power-automate/?WT.mc_id=api_CatalogApi",
@@ -26703,8 +26107,8 @@
       "products": [
         "power-platform"
       ],
-      "durationMinutes": 179,
-      "moduleCount": 3,
+      "durationMinutes": 121,
+      "moduleCount": 1,
       "roles": [
         "developer"
       ],
@@ -27180,8 +26584,8 @@
         "power-automate",
         "ms-copilot"
       ],
-      "durationMinutes": 488,
-      "moduleCount": 12,
+      "durationMinutes": 349,
+      "moduleCount": 9,
       "roles": [
         "solution-architect"
       ],
@@ -28430,25 +27834,6 @@
       ]
     },
     {
-      "uid": "learn.wwl.understand-app-service-deployment-slots",
-      "title": "Esplorare gli slot di distribuzione di Servizio app di Azure",
-      "url": "https://learn.microsoft.com/it-it/training/modules/understand-app-service-deployment-slots/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "intermediate",
-      "products": [
-        "azure",
-        "azure-app-service"
-      ],
-      "durationMinutes": 57,
-      "moduleCount": 8,
-      "roles": [
-        "developer"
-      ],
-      "subjects": [
-        "cloud-computing"
-      ]
-    },
-    {
       "uid": "learn.wwl.audit-security-of-windows-server-iaas-vms",
       "title": "Controllare la sicurezza delle macchine virtuali Windows Server IaaS",
       "url": "https://learn.microsoft.com/it-it/training/modules/audit-security-of-windows-server-iaas-virtual-machines/?WT.mc_id=api_CatalogApi",
@@ -29326,24 +28711,6 @@
       ],
       "subjects": [
         "information-protection-governance"
-      ]
-    },
-    {
-      "uid": "learn.wwl.migrate-premises-mysql-databases-azure-database-mysql",
-      "title": "Eseguire la migrazione di database MySQL locali a Database di Azure per MySQL",
-      "url": "https://learn.microsoft.com/it-it/training/modules/migrate-on-premises-mysql-databases/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "intermediate",
-      "products": [
-        "azure"
-      ],
-      "durationMinutes": 69,
-      "moduleCount": 7,
-      "roles": [
-        "data-engineer"
-      ],
-      "subjects": [
-        "migration"
       ]
     },
     {
@@ -31840,7 +31207,7 @@
         "azure",
         "foundry-tools"
       ],
-      "durationMinutes": 50,
+      "durationMinutes": 46,
       "moduleCount": 8,
       "roles": [
         "data-scientist",
@@ -31991,6 +31358,29 @@
         "student"
       ],
       "subjects": []
+    },
+    {
+      "uid": "learn.wwl.build-enterprise-tool-ecosystems-mcp-azure",
+      "title": "Creare ecosistemi di strumenti di livello aziendale con MCP e Microsoft Foundry",
+      "url": "https://learn.microsoft.com/it-it/training/modules/aaai-build-enterprise-tool-ecosystems-mcp-azure/?WT.mc_id=api_CatalogApi",
+      "type": "module",
+      "level": "advanced",
+      "products": [
+        "azure",
+        "microsoft-foundry",
+        "foundry-agent-service"
+      ],
+      "durationMinutes": 41,
+      "moduleCount": 7,
+      "roles": [
+        "ai-engineer",
+        "solution-architect",
+        "developer"
+      ],
+      "subjects": [
+        "artificial-intelligence",
+        "app-development"
+      ]
     },
     {
       "uid": "learn.wwl.describe-features-tools-azure-for-governance-compliance",
@@ -33376,24 +32766,6 @@
       ]
     },
     {
-      "uid": "learn.wwl.introduction-open-source-database-migration-azure",
-      "title": "Introduzione alla migrazione di un database open source in Azure",
-      "url": "https://learn.microsoft.com/it-it/training/modules/introduction-open-source-database-migration-azure/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "intermediate",
-      "products": [
-        "azure"
-      ],
-      "durationMinutes": 50,
-      "moduleCount": 6,
-      "roles": [
-        "data-engineer"
-      ],
-      "subjects": [
-        "databases"
-      ]
-    },
-    {
       "uid": "learn.azure.accelerate-migration-journey",
       "title": "Accelerare il percorso di migrazione, modernizzazione e innovazione ad Azure",
       "url": "https://learn.microsoft.com/it-it/training/modules/accelerate-azure-migration-journey/?WT.mc_id=api_CatalogApi",
@@ -34473,24 +33845,6 @@
       ]
     },
     {
-      "uid": "learn.wwl.migrate-premises-postgresql-databases-azure-database-postgresql",
-      "title": "Eseguire la migrazione di database PostgreSQL locali a Database di Azure per PostgreSQL",
-      "url": "https://learn.microsoft.com/it-it/training/modules/migrate-on-premises-postgresql-databases/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "intermediate",
-      "products": [
-        "azure"
-      ],
-      "durationMinutes": 70,
-      "moduleCount": 7,
-      "roles": [
-        "data-engineer"
-      ],
-      "subjects": [
-        "migration"
-      ]
-    },
-    {
       "uid": "learn.wwl.query-manipulate-repository-objects",
       "title": "Eseguire query e modificare gli oggetti del repository usando i metodi CIM e WMI",
       "url": "https://learn.microsoft.com/it-it/training/modules/query-manipulate-repository-objects/?WT.mc_id=api_CatalogApi",
@@ -34750,6 +34104,27 @@
       ],
       "subjects": [
         "threat-protection"
+      ]
+    },
+    {
+      "uid": "learn.wwl.design-advanced-prompting-production-agents",
+      "title": "Progettare strategie avanzate di richiesta per gli agenti di IA di produzione",
+      "url": "https://learn.microsoft.com/it-it/training/modules/aaai-design-advanced-prompt-production-agents/?WT.mc_id=api_CatalogApi",
+      "type": "module",
+      "level": "advanced",
+      "products": [
+        "azure",
+        "microsoft-foundry"
+      ],
+      "durationMinutes": 93,
+      "moduleCount": 10,
+      "roles": [
+        "ai-engineer",
+        "solution-architect",
+        "developer"
+      ],
+      "subjects": [
+        "artificial-intelligence"
       ]
     },
     {
@@ -35954,24 +35329,6 @@
       ]
     },
     {
-      "uid": "learn.wwl.implement-managed-identities",
-      "title": "Implementare le identità gestite",
-      "url": "https://learn.microsoft.com/it-it/training/modules/implement-managed-identities/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "intermediate",
-      "products": [
-        "azure"
-      ],
-      "durationMinutes": 23,
-      "moduleCount": 7,
-      "roles": [
-        "developer"
-      ],
-      "subjects": [
-        "identity-access"
-      ]
-    },
-    {
       "uid": "learn.wwl.characterize-devops-continous-collaboration-improvement",
       "title": "Caratterizzare la collaborazione continua e il miglioramento continuo di DevOps",
       "url": "https://learn.microsoft.com/it-it/training/modules/characterize-devops-continous-collaboration-improvement/?WT.mc_id=api_CatalogApi",
@@ -36659,6 +36016,27 @@
       ]
     },
     {
+      "uid": "learn.intro-to-azure-copilot",
+      "title": "Introduzione ad Azure Copilot",
+      "url": "https://learn.microsoft.com/it-it/training/modules/intro-to-azure-copilot/?WT.mc_id=api_CatalogApi",
+      "type": "module",
+      "level": "beginner",
+      "products": [
+        "azure"
+      ],
+      "durationMinutes": 27,
+      "moduleCount": 7,
+      "roles": [
+        "administrator",
+        "developer",
+        "solution-architect"
+      ],
+      "subjects": [
+        "cloud-computing",
+        "artificial-intelligence"
+      ]
+    },
+    {
       "uid": "learn.wwl.configure-trusted-launch-azure-virtual-machines",
       "title": "Configurare le funzionalità di sicurezza di avvio attendibili per Azure macchine virtuali",
       "url": "https://learn.microsoft.com/it-it/training/modules/configure-trusted-launch-azure-virtual-machines/?WT.mc_id=api_CatalogApi",
@@ -36902,7 +36280,7 @@
     },
     {
       "uid": "learn.wwl.design-agentic-loops-microsoft-foundry-agent-service",
-      "title": "Progettare cicli agentici con stato con Microsoft Foundry Agent Service",
+      "title": "Progettare loop agentici con stato con il servizio Agente di Microsoft Foundry",
       "url": "https://learn.microsoft.com/it-it/training/modules/aaai-design-agentic-loops-azure-ai-agent-service/?WT.mc_id=api_CatalogApi",
       "type": "module",
       "level": "advanced",
@@ -37541,25 +36919,6 @@
       ]
     },
     {
-      "uid": "learn.wwl.protecting-monitoring-tuning-migrated-database",
-      "title": "Proteggere, monitorare e ottimizzare un database migrato",
-      "url": "https://learn.microsoft.com/it-it/training/modules/protect-monitor-tuning-migrated-database/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "intermediate",
-      "products": [
-        "azure"
-      ],
-      "durationMinutes": 66,
-      "moduleCount": 8,
-      "roles": [
-        "data-engineer"
-      ],
-      "subjects": [
-        "cloud-security",
-        "migration"
-      ]
-    },
-    {
       "uid": "learn.wwl.filter-objects-out-of-pipeline",
       "title": "Filtrare gli oggetti dalla pipeline",
       "url": "https://learn.microsoft.com/it-it/training/modules/filter-objects-out-of-pipeline/?WT.mc_id=api_CatalogApi",
@@ -37909,25 +37268,6 @@
         "student"
       ],
       "subjects": []
-    },
-    {
-      "uid": "learn.wwl.scale-apps-app-service",
-      "title": "Ridimensionare le app in Servizio app di Azure",
-      "url": "https://learn.microsoft.com/it-it/training/modules/scale-apps-app-service/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "intermediate",
-      "products": [
-        "azure",
-        "azure-app-service"
-      ],
-      "durationMinutes": 22,
-      "moduleCount": 7,
-      "roles": [
-        "developer"
-      ],
-      "subjects": [
-        "cloud-computing"
-      ]
     },
     {
       "uid": "learn.wwl.azure-ai-foundry-configure-manage-guardrails",
@@ -38534,25 +37874,6 @@
       ],
       "subjects": [
         "infrastructure",
-        "cloud-computing"
-      ]
-    },
-    {
-      "uid": "learn.wwl.introduction-to-azure-app-service",
-      "title": "Esplorare il servizio app di Azure",
-      "url": "https://learn.microsoft.com/it-it/training/modules/introduction-to-azure-app-service/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "intermediate",
-      "products": [
-        "azure",
-        "azure-app-service"
-      ],
-      "durationMinutes": 44,
-      "moduleCount": 9,
-      "roles": [
-        "developer"
-      ],
-      "subjects": [
         "cloud-computing"
       ]
     },
@@ -40227,25 +39548,6 @@
       ],
       "subjects": [
         "devops"
-      ]
-    },
-    {
-      "uid": "learn.wwl.configure-web-app-settings",
-      "title": "Configurare le impostazioni delle app Web",
-      "url": "https://learn.microsoft.com/it-it/training/modules/configure-web-app-settings/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "intermediate",
-      "products": [
-        "azure",
-        "azure-app-service"
-      ],
-      "durationMinutes": 30,
-      "moduleCount": 8,
-      "roles": [
-        "developer"
-      ],
-      "subjects": [
-        "cloud-computing"
       ]
     },
     {
@@ -43415,7 +42717,7 @@
     },
     {
       "uid": "learn.govern-ai-services-azure-policy",
-      "title": "Gestire i servizi di intelligenza artificiale con Azure Policy",
+      "title": "Gestire i servizi di intelligenza artificiale con Criteri di Azure",
       "url": "https://learn.microsoft.com/it-it/training/modules/govern-ai-azure-policy/?WT.mc_id=api_CatalogApi",
       "type": "module",
       "level": "beginner",
@@ -45306,29 +44608,6 @@
       ]
     },
     {
-      "uid": "learn.wwl.build-enterprise-tool-ecosystems-mcp-azure",
-      "title": "Build enterprise-grade tool ecosystems with MCP and Microsoft Foundry",
-      "url": "https://learn.microsoft.com/it-it/training/modules/aaai-build-enterprise-tool-ecosystems-mcp-azure/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "advanced",
-      "products": [
-        "azure",
-        "microsoft-foundry",
-        "foundry-agent-service"
-      ],
-      "durationMinutes": 41,
-      "moduleCount": 7,
-      "roles": [
-        "ai-engineer",
-        "solution-architect",
-        "developer"
-      ],
-      "subjects": [
-        "artificial-intelligence",
-        "app-development"
-      ]
-    },
-    {
       "uid": "learn.wwl.implement-distributed-observability-multi-agent-opentelemetry",
       "title": "Implement distributed observability for multi-agent solutions with OpenTelemetry",
       "url": "https://learn.microsoft.com/it-it/training/modules/aaai-implement-distributed-observability-multi-agent-opentelemetry/?WT.mc_id=api_CatalogApi",
@@ -45349,27 +44628,6 @@
       "subjects": [
         "artificial-intelligence",
         "devops"
-      ]
-    },
-    {
-      "uid": "learn.wwl.design-advanced-prompting-production-agents",
-      "title": "Design advanced prompting strategies for production AI agents",
-      "url": "https://learn.microsoft.com/it-it/training/modules/aaai-design-advanced-prompt-production-agents/?WT.mc_id=api_CatalogApi",
-      "type": "module",
-      "level": "advanced",
-      "products": [
-        "azure",
-        "microsoft-foundry"
-      ],
-      "durationMinutes": 93,
-      "moduleCount": 10,
-      "roles": [
-        "ai-engineer",
-        "solution-architect",
-        "developer"
-      ],
-      "subjects": [
-        "artificial-intelligence"
       ]
     },
     {
@@ -45661,26 +44919,6 @@
       ]
     },
     {
-      "uid": "learn.wwl.migrating-open-source-workloads-to-azure",
-      "title": "Eseguire la migrazione di database open source ad Azure",
-      "url": "https://learn.microsoft.com/it-it/training/paths/migrate-open-source-workloads/?WT.mc_id=api_CatalogApi",
-      "type": "learningPath",
-      "level": "intermediate",
-      "products": [
-        "azure"
-      ],
-      "durationMinutes": 255,
-      "moduleCount": 4,
-      "roles": [
-        "data-engineer"
-      ],
-      "subjects": [
-        "migration",
-        "cloud-computing",
-        "cross-development"
-      ]
-    },
-    {
       "uid": "learn.wwl.az-204-implement-iaas-solutions",
       "title": "Implementare soluzioni in contenitori",
       "url": "https://learn.microsoft.com/it-it/training/paths/az-204-implement-iaas-solutions/?WT.mc_id=api_CatalogApi",
@@ -45719,25 +44957,6 @@
       ],
       "subjects": [
         "custom-app-development"
-      ]
-    },
-    {
-      "uid": "learn.wwl.create-azure-app-service-web-apps",
-      "title": "Implementare app Web del servizio app di Azure",
-      "url": "https://learn.microsoft.com/it-it/training/paths/create-azure-app-service-web-apps/?WT.mc_id=api_CatalogApi",
-      "type": "learningPath",
-      "level": "intermediate",
-      "products": [
-        "azure",
-        "azure-app-service"
-      ],
-      "durationMinutes": 153,
-      "moduleCount": 4,
-      "roles": [
-        "developer"
-      ],
-      "subjects": [
-        "cloud-computing"
       ]
     },
     {
@@ -47492,27 +46711,6 @@
       "subjects": []
     },
     {
-      "uid": "learn.wwl.az-204-implement-secure-cloud-solutions",
-      "title": "Implementare soluzioni Azure sicure",
-      "url": "https://learn.microsoft.com/it-it/training/paths/az-204-implement-secure-cloud-solutions/?WT.mc_id=api_CatalogApi",
-      "type": "learningPath",
-      "level": "intermediate",
-      "products": [
-        "azure",
-        "azure-app-configuration",
-        "azure-key-vault",
-        "azure-rbac"
-      ],
-      "durationMinutes": 107,
-      "moduleCount": 3,
-      "roles": [
-        "developer"
-      ],
-      "subjects": [
-        "cloud-security"
-      ]
-    },
-    {
       "uid": "learn.wwl.design-data-storage-solutions",
       "title": "AZ-305: Progettare soluzioni di archiviazione dei dati",
       "url": "https://learn.microsoft.com/it-it/training/paths/design-data-storage-solutions/?WT.mc_id=api_CatalogApi",
@@ -48762,8 +47960,8 @@
         "entra-id",
         "windows-server"
       ],
-      "durationMinutes": 422,
-      "moduleCount": 8,
+      "durationMinutes": 453,
+      "moduleCount": 9,
       "roles": [
         "administrator",
         "solution-architect",
@@ -50114,18 +49312,17 @@
     },
     {
       "uid": "learn.wwl.build-foundation-extend-microsoft-365-copilot",
-      "title": "Creare una base per creare agenti di intelligenza artificiale ed estendere Microsoft 365 Copilot",
+      "title": "Introduzione alla creazione di agenti di intelligenza artificiale",
       "url": "https://learn.microsoft.com/it-it/training/paths/build-foundation-extend-microsoft-365-copilot/?WT.mc_id=api_CatalogApi",
       "type": "learningPath",
       "level": "beginner",
       "products": [
         "azure",
         "microsoft-365-copilot",
-        "microsoft-365-copilot-chat",
         "microsoft-copilot-studio"
       ],
-      "durationMinutes": 104,
-      "moduleCount": 4,
+      "durationMinutes": 122,
+      "moduleCount": 3,
       "roles": [
         "developer",
         "maker"
@@ -50574,7 +49771,8 @@
       "products": [
         "azure",
         "defender-xdr",
-        "microsoft-defender"
+        "microsoft-defender",
+        "security-copilot"
       ],
       "roles": [
         "security-engineer"
@@ -50657,6 +49855,21 @@
       "roles": [
         "ai-engineer",
         "developer"
+      ],
+      "subjects": []
+    },
+    {
+      "uid": "course.az-802t00",
+      "title": "Amministrare Windows Server",
+      "url": "https://learn.microsoft.com/it-it/training/courses/az-802t00/?WT.mc_id=api_CatalogApi",
+      "type": "course",
+      "level": "intermediate",
+      "products": [
+        "azure",
+        "windows"
+      ],
+      "roles": [
+        "administrator"
       ],
       "subjects": []
     },

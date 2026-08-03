@@ -13,7 +13,7 @@ import { enrichReleaseItemsWithLearn } from './learnEnrichment';
 
 const SOURCE_URL = 'https://releaseplans.microsoft.com/it-it/allreleaseplans/';
 const SNAPSHOT_URL =
-  'https://releaseplans.microsoft.com/_api/mssh_releaseplansnapshots?$select=mssh_releaseplansnapshotid,mssh_featurename,_mssh_releaseplan_value,mssh_docsurl,mssh_articlepath&$filter=statecode eq 0';
+  'https://releaseplans.microsoft.com/_api/mssh_releaseplansnapshots?$select=mssh_releaseplansnapshotid,_mssh_releaseplan_value&$filter=statecode eq 0';
 
 const resolveAppName = (product: string): string | null =>
   resolveAppNameFromProduct(product);
@@ -160,28 +160,12 @@ const buildSnapshotKey = (releasePlanId: string, featureName: string): string =>
   return `${releasePlanId}::${normalizeText(featureName).toLowerCase()}`;
 };
 
-const normalizeDocUrl = (value?: string | null): string | null => {
-  if (!value) {
-    return null;
-  }
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return null;
-  }
-  if (/^https?:\/\//i.test(trimmed)) {
-    return trimmed;
-  }
-  if (trimmed.startsWith('/')) {
-    return `https://learn.microsoft.com${trimmed}`;
-  }
-  return null;
-};
-
 const fetchSnapshotIndex = async (): Promise<Map<string, { snapshotId: string; learnUrl: string | null }>> => {
   const headers = {
     Accept: 'application/json',
     'OData-MaxVersion': '4.0',
-    'OData-Version': '4.0'
+    'OData-Version': '4.0',
+    'User-Agent': 'UpdateLens/1.0 (+offline snapshot generator)'
   };
   let nextUrl: string | undefined = SNAPSHOT_URL;
   const index = new Map<string, { snapshotId: string; learnUrl: string | null }>();
@@ -194,21 +178,19 @@ const fetchSnapshotIndex = async (): Promise<Map<string, { snapshotId: string; l
     const payload = (await response.json()) as {
       value: Array<{
         mssh_releaseplansnapshotid: string;
-        mssh_featurename?: string;
         _mssh_releaseplan_value?: string;
-        mssh_docsurl?: string;
-        mssh_articlepath?: string;
+        ['_mssh_releaseplan_value@OData.Community.Display.V1.FormattedValue']?: string;
       }>;
       ['@odata.nextLink']?: string;
     };
     payload.value.forEach((row) => {
-      if (!row._mssh_releaseplan_value || !row.mssh_featurename) {
+      const featureName = row['_mssh_releaseplan_value@OData.Community.Display.V1.FormattedValue'];
+      if (!row._mssh_releaseplan_value || !featureName) {
         return;
       }
-      const key = buildSnapshotKey(row._mssh_releaseplan_value, row.mssh_featurename);
+      const key = buildSnapshotKey(row._mssh_releaseplan_value, featureName);
       if (!index.has(key)) {
-        const learnUrl = normalizeDocUrl(row.mssh_docsurl ?? row.mssh_articlepath ?? null);
-        index.set(key, { snapshotId: row.mssh_releaseplansnapshotid, learnUrl });
+        index.set(key, { snapshotId: row.mssh_releaseplansnapshotid, learnUrl: null });
       }
     });
     nextUrl = payload['@odata.nextLink'];
