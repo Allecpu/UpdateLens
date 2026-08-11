@@ -914,13 +914,6 @@ const CssPage = () => {
     setVisibleColumns(next);
   };
 
-  const onResetExpandedLayout = () => {
-    setIsWideMode(true);
-    setShowColumnPanel(true);
-    setVisibleColumns(DEFAULT_VISIBLE_COLUMNS);
-    localStorage.removeItem(GRID_PREFS_STORAGE_KEY);
-  };
-
   const onToggleSort = (key: SortKey) => {
     if (sortBy === key) {
       setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
@@ -1147,24 +1140,7 @@ const CssPage = () => {
                 className="ul-button ul-button-ghost h-9"
                 onClick={() => setShowColumnPanel((prev) => !prev)}
               >
-                {showColumnPanel ? 'Chiudi colonne' : 'Mostra/Nascondi colonne'}
-              </button>
-              <div className="flex items-center gap-1 rounded-lg bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700">
-                <span>🔒 Controlli Microsoft Lists applicati</span>
-              </div>
-              <button
-                type="button"
-                className="ul-button ul-button-ghost h-9"
-                onClick={() => setIsWideMode((prev) => !prev)}
-              >
-                {isWideMode ? 'Modalità standard' : 'Modalità espansa'}
-              </button>
-              <button
-                type="button"
-                className="ul-button ul-button-ghost h-9"
-                onClick={onResetExpandedLayout}
-              >
-                Ripristina vista espansa
+                {showColumnPanel ? 'Chiudi colonne' : 'Mostra colonne'}
               </button>
             </div>
 
