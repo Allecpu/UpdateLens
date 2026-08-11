@@ -79,11 +79,11 @@ export function ModernListsLayout({
     (advancedFilters.rules && advancedFilters.rules.length > 0);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-0">
       {/* 1. Views Bar - Pill/Tab Style */}
-      <div className="border-b border-border/50 bg-background/50 px-4 py-3">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-muted-foreground">Viste:</span>
+      <div className="border-b border-border bg-background px-4 py-2.5">
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Viste:</span>
           <div className="flex-1 overflow-x-auto">
             <ViewsPanel compact={true} />
           </div>
@@ -91,7 +91,7 @@ export function ModernListsLayout({
       </div>
 
       {/* 2. Command Bar */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-border/50 bg-muted/20 px-4 py-3">
+      <div className="flex flex-wrap items-center gap-3 border-b border-border bg-background px-4 py-2.5 [&>*:first-child]:mr-1 [&>*:first-child]:pr-2 [&>*:first-child]:border-r [&>*:first-child]:border-border/50">
         {/* Main Actions */}
         <button
           type="button"
@@ -179,7 +179,7 @@ export function ModernListsLayout({
       </div>
 
       {/* 3. Quick Filters - Inline Dropdowns */}
-      <div className="flex flex-wrap items-end gap-2 border-b border-border/50 bg-background/30 px-4 py-2">
+      <div className="flex flex-wrap items-end gap-2 border-b border-border bg-background px-4 py-2.5">
         <div className="flex items-center gap-2">
           <label className="text-xs font-medium text-muted-foreground">Filtra rapida:</label>
 
@@ -250,7 +250,7 @@ export function ModernListsLayout({
 
       {/* 4. Advanced Options Panel - Collapsible */}
       {showAdvancedOptions && (
-        <div className="space-y-3 border-b border-border/50 bg-muted/20 px-4 py-3">
+        <div className="space-y-3 border-b border-border bg-muted/5 px-4 py-3">
           <div className="grid gap-3 md:grid-cols-2">
             <AdvancedFiltersPanel
               activities={activities}
@@ -273,13 +273,13 @@ export function ModernListsLayout({
 
       {/* 5. Audit Trail - Collapsible */}
       {showAuditTrail && (
-        <div className="border-b border-border/50 px-4 py-3">
+        <div className="border-b border-border bg-muted/5 px-4 py-3">
           <AuditTrail />
         </div>
       )}
 
       {/* 6. Info Bar - Results count and status */}
-      <div className="flex items-center justify-between bg-muted/20 px-4 py-2 text-xs text-muted-foreground">
+      <div className="flex items-center justify-between border-b border-border bg-muted/5 px-4 py-2 text-xs text-muted-foreground">
         <span>
           📊 <strong>{filteredActivities.length}</strong> di <strong>{activities.length}</strong> record visibili
           {hasActiveFilters && <span className="ml-2">• 🔍 Filtri attivi</span>}
