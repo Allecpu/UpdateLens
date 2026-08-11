@@ -11,6 +11,7 @@ import * as presets from './presets.js';
 import * as users from './users.js';
 import type { WhitelistCheckResult } from './users.js';
 import { handleChatQuery } from './chat/ChatController.js';
+import * as css from './css.js';
 
 const execAsync = promisify(exec);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -698,6 +699,138 @@ export const createApi = () => {
       }
     } catch (error) {
       res.status(500).json({ error: 'Errore durante l\'upload dell\'immagine.' });
+    }
+  });
+
+  // ============================================
+  // CSS API Endpoints
+  // ============================================
+
+  app.get('/api/css/meta', (_req, res) => {
+    try {
+      res.json(css.getCssMeta(db));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Errore durante il recupero metadata CSS';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  app.get('/api/css/activities', (req, res) => {
+    try {
+      const activities = css.listCssActivities(db, {
+        customer: typeof req.query.customer === 'string' ? req.query.customer : undefined,
+        owner: typeof req.query.owner === 'string' ? req.query.owner : undefined,
+        status: typeof req.query.status === 'string' ? req.query.status : undefined,
+        query: typeof req.query.query === 'string' ? req.query.query : undefined
+      });
+      res.json({ items: activities, total: activities.length });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Errore durante il recupero attività CSS';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  app.post('/api/css/activities', (req, res) => {
+    try {
+      const { customerName, cssOwner, lastUpdate, blBu, issue, issueStatus, details, sourceRef } = req.body ?? {};
+      if (!customerName || typeof customerName !== 'string') {
+        return res.status(400).json({ error: 'customerName obbligatorio' });
+      }
+      if (!issue || typeof issue !== 'string') {
+        return res.status(400).json({ error: 'issue obbligatoria' });
+      }
+      const created = css.createCssActivity(db, {
+        customerName,
+        cssOwner: typeof cssOwner === 'string' ? cssOwner : null,
+        lastUpdate: typeof lastUpdate === 'string' ? lastUpdate : null,
+        blBu: typeof blBu === 'string' ? blBu : null,
+        issue,
+        issueStatus: typeof issueStatus === 'string' ? issueStatus : 'Action required',
+        details: typeof details === 'string' ? details : null,
+        sourceRef: typeof sourceRef === 'string' ? sourceRef : null
+      });
+      res.status(201).json(created);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Errore durante la creazione attività CSS';
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.patch('/api/css/activities/:id', (req, res) => {
+    try {
+      const updated = css.updateCssActivity(db, req.params.id, req.body ?? {});
+      res.json(updated);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Errore durante aggiornamento attività CSS';
+      const status = message.includes('non trovata') ? 404 : 400;
+      res.status(status).json({ error: message });
+    }
+  });
+
+  app.get('/api/css/documents', (_req, res) => {
+    try {
+      res.json({ items: css.listCssDocuments(db) });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Errore durante il recupero documenti CSS';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  app.post('/api/css/documents/upload', async (req, res) => {
+    try {
+      const { filename, mimeType, contentBase64 } = req.body ?? {};
+      if (!filename || typeof filename !== 'string') {
+        return res.status(400).json({ error: 'filename obbligatorio' });
+      }
+      if (!contentBase64 || typeof contentBase64 !== 'string') {
+        return res.status(400).json({ error: 'contentBase64 obbligatorio' });
+      }
+      const uploaded = await css.uploadCssDocument(db, {
+        filename,
+        mimeType: typeof mimeType === 'string' ? mimeType : null,
+        contentBase64,
+        uploadedBy: req.user?.email ?? null
+      });
+      res.status(201).json(uploaded);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Errore durante upload documento';
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.post('/api/css/documents/:id/extract', async (req, res) => {
+    try {
+      const result = await css.processCssDocument(db, req.params.id);
+      res.status(201).json(result);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Errore durante l\'estrazione documento';
+      const status = message.includes('non trovato') ? 404 : 400;
+      res.status(status).json({ error: message });
+    }
+  });
+
+  app.get('/api/css/proposals/:batchId', (req, res) => {
+    try {
+      const proposals = css.getCssProposalsByBatch(db, req.params.batchId);
+      res.json({ items: proposals, total: proposals.length });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Errore durante il recupero proposte';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  app.post('/api/css/proposals/:batchId/validate', (req, res) => {
+    try {
+      const result = css.validateCssBatch(db, req.params.batchId, {
+        reviewer: req.user?.email ?? null,
+        approveAll: Boolean(req.body?.approveAll),
+        decisions: Array.isArray(req.body?.decisions) ? req.body.decisions : []
+      });
+      res.json(result);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Errore durante la validazione proposte';
+      const status = message.includes('non trovato') ? 404 : 400;
+      res.status(status).json({ error: message });
     }
   });
 

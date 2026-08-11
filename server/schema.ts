@@ -156,5 +156,84 @@ export const initSchema = (db: Database.Database): void => {
       ON sharing_users(email);
     CREATE INDEX IF NOT EXISTS idx_sharing_users_role
       ON sharing_users(role);
+
+    -- CSS domain: customers, activities, meeting docs and proposals
+    CREATE TABLE IF NOT EXISTS css_customers (
+      customer_id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      aliases_json TEXT NOT NULL DEFAULT '[]',
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS css_activities (
+      activity_id TEXT PRIMARY KEY,
+      customer_id TEXT NOT NULL,
+      css_owner TEXT,
+      last_update TEXT,
+      bl_bu TEXT,
+      issue TEXT NOT NULL,
+      issue_status TEXT NOT NULL,
+      details TEXT,
+      source_ref TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (customer_id) REFERENCES css_customers(customer_id) ON DELETE RESTRICT
+    );
+
+    CREATE TABLE IF NOT EXISTS css_meeting_documents (
+      document_id TEXT PRIMARY KEY,
+      filename TEXT NOT NULL,
+      mime_type TEXT,
+      file_type TEXT NOT NULL,
+      file_hash TEXT NOT NULL,
+      content_base64 TEXT NOT NULL,
+      extracted_text TEXT,
+      extraction_status TEXT NOT NULL DEFAULT 'pending',
+      extraction_error TEXT,
+      uploaded_by TEXT,
+      uploaded_at TEXT NOT NULL,
+      processed_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS css_validation_batches (
+      batch_id TEXT PRIMARY KEY,
+      document_id TEXT NOT NULL,
+      ai_provider TEXT NOT NULL DEFAULT 'none',
+      ai_model TEXT,
+      extraction_notes TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
+      created_at TEXT NOT NULL,
+      validated_at TEXT,
+      validated_by TEXT,
+      FOREIGN KEY (document_id) REFERENCES css_meeting_documents(document_id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS css_activity_proposals (
+      proposal_id TEXT PRIMARY KEY,
+      batch_id TEXT NOT NULL,
+      action_type TEXT NOT NULL,
+      target_activity_id TEXT,
+      payload_json TEXT NOT NULL,
+      confidence REAL NOT NULL DEFAULT 0,
+      decision_status TEXT NOT NULL DEFAULT 'pending',
+      decision_note TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (batch_id) REFERENCES css_validation_batches(batch_id) ON DELETE CASCADE,
+      FOREIGN KEY (target_activity_id) REFERENCES css_activities(activity_id) ON DELETE SET NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_css_activities_customer
+      ON css_activities(customer_id);
+    CREATE INDEX IF NOT EXISTS idx_css_activities_status
+      ON css_activities(issue_status);
+    CREATE INDEX IF NOT EXISTS idx_css_activities_owner
+      ON css_activities(css_owner);
+    CREATE INDEX IF NOT EXISTS idx_css_documents_status
+      ON css_meeting_documents(extraction_status);
+    CREATE INDEX IF NOT EXISTS idx_css_proposals_batch
+      ON css_activity_proposals(batch_id);
   `);
 };

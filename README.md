@@ -17,6 +17,7 @@ I dati provengono da snapshot JSON versionati, serviti insieme all'applicazione.
 - ✅ **Export PowerPoint** - Deck cliente con l'identità visiva EOS Solutions, sezioni configurabili
 - ✅ **GitHub Issues Integration** - Gestione bug/feature direttamente dal portale
 - ✅ **Manuale Integrato** - Procedure, glossario, ruoli, checklist e troubleshooting
+- ✅ **Sezione CSS** - Gestione attività clienti e import meeting report con proposta validata
 - ✅ **Snapshot Locali** - Dati versionati e tracciabili
 
 ### Pagine Disponibili
@@ -24,6 +25,7 @@ I dati provengono da snapshot JSON versionati, serviti insieme all'applicazione.
 - **Clienti** - Gestione configurazioni cliente
 - **Filtri Globali** - Definizione regole di filtro globali
 - **Learn** - Risorse formative Microsoft collegate ai prodotti
+- **CSS** - Gestione attività clienti + import DOCX/DOC/PDF con proposte di aggiornamento
 - **Segnalazioni** - Integrazione GitHub per bug tracking
 - **Condivisioni** - Preset inviati e ricevuti
 - **Manuale** - Guida operativa interna all'app

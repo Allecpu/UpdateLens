@@ -65,6 +65,7 @@ Il menu di navigazione si trova nella barra orizzontale in alto:
 - **Clienti** - Gestione clienti, gruppi, prodotti e Owner CSS
 - **Filtri globali** - Target, regole e preset persistenti
 - **Learn** - Catalogo delle risorse formative Microsoft
+- **CSS** - Attività clienti, import meeting report e validazione proposte
 - **Versione** - Build, note di rilascio e aggiornamento delle fonti
 - **Segnalazioni** - Issue GitHub per bug e richieste
 - **Condivisioni** - Preset condivisi tra utenti
