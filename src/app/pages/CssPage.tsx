@@ -1308,7 +1308,13 @@ const CssPage = () => {
                 </tr>
               )}
               {!isLoading && sortedActivities.length === 0 && (
-                <tr><td className="px-3 py-4 text-muted-foreground" colSpan={tableColSpan}>Nessuna attività presente.</td></tr>
+                <tr><td className="px-3 py-8 text-center text-muted-foreground" colSpan={tableColSpan}>
+                  <div className="space-y-2">
+                    <div className="text-2xl">📭</div>
+                    <div className="text-sm font-medium">Nessuna attività presente</div>
+                    <div className="text-xs text-muted-foreground/70">Prova a modificare i filtri o creane una nuova</div>
+                  </div>
+                </td></tr>
               )}
               {sortedActivities.map((activity) => {
                 const isEditingChoice = (field: EditableChoiceField) =>
