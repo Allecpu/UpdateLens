@@ -1321,7 +1321,7 @@ const CssPage = () => {
                 return (
                 <tr
                   key={activity.activityId}
-                  className={`border-t border-border/70 align-top ${inlineEditId === activity.activityId ? '' : 'cursor-pointer'}`}
+                  className={`border-t border-border/70 align-top transition-colors ${inlineEditId === activity.activityId ? 'bg-blue-50 dark:bg-blue-950/30' : 'hover:bg-slate-50 dark:hover:bg-slate-900/30 cursor-pointer'}`}
                   onClick={(event) => {
                     if (inlineEditId === activity.activityId) {
                       return;
