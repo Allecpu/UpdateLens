@@ -195,6 +195,65 @@ export function ViewsPanel({ compact = false }: ViewsPanelProps) {
     );
   };
 
+  // Early return per compact mode - solo pillole
+  if (compact) {
+    return (
+      <div className="flex flex-wrap items-center gap-1">
+        {/* System Views */}
+        {systemViews.map((view) => (
+          <button
+            key={view.id}
+            onClick={() => switchView(view.id)}
+            className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition ${
+              activeViewId === view.id
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'bg-gray-200 text-gray-900 hover:bg-gray-300'
+            }`}
+            title={view.description}
+          >
+            {view.name}
+            {view.isSystem && <span className="text-xs">🔒</span>}
+          </button>
+        ))}
+
+        {/* Custom Views */}
+        {(showAll || customViews.length <= 3) && customViews.map((view) => (
+          <button
+            key={view.id}
+            onClick={() => switchView(view.id)}
+            className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition ${
+              activeViewId === view.id
+                ? 'bg-purple-600 text-white shadow-sm'
+                : 'bg-purple-100 text-purple-900 hover:bg-purple-200'
+            }`}
+            title={view.description}
+          >
+            {view.name}
+          </button>
+        ))}
+
+        {customViews.length > 3 && !showAll && (
+          <button
+            onClick={() => setShowAll(true)}
+            className="rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-200"
+            title={`${customViews.length - 3} viste nascoste`}
+          >
+            +{customViews.length - 3}
+          </button>
+        )}
+
+        {/* Quick add */}
+        <button
+          onClick={() => setIsCreating(!isCreating)}
+          className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-200"
+          title="Crea nuova vista"
+        >
+          {isCreating ? '✕' : '+'}
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="mb-4">
       <div className="space-y-3">
@@ -341,70 +400,13 @@ export function ViewsPanel({ compact = false }: ViewsPanelProps) {
         )}
 
         {/* Info vista attiva */}
-        {activeView && !compact && (
+        {activeView && (
           <div className="text-xs text-gray-600">
             <span className="font-medium">📍 Vista attiva:</span> {activeView.name}
             {activeView.description && <span> — {activeView.description}</span>}
           </div>
         )}
       </div>
-
-      {/* Compact Mode - Horizontal Pills */}
-      {compact && (
-        <div className="flex flex-wrap items-center gap-1">
-          {/* System Views */}
-          {systemViews.map((view) => (
-            <button
-              key={view.id}
-              onClick={() => switchView(view.id)}
-              className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition ${
-                activeViewId === view.id
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'bg-gray-200 text-gray-900 hover:bg-gray-300'
-              }`}
-              title={view.description}
-            >
-              {view.name}
-              {view.isSystem && <span className="text-xs">🔒</span>}
-            </button>
-          ))}
-
-          {/* Custom Views */}
-          {(showAll || customViews.length <= 3) && customViews.map((view) => (
-            <button
-              key={view.id}
-              onClick={() => switchView(view.id)}
-              className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition ${
-                activeViewId === view.id
-                  ? 'bg-purple-600 text-white shadow-sm'
-                  : 'bg-purple-100 text-purple-900 hover:bg-purple-200'
-              }`}
-              title={view.description}
-            >
-              {view.name}
-            </button>
-          ))}
-
-          {customViews.length > 3 && !showAll && (
-            <button
-              onClick={() => setShowAll(true)}
-              className="rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-200"
-              title={`${customViews.length - 3} viste nascoste`}
-            >
-              +{customViews.length - 3}
-            </button>
-          )}
-
-          {/* Quick add */}
-          <button
-            onClick={() => setIsCreating(!isCreating)}
-            className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-200"
-            title="Crea nuova vista"
-          >
-            +
-          </button>
-        </div>
-      )}
     </div>
   );
 }
