@@ -1086,14 +1086,6 @@ const CssPage = () => {
     <div
       className={`space-y-6 ${isWideMode ? 'relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] w-screen px-4 sm:px-6' : ''}`}
     >
-      <section className="ul-surface p-5">
-        <h1 className="text-2xl font-semibold">CSS - Attività Clienti</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Nuova area operativa centralizzata per attività clienti e import meeting report.
-          La selezione utenti da Microsoft Graph su SharePoint resta fuori scope in questa fase.
-        </p>
-      </section>
-
       {error && (
         <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
           {error}
