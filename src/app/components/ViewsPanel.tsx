@@ -204,7 +204,7 @@ export function ViewsPanel({ compact = false }: ViewsPanelProps) {
           <button
             key={view.id}
             onClick={() => switchView(view.id)}
-            className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition ${
+            className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-medium transition ${
               activeViewId === view.id
                 ? 'bg-blue-600 text-white shadow-sm'
                 : 'bg-gray-200 text-gray-900 hover:bg-gray-300'
@@ -212,7 +212,7 @@ export function ViewsPanel({ compact = false }: ViewsPanelProps) {
             title={view.description}
           >
             {view.name}
-            {view.isSystem && <span className="text-xs">🔒</span>}
+            {view.isSystem && <span className="text-sm">🔒</span>}
           </button>
         ))}
 
@@ -221,7 +221,7 @@ export function ViewsPanel({ compact = false }: ViewsPanelProps) {
           <button
             key={view.id}
             onClick={() => switchView(view.id)}
-            className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition ${
+            className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-medium transition ${
               activeViewId === view.id
                 ? 'bg-purple-600 text-white shadow-sm'
                 : 'bg-purple-100 text-purple-900 hover:bg-purple-200'
@@ -235,7 +235,7 @@ export function ViewsPanel({ compact = false }: ViewsPanelProps) {
         {customViews.length > 3 && !showAll && (
           <button
             onClick={() => setShowAll(true)}
-            className="rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-200"
+            className="rounded-full bg-gray-100 px-2 py-1 text-sm font-medium text-gray-600 hover:bg-gray-200"
             title={`${customViews.length - 3} viste nascoste`}
           >
             +{customViews.length - 3}
@@ -245,7 +245,7 @@ export function ViewsPanel({ compact = false }: ViewsPanelProps) {
         {/* Quick add */}
         <button
           onClick={() => setIsCreating(!isCreating)}
-          className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-200"
+          className="rounded-full bg-emerald-100 px-2 py-1 text-sm font-medium text-emerald-700 hover:bg-emerald-200"
           title="Crea nuova vista"
         >
           {isCreating ? '✕' : '+'}
