@@ -732,7 +732,11 @@ export const createApi = () => {
 
   app.post('/api/css/activities', (req, res) => {
     try {
-      const { customerName, cssOwner, lastUpdate, blBu, issue, issueStatus, details, sourceRef } = req.body ?? {};
+      const {
+        customerName, cssOwner, lastUpdate, blBu, issue, listStatus, issueStatus, details,
+        eosOwners, customerOwners, cssAction, notes, customerPriority, cssPriority, dueDate,
+        rating, itemType, sourceRef
+      } = req.body ?? {};
       if (!customerName || typeof customerName !== 'string') {
         return res.status(400).json({ error: 'customerName obbligatorio' });
       }
@@ -745,8 +749,18 @@ export const createApi = () => {
         lastUpdate: typeof lastUpdate === 'string' ? lastUpdate : null,
         blBu: typeof blBu === 'string' ? blBu : null,
         issue,
+        listStatus: typeof listStatus === 'string' ? listStatus : null,
         issueStatus: typeof issueStatus === 'string' ? issueStatus : 'Action required',
         details: typeof details === 'string' ? details : null,
+        eosOwners: typeof eosOwners === 'string' ? eosOwners : null,
+        customerOwners: typeof customerOwners === 'string' ? customerOwners : null,
+        cssAction: typeof cssAction === 'string' ? cssAction : null,
+        notes: typeof notes === 'string' ? notes : null,
+        customerPriority: typeof customerPriority === 'string' ? customerPriority : null,
+        cssPriority: typeof cssPriority === 'string' ? cssPriority : null,
+        dueDate: typeof dueDate === 'string' ? dueDate : null,
+        rating: typeof rating === 'number' ? rating : null,
+        itemType: typeof itemType === 'string' ? itemType : null,
         sourceRef: typeof sourceRef === 'string' ? sourceRef : null
       });
       res.status(201).json(created);
@@ -764,6 +778,26 @@ export const createApi = () => {
       const message = error instanceof Error ? error.message : 'Errore durante aggiornamento attività CSS';
       const status = message.includes('non trovata') ? 404 : 400;
       res.status(status).json({ error: message });
+    }
+  });
+
+  app.post('/api/css/activities/bulk-status', (req, res) => {
+    try {
+      const { activityIds, issueStatus } = req.body ?? {};
+      if (!Array.isArray(activityIds) || activityIds.length === 0) {
+        return res.status(400).json({ error: 'activityIds obbligatorio (array non vuoto)' });
+      }
+      if (!issueStatus || typeof issueStatus !== 'string') {
+        return res.status(400).json({ error: 'issueStatus obbligatorio' });
+      }
+      const result = css.bulkUpdateCssActivityStatus(db, {
+        activityIds: activityIds.filter((id: unknown) => typeof id === 'string'),
+        issueStatus
+      });
+      res.json(result);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Errore bulk update stato attività CSS';
+      res.status(400).json({ error: message });
     }
   });
 

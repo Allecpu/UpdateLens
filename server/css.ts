@@ -9,8 +9,18 @@ export type CssActivity = {
   lastUpdate: string | null;
   blBu: string | null;
   issue: string;
+  listStatus: string | null;
   issueStatus: string;
   details: string | null;
+  eosOwners: string | null;
+  customerOwners: string | null;
+  cssAction: string | null;
+  notes: string | null;
+  customerPriority: string | null;
+  cssPriority: string | null;
+  dueDate: string | null;
+  rating: number | null;
+  itemType: string | null;
   sourceRef: string | null;
   createdAt: string;
   updatedAt: string;
@@ -32,8 +42,18 @@ type CssProposalPayload = {
   cssOwner?: string | null;
   blBu?: string | null;
   issue: string;
+  listStatus?: string | null;
   issueStatus: string;
   details?: string | null;
+  eosOwners?: string | null;
+  customerOwners?: string | null;
+  cssAction?: string | null;
+  notes?: string | null;
+  customerPriority?: string | null;
+  cssPriority?: string | null;
+  dueDate?: string | null;
+  rating?: number | null;
+  itemType?: string | null;
   lastUpdate?: string | null;
 };
 
@@ -58,8 +78,18 @@ type ActivityRow = {
   last_update: string | null;
   bl_bu: string | null;
   issue: string;
+  list_status: string | null;
   issue_status: string;
   details: string | null;
+  eos_owners: string | null;
+  customer_owners: string | null;
+  css_action: string | null;
+  notes: string | null;
+  customer_priority: string | null;
+  css_priority: string | null;
+  due_date: string | null;
+  rating: number | null;
+  item_type: string | null;
   source_ref: string | null;
   created_at: string;
   updated_at: string;
@@ -80,16 +110,85 @@ type ProposalRow = {
 
 const KNOWN_STATUSES = ['Action required', 'In progress', 'Opportunity', 'Planned', 'Done'] as const;
 
+const normalizeOwner = (value?: string | null): string | null => {
+  const normalized = (value ?? '').trim();
+  if (!normalized) {
+    return null;
+  }
+  // SharePoint Person fields often come as "Display Name;#Id"
+  const sharePointTokenIndex = normalized.indexOf(';#');
+  const cleaned = sharePointTokenIndex >= 0 ? normalized.slice(0, sharePointTokenIndex).trim() : normalized;
+  return cleaned || null;
+};
+
+const splitOwners = (value?: string | null): string[] => {
+  const normalized = (value ?? '').trim();
+  if (!normalized) {
+    return [];
+  }
+  // Handles SharePoint person fields:
+  // - "Name;#12"
+  // - "Name A;#12;#Name B;#34"
+  const parts = normalized
+    .split(';#')
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0)
+    .filter((part) => !/^\d+$/.test(part));
+  return Array.from(new Set(parts.map((part) => normalizeOwner(part)).filter(Boolean) as string[]));
+};
+
+const normalizeOwnerForStorage = (value?: string | null): string | null => {
+  const owners = splitOwners(value);
+  if (owners.length === 0) {
+    return null;
+  }
+  return owners.join(', ');
+};
+
+const normalizeFilterToken = (value?: string | null): string =>
+  (value ?? '').trim().toLowerCase();
+
+const splitChoiceTokens = (value?: string | null): string[] => {
+  const normalized = (value ?? '').trim();
+  if (!normalized) {
+    return [];
+  }
+  const parts = normalized
+    .split(';#')
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0)
+    .filter((part) => !/^\d+$/.test(part));
+  return Array.from(new Set(parts));
+};
+
+const normalizeChoiceValue = (value?: string | null): string | null => {
+  const tokens = splitChoiceTokens(value);
+  if (tokens.length === 0) {
+    return null;
+  }
+  return tokens[0];
+};
+
 const toActivity = (row: ActivityRow): CssActivity => ({
   activityId: row.activity_id,
   customerId: row.customer_id,
   customerName: row.customer_name,
-  cssOwner: row.css_owner,
+  cssOwner: splitOwners(row.css_owner).join(', ') || null,
   lastUpdate: row.last_update,
-  blBu: row.bl_bu,
+  blBu: normalizeChoiceValue(row.bl_bu),
   issue: row.issue,
-  issueStatus: row.issue_status,
+  listStatus: normalizeChoiceValue(row.list_status),
+  issueStatus: sanitizeIssueStatus(normalizeChoiceValue(row.issue_status)),
   details: row.details,
+  eosOwners: splitOwners(row.eos_owners).join(', ') || null,
+  customerOwners: splitOwners(row.customer_owners).join(', ') || null,
+  cssAction: row.css_action,
+  notes: row.notes,
+  customerPriority: normalizeChoiceValue(row.customer_priority),
+  cssPriority: normalizeChoiceValue(row.css_priority),
+  dueDate: row.due_date,
+  rating: row.rating,
+  itemType: row.item_type,
   sourceRef: row.source_ref,
   createdAt: row.created_at,
   updatedAt: row.updated_at
@@ -183,7 +282,9 @@ const findMatchingActivity = (
 };
 
 const sanitizeIssueStatus = (status?: string | null): string => {
-  const normalized = (status ?? '').trim();
+  const normalized = (status ?? '')
+    .trim()
+    .replace(/\s+/g, ' ');
   if (!normalized) {
     return 'Action required';
   }
@@ -325,54 +426,92 @@ export const listCssActivities = (
   db: Database.Database,
   params: { customer?: string; owner?: string; status?: string; query?: string }
 ): CssActivity[] => {
-  const filters: string[] = [];
-  const values: unknown[] = [];
-  if (params.customer?.trim()) {
-    filters.push('LOWER(c.name) = LOWER(?)');
-    values.push(params.customer.trim());
-  }
-  if (params.owner?.trim()) {
-    filters.push('LOWER(a.css_owner) = LOWER(?)');
-    values.push(params.owner.trim());
-  }
-  if (params.status?.trim()) {
-    filters.push('LOWER(a.issue_status) = LOWER(?)');
-    values.push(params.status.trim());
-  }
-  if (params.query?.trim()) {
-    const like = `%${params.query.trim().toLowerCase()}%`;
-    filters.push('(LOWER(a.issue) LIKE ? OR LOWER(COALESCE(a.details, \'\')) LIKE ? OR LOWER(c.name) LIKE ?)');
-    values.push(like, like, like);
-  }
-
-  const where = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
   const rows = db.prepare(`
     SELECT
       a.activity_id, a.customer_id, c.name AS customer_name, a.css_owner, a.last_update, a.bl_bu,
-      a.issue, a.issue_status, a.details, a.source_ref, a.created_at, a.updated_at
+      a.issue, a.list_status, a.issue_status, a.details, a.eos_owners, a.customer_owners,
+      a.css_action, a.notes, a.customer_priority, a.css_priority, a.due_date, a.rating, a.item_type,
+      a.source_ref, a.created_at, a.updated_at
     FROM css_activities a
     JOIN css_customers c ON c.customer_id = a.customer_id
-    ${where}
     ORDER BY COALESCE(a.last_update, a.updated_at) DESC, c.name ASC
-  `).all(...values) as ActivityRow[];
+  `).all() as ActivityRow[];
 
-  return rows.map(toActivity);
+  const customerFilter = normalizeFilterToken(params.customer);
+  const ownerFilter = normalizeFilterToken(params.owner);
+  const ownerFilterTokensRaw = splitOwners(params.owner);
+  const ownerFilterTokens =
+    ownerFilterTokensRaw.length > 0
+      ? ownerFilterTokensRaw.map((token) => token.toLowerCase())
+      : ownerFilter
+      ? [normalizeOwner(params.owner)?.toLowerCase() ?? ownerFilter]
+      : [];
+  const statusFilter = normalizeFilterToken(params.status);
+  const queryFilter = normalizeFilterToken(params.query);
+
+  const filteredRows = rows.filter((row) => {
+    const customerName = row.customer_name ?? '';
+    const owners = splitOwners(row.css_owner);
+    const issueStatus = sanitizeIssueStatus(normalizeChoiceValue(row.issue_status));
+    const listStatus = normalizeChoiceValue(row.list_status) ?? '';
+    const details = row.details ?? '';
+    const issue = row.issue ?? '';
+    const blBu = normalizeChoiceValue(row.bl_bu) ?? '';
+    const notes = row.notes ?? '';
+    const eosOwners = row.eos_owners ?? '';
+    const customerOwners = row.customer_owners ?? '';
+    const cssAction = row.css_action ?? '';
+    const itemType = row.item_type ?? '';
+    const ownerJoined = owners.join(' ');
+
+    if (customerFilter && !customerName.toLowerCase().includes(customerFilter)) {
+      return false;
+    }
+
+    if (ownerFilterTokens.length > 0) {
+      const ownerLower = owners.map((owner) => owner.toLowerCase());
+      const ownerMatch = ownerFilterTokens.some((filterToken) =>
+        ownerLower.some((currentOwner) => currentOwner === filterToken || currentOwner.includes(filterToken))
+      );
+      if (!ownerMatch) {
+        return false;
+      }
+    }
+
+    if (statusFilter && issueStatus.toLowerCase() !== statusFilter) {
+      return false;
+    }
+
+    if (queryFilter) {
+      const searchable = `${customerName} ${issue} ${listStatus} ${issueStatus} ${details} ${blBu} ${notes} ${eosOwners} ${customerOwners} ${cssAction} ${itemType} ${ownerJoined}`.toLowerCase();
+      if (!searchable.includes(queryFilter)) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+
+  return filteredRows.map(toActivity);
 };
 
 export const getCssMeta = (db: Database.Database): { owners: string[]; statuses: string[]; customers: string[] } => {
-  const owners = db
+  const ownersRaw = db
     .prepare(`SELECT DISTINCT css_owner FROM css_activities WHERE css_owner IS NOT NULL AND css_owner != '' ORDER BY css_owner`)
     .all() as Array<{ css_owner: string }>;
-  const statuses = db
+  const statusesRaw = db
     .prepare(`SELECT DISTINCT issue_status FROM css_activities WHERE issue_status IS NOT NULL AND issue_status != '' ORDER BY issue_status`)
     .all() as Array<{ issue_status: string }>;
   const customers = db
     .prepare(`SELECT name FROM css_customers WHERE is_active = 1 ORDER BY name`)
     .all() as Array<{ name: string }>;
 
+  const normalizedStatuses = Array.from(
+    new Set(statusesRaw.map((row) => sanitizeIssueStatus(normalizeChoiceValue(row.issue_status))).filter(Boolean) as string[])
+  ).sort((a, b) => a.localeCompare(b));
   return {
-    owners: owners.map((row) => row.css_owner),
-    statuses: statuses.map((row) => row.issue_status),
+    owners: Array.from(new Set(ownersRaw.flatMap((row) => splitOwners(row.css_owner)))).sort((a, b) => a.localeCompare(b)),
+    statuses: normalizedStatuses,
     customers: customers.map((row) => row.name)
   };
 };
@@ -385,8 +524,18 @@ export const createCssActivity = (
     lastUpdate?: string | null;
     blBu?: string | null;
     issue: string;
+    listStatus?: string | null;
     issueStatus: string;
     details?: string | null;
+    eosOwners?: string | null;
+    customerOwners?: string | null;
+    cssAction?: string | null;
+    notes?: string | null;
+    customerPriority?: string | null;
+    cssPriority?: string | null;
+    dueDate?: string | null;
+    rating?: number | null;
+    itemType?: string | null;
     sourceRef?: string | null;
   }
 ): CssActivity => {
@@ -400,17 +549,29 @@ export const createCssActivity = (
   const activityId = randomUUID();
   db.prepare(`
     INSERT INTO css_activities (
-      activity_id, customer_id, css_owner, last_update, bl_bu, issue, issue_status, details, source_ref, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      activity_id, customer_id, css_owner, last_update, bl_bu, issue, list_status, issue_status, details,
+      eos_owners, customer_owners, css_action, notes, customer_priority, css_priority, due_date, rating, item_type,
+      source_ref, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     activityId,
     customer.customerId,
-    payload.cssOwner?.trim() || null,
+    normalizeOwnerForStorage(payload.cssOwner),
     normalizeDate(payload.lastUpdate) ?? now.slice(0, 10),
-    payload.blBu?.trim() || null,
+    normalizeChoiceValue(payload.blBu),
     issue,
-    sanitizeIssueStatus(payload.issueStatus),
+    normalizeChoiceValue(payload.listStatus),
+    sanitizeIssueStatus(normalizeChoiceValue(payload.issueStatus)),
     payload.details?.trim() || null,
+    normalizeOwnerForStorage(payload.eosOwners),
+    normalizeOwnerForStorage(payload.customerOwners),
+    payload.cssAction?.trim() || null,
+    payload.notes?.trim() || null,
+    normalizeChoiceValue(payload.customerPriority),
+    normalizeChoiceValue(payload.cssPriority),
+    normalizeDate(payload.dueDate) ?? null,
+    payload.rating ?? null,
+    payload.itemType?.trim() || null,
     payload.sourceRef?.trim() || null,
     now,
     now
@@ -419,7 +580,9 @@ export const createCssActivity = (
   const row = db.prepare(`
     SELECT
       a.activity_id, a.customer_id, c.name AS customer_name, a.css_owner, a.last_update, a.bl_bu,
-      a.issue, a.issue_status, a.details, a.source_ref, a.created_at, a.updated_at
+      a.issue, a.list_status, a.issue_status, a.details, a.eos_owners, a.customer_owners,
+      a.css_action, a.notes, a.customer_priority, a.css_priority, a.due_date, a.rating, a.item_type,
+      a.source_ref, a.created_at, a.updated_at
     FROM css_activities a
     JOIN css_customers c ON c.customer_id = a.customer_id
     WHERE a.activity_id = ?
@@ -439,13 +602,25 @@ export const updateCssActivity = (
     lastUpdate?: string | null;
     blBu?: string | null;
     issue?: string;
+    listStatus?: string | null;
     issueStatus?: string;
     details?: string | null;
+    eosOwners?: string | null;
+    customerOwners?: string | null;
+    cssAction?: string | null;
+    notes?: string | null;
+    customerPriority?: string | null;
+    cssPriority?: string | null;
+    dueDate?: string | null;
+    rating?: number | null;
+    itemType?: string | null;
   }
 ): CssActivity => {
   const current = db.prepare(`
     SELECT a.activity_id, a.customer_id, c.name AS customer_name, a.css_owner, a.last_update, a.bl_bu,
-           a.issue, a.issue_status, a.details, a.source_ref, a.created_at, a.updated_at
+           a.issue, a.list_status, a.issue_status, a.details, a.eos_owners, a.customer_owners,
+           a.css_action, a.notes, a.customer_priority, a.css_priority, a.due_date, a.rating, a.item_type,
+           a.source_ref, a.created_at, a.updated_at
     FROM css_activities a
     JOIN css_customers c ON c.customer_id = a.customer_id
     WHERE a.activity_id = ?
@@ -467,25 +642,47 @@ export const updateCssActivity = (
         last_update = ?,
         bl_bu = ?,
         issue = ?,
+        list_status = ?,
         issue_status = ?,
         details = ?,
+        eos_owners = ?,
+        customer_owners = ?,
+        css_action = ?,
+        notes = ?,
+        customer_priority = ?,
+        css_priority = ?,
+        due_date = ?,
+        rating = ?,
+        item_type = ?,
         updated_at = ?
     WHERE activity_id = ?
   `).run(
     customerId,
-    patch.cssOwner === undefined ? current.css_owner : patch.cssOwner?.trim() || null,
+    patch.cssOwner === undefined ? normalizeOwnerForStorage(current.css_owner) : normalizeOwnerForStorage(patch.cssOwner),
     patch.lastUpdate === undefined ? current.last_update : normalizeDate(patch.lastUpdate),
-    patch.blBu === undefined ? current.bl_bu : patch.blBu?.trim() || null,
+    patch.blBu === undefined ? normalizeChoiceValue(current.bl_bu) : normalizeChoiceValue(patch.blBu),
     patch.issue === undefined ? current.issue : patch.issue.trim(),
-    patch.issueStatus === undefined ? current.issue_status : sanitizeIssueStatus(patch.issueStatus),
+    patch.listStatus === undefined ? normalizeChoiceValue(current.list_status) : normalizeChoiceValue(patch.listStatus),
+    patch.issueStatus === undefined ? sanitizeIssueStatus(normalizeChoiceValue(current.issue_status)) : sanitizeIssueStatus(normalizeChoiceValue(patch.issueStatus)),
     patch.details === undefined ? current.details : patch.details?.trim() || null,
+    patch.eosOwners === undefined ? normalizeOwnerForStorage(current.eos_owners) : normalizeOwnerForStorage(patch.eosOwners),
+    patch.customerOwners === undefined ? normalizeOwnerForStorage(current.customer_owners) : normalizeOwnerForStorage(patch.customerOwners),
+    patch.cssAction === undefined ? current.css_action : patch.cssAction?.trim() || null,
+    patch.notes === undefined ? current.notes : patch.notes?.trim() || null,
+    patch.customerPriority === undefined ? normalizeChoiceValue(current.customer_priority) : normalizeChoiceValue(patch.customerPriority),
+    patch.cssPriority === undefined ? normalizeChoiceValue(current.css_priority) : normalizeChoiceValue(patch.cssPriority),
+    patch.dueDate === undefined ? current.due_date : normalizeDate(patch.dueDate),
+    patch.rating === undefined ? current.rating : patch.rating,
+    patch.itemType === undefined ? current.item_type : patch.itemType?.trim() || null,
     now,
     activityId
   );
 
   const updated = db.prepare(`
     SELECT a.activity_id, a.customer_id, c.name AS customer_name, a.css_owner, a.last_update, a.bl_bu,
-           a.issue, a.issue_status, a.details, a.source_ref, a.created_at, a.updated_at
+           a.issue, a.list_status, a.issue_status, a.details, a.eos_owners, a.customer_owners,
+           a.css_action, a.notes, a.customer_priority, a.css_priority, a.due_date, a.rating, a.item_type,
+           a.source_ref, a.created_at, a.updated_at
     FROM css_activities a
     JOIN css_customers c ON c.customer_id = a.customer_id
     WHERE a.activity_id = ?
@@ -570,6 +767,25 @@ export const listCssDocuments = (db: Database.Database): CssDocument[] => {
     uploadedAt: row.uploaded_at,
     processedAt: row.processed_at
   }));
+};
+
+export const bulkUpdateCssActivityStatus = (
+  db: Database.Database,
+  data: { activityIds: string[]; issueStatus: string }
+): { updated: number } => {
+  const ids = data.activityIds.filter((id) => id && id.trim().length > 0);
+  if (ids.length === 0) {
+    throw new Error('Nessuna attività selezionata');
+  }
+  const status = sanitizeIssueStatus(data.issueStatus);
+  const placeholders = ids.map(() => '?').join(',');
+  const now = new Date().toISOString();
+  const result = db.prepare(`
+    UPDATE css_activities
+    SET issue_status = ?, updated_at = ?
+    WHERE activity_id IN (${placeholders})
+  `).run(status, now, ...ids);
+  return { updated: result.changes };
 };
 
 export const processCssDocument = async (

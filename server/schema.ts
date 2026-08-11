@@ -174,8 +174,18 @@ export const initSchema = (db: Database.Database): void => {
       last_update TEXT,
       bl_bu TEXT,
       issue TEXT NOT NULL,
+      list_status TEXT,
       issue_status TEXT NOT NULL,
       details TEXT,
+      eos_owners TEXT,
+      customer_owners TEXT,
+      css_action TEXT,
+      notes TEXT,
+      customer_priority TEXT,
+      css_priority TEXT,
+      due_date TEXT,
+      rating REAL,
+      item_type TEXT,
       source_ref TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
@@ -236,4 +246,16 @@ export const initSchema = (db: Database.Database): void => {
     CREATE INDEX IF NOT EXISTS idx_css_proposals_batch
       ON css_activity_proposals(batch_id);
   `);
+
+  // Backward-compatible migrations for css_activities columns imported from Excel/SharePoint
+  ensureColumn(db, 'css_activities', 'list_status', 'list_status TEXT');
+  ensureColumn(db, 'css_activities', 'eos_owners', 'eos_owners TEXT');
+  ensureColumn(db, 'css_activities', 'customer_owners', 'customer_owners TEXT');
+  ensureColumn(db, 'css_activities', 'css_action', 'css_action TEXT');
+  ensureColumn(db, 'css_activities', 'notes', 'notes TEXT');
+  ensureColumn(db, 'css_activities', 'customer_priority', 'customer_priority TEXT');
+  ensureColumn(db, 'css_activities', 'css_priority', 'css_priority TEXT');
+  ensureColumn(db, 'css_activities', 'due_date', 'due_date TEXT');
+  ensureColumn(db, 'css_activities', 'rating', 'rating REAL');
+  ensureColumn(db, 'css_activities', 'item_type', 'item_type TEXT');
 };

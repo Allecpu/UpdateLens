@@ -6,8 +6,18 @@ export type CssActivity = {
   lastUpdate: string | null;
   blBu: string | null;
   issue: string;
+  listStatus: string | null;
   issueStatus: string;
   details: string | null;
+  eosOwners: string | null;
+  customerOwners: string | null;
+  cssAction: string | null;
+  notes: string | null;
+  customerPriority: string | null;
+  cssPriority: string | null;
+  dueDate: string | null;
+  rating: number | null;
+  itemType: string | null;
   sourceRef: string | null;
   createdAt: string;
   updatedAt: string;

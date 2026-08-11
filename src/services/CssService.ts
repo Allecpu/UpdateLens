@@ -13,8 +13,18 @@ type CreateActivityRequest = {
   lastUpdate?: string | null;
   blBu?: string | null;
   issue: string;
+  listStatus?: string | null;
   issueStatus: string;
   details?: string | null;
+  eosOwners?: string | null;
+  customerOwners?: string | null;
+  cssAction?: string | null;
+  notes?: string | null;
+  customerPriority?: string | null;
+  cssPriority?: string | null;
+  dueDate?: string | null;
+  rating?: number | null;
+  itemType?: string | null;
   sourceRef?: string | null;
 };
 
@@ -88,6 +98,13 @@ export const cssService = {
     return request<CssActivity>(`/api/css/activities/${encodeURIComponent(activityId)}`, {
       method: 'PATCH',
       body: JSON.stringify(payload)
+    });
+  },
+
+  async bulkUpdateStatus(activityIds: string[], issueStatus: string): Promise<{ updated: number }> {
+    return request<{ updated: number }>('/api/css/activities/bulk-status', {
+      method: 'POST',
+      body: JSON.stringify({ activityIds, issueStatus })
     });
   },
 
