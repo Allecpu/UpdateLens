@@ -184,7 +184,7 @@ export function ModernListsLayout({
           <select
             value={customerFilter}
             onChange={(e) => onCustomerFilterChange(e.target.value)}
-            className="ul-input h-8 w-40 px-2 text-xs"
+            className="ul-input h-8 w-40 px-2 text-sm"
           >
             <option value="">Tutti clienti</option>
             {customers.map((customer) => (
@@ -195,7 +195,7 @@ export function ModernListsLayout({
           <select
             value={ownerFilter}
             onChange={(e) => onOwnerFilterChange(e.target.value)}
-            className="ul-input h-8 w-40 px-2 text-xs"
+            className="ul-input h-8 w-40 px-2 text-sm"
           >
             <option value="">Tutti owner</option>
             {owners.map((owner) => (
@@ -206,7 +206,7 @@ export function ModernListsLayout({
           <select
             value={statusFilter}
             onChange={(e) => onStatusFilterChange(e.target.value)}
-            className="ul-input h-8 w-40 px-2 text-xs"
+            className="ul-input h-8 w-40 px-2 text-sm"
           >
             <option value="">Tutti status</option>
             {statuses.map((status) => (
@@ -217,7 +217,7 @@ export function ModernListsLayout({
           <select
             value={ratingFilter}
             onChange={(e) => onRatingFilterChange(e.target.value)}
-            className="ul-input h-8 w-36 px-2 text-xs"
+            className="ul-input h-8 w-36 px-2 text-sm"
           >
             <option value="">Rating</option>
             {ratingOptions.map((rating) => (
@@ -231,7 +231,7 @@ export function ModernListsLayout({
         {hasActiveFilters && (
           <button
             type="button"
-            className="ul-button ul-button-ghost h-8 px-3 text-xs font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+            className="ul-button ul-button-ghost h-8 px-3 text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
             onClick={() => {
               onCustomerFilterChange('');
               onOwnerFilterChange('');
@@ -277,7 +277,7 @@ export function ModernListsLayout({
       )}
 
       {/* 6. Info Bar - Results count and status */}
-      <div className="flex items-center justify-between border-b border-border bg-muted/5 px-4 py-2 text-xs text-muted-foreground">
+      <div className="flex items-center justify-between border-b border-border bg-muted/5 px-4 py-2 text-sm text-muted-foreground">
         <span>
           📊 <strong>{filteredActivities.length}</strong> di <strong>{activities.length}</strong> record visibili
           {hasActiveFilters && <span className="ml-2">• 🔍 Filtri attivi</span>}
