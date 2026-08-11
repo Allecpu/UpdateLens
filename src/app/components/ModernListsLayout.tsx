@@ -95,7 +95,7 @@ export function ModernListsLayout({
         {/* Main Actions */}
         <button
           type="button"
-          className="ul-button ul-button-primary h-8 px-3 text-xs font-medium"
+          className="ul-button ul-button-primary h-8 px-4 text-xs font-semibold"
           onClick={onCreateActivity}
         >
           ➕ Nuova attività
@@ -151,16 +151,16 @@ export function ModernListsLayout({
           {/* Search */}
           <input
             type="text"
-            placeholder="🔍 Cerca..."
+              placeholder="🔍 Cerca attività..."
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
-            className="ul-input h-8 w-40 px-2 text-xs"
+              className="ul-input h-8 w-48 px-3 text-xs"
           />
 
           {/* More Options */}
           <button
             type="button"
-            className={`ul-button ${showAdvancedOptions ? 'ul-button-primary' : 'ul-button-ghost'} h-8 px-3 text-xs`}
+            className={`ul-button ${showAdvancedOptions ? 'ul-button-primary' : 'ul-button-ghost'} h-8 px-4 text-xs font-medium`}
             onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
             title="Filtri avanzati, raggruppamento, esportazione"
           >
@@ -169,7 +169,7 @@ export function ModernListsLayout({
 
           <button
             type="button"
-            className={`ul-button ${showAuditTrail ? 'ul-button-primary' : 'ul-button-ghost'} h-8 px-3 text-xs`}
+            className={`ul-button ${showAuditTrail ? 'ul-button-primary' : 'ul-button-ghost'} h-8 px-4 text-xs font-medium`}
             onClick={() => setShowAuditTrail(!showAuditTrail)}
             title="Visualizza cronologia"
           >
@@ -179,16 +179,14 @@ export function ModernListsLayout({
       </div>
 
       {/* 3. Quick Filters - Inline Dropdowns */}
-      <div className="flex flex-wrap items-end gap-2 border-b border-border bg-background px-4 py-2.5">
-        <div className="flex items-center gap-2">
-          <label className="text-xs font-medium text-muted-foreground">Filtra rapida:</label>
-
+      <div className="flex flex-wrap items-center gap-3 border-b border-border bg-background px-4 py-2.5">
+        <div className="flex items-center gap-3">
           <select
             value={customerFilter}
             onChange={(e) => onCustomerFilterChange(e.target.value)}
-            className="ul-input h-7 w-40 px-2 text-xs"
+            className="ul-input h-8 w-40 px-2 text-xs"
           >
-            <option value="">👤 Tutti i clienti</option>
+            <option value="">Tutti clienti</option>
             {customers.map((customer) => (
               <option key={customer} value={customer}>{customer}</option>
             ))}
@@ -197,9 +195,9 @@ export function ModernListsLayout({
           <select
             value={ownerFilter}
             onChange={(e) => onOwnerFilterChange(e.target.value)}
-            className="ul-input h-7 w-40 px-2 text-xs"
+            className="ul-input h-8 w-40 px-2 text-xs"
           >
-            <option value="">👨‍💼 Tutti owner</option>
+            <option value="">Tutti owner</option>
             {owners.map((owner) => (
               <option key={owner} value={owner}>{owner}</option>
             ))}
@@ -208,9 +206,9 @@ export function ModernListsLayout({
           <select
             value={statusFilter}
             onChange={(e) => onStatusFilterChange(e.target.value)}
-            className="ul-input h-7 w-40 px-2 text-xs"
+            className="ul-input h-8 w-40 px-2 text-xs"
           >
-            <option value="">⚠️ Tutti status</option>
+            <option value="">Tutti status</option>
             {statuses.map((status) => (
               <option key={status} value={status}>{status}</option>
             ))}
@@ -219,9 +217,9 @@ export function ModernListsLayout({
           <select
             value={ratingFilter}
             onChange={(e) => onRatingFilterChange(e.target.value)}
-            className="ul-input h-7 w-32 px-2 text-xs"
+            className="ul-input h-8 w-36 px-2 text-xs"
           >
-            <option value="">⭐ Rating</option>
+            <option value="">Rating</option>
             {ratingOptions.map((rating) => (
               <option key={rating} value={String(rating)}>
                 {renderRatingStars(rating)}
@@ -233,7 +231,7 @@ export function ModernListsLayout({
         {hasActiveFilters && (
           <button
             type="button"
-            className="ul-button ul-button-ghost h-7 px-2 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+            className="ul-button ul-button-ghost h-8 px-3 text-xs font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
             onClick={() => {
               onCustomerFilterChange('');
               onOwnerFilterChange('');
