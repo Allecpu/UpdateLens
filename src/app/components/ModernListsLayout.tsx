@@ -95,7 +95,7 @@ export function ModernListsLayout({
         {/* Main Actions */}
         <button
           type="button"
-          className="ul-button ul-button-primary h-8 px-4 text-xs font-semibold"
+          className="ul-button ul-button-primary h-8 px-4 text-sm font-semibold"
           onClick={onCreateActivity}
         >
           ➕ Nuova attività
@@ -108,7 +108,7 @@ export function ModernListsLayout({
           {customerFilter && (
             <button
               type="button"
-              className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700 dark:bg-blue-900 dark:text-blue-100 hover:bg-blue-200 dark:hover:bg-blue-800"
+              className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-1 text-sm font-medium text-blue-700 dark:bg-blue-900 dark:text-blue-100 hover:bg-blue-200 dark:hover:bg-blue-800"
               onClick={() => onCustomerFilterChange('')}
               title="Clicca per rimuovere"
             >
@@ -118,7 +118,7 @@ export function ModernListsLayout({
           {ownerFilter && (
             <button
               type="button"
-              className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-1 text-xs font-medium text-purple-700 dark:bg-purple-900 dark:text-purple-100 hover:bg-purple-200 dark:hover:bg-purple-800"
+              className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-1 text-sm font-medium text-purple-700 dark:bg-purple-900 dark:text-purple-100 hover:bg-purple-200 dark:hover:bg-purple-800"
               onClick={() => onOwnerFilterChange('')}
               title="Clicca per rimuovere"
             >
@@ -128,7 +128,7 @@ export function ModernListsLayout({
           {statusFilter && (
             <button
               type="button"
-              className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-700 dark:bg-amber-900 dark:text-amber-100 hover:bg-amber-200 dark:hover:bg-amber-800"
+              className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-sm font-medium text-amber-700 dark:bg-amber-900 dark:text-amber-100 hover:bg-amber-200 dark:hover:bg-amber-800"
               onClick={() => onStatusFilterChange('')}
               title="Clicca per rimuovere"
             >
@@ -138,7 +138,7 @@ export function ModernListsLayout({
           {ratingFilter && (
             <button
               type="button"
-              className="inline-flex items-center gap-1 rounded-full bg-yellow-100 px-2 py-1 text-xs font-medium text-yellow-700 dark:bg-yellow-900 dark:text-yellow-100 hover:bg-yellow-200 dark:hover:bg-yellow-800"
+              className="inline-flex items-center gap-1 rounded-full bg-yellow-100 px-2 py-1 text-sm font-medium text-yellow-700 dark:bg-yellow-900 dark:text-yellow-100 hover:bg-yellow-200 dark:hover:bg-yellow-800"
               onClick={() => onRatingFilterChange('')}
               title="Clicca per rimuovere"
             >
@@ -154,13 +154,13 @@ export function ModernListsLayout({
               placeholder="🔍 Cerca attività..."
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
-              className="ul-input h-8 w-48 px-3 text-xs"
+              className="ul-input h-8 w-48 px-3 text-sm"
           />
 
           {/* More Options */}
           <button
             type="button"
-            className={`ul-button ${showAdvancedOptions ? 'ul-button-primary' : 'ul-button-ghost'} h-8 px-4 text-xs font-medium`}
+            className={`ul-button ${showAdvancedOptions ? 'ul-button-primary' : 'ul-button-ghost'} h-8 px-4 text-sm font-medium`}
             onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
             title="Filtri avanzati, raggruppamento, esportazione"
           >
@@ -169,7 +169,7 @@ export function ModernListsLayout({
 
           <button
             type="button"
-            className={`ul-button ${showAuditTrail ? 'ul-button-primary' : 'ul-button-ghost'} h-8 px-4 text-xs font-medium`}
+            className={`ul-button ${showAuditTrail ? 'ul-button-primary' : 'ul-button-ghost'} h-8 px-4 text-sm font-medium`}
             onClick={() => setShowAuditTrail(!showAuditTrail)}
             title="Visualizza cronologia"
           >
