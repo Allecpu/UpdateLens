@@ -337,7 +337,7 @@ const CssPage = () => {
   const [bulkStatus, setBulkStatus] = useState('In progress');
   const [bulkUpdating, setBulkUpdating] = useState(false);
   const [isWideMode, setIsWideMode] = useState(true);
-  const [showColumnPanel, setShowColumnPanel] = useState(true);
+  const [showColumnPanel, setShowColumnPanel] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<Record<ColumnKey, boolean>>(DEFAULT_VISIBLE_COLUMNS);
   const [groupBy, setGroupBy] = useState<GroupByKey>(null);
   const [inlineEditId, setInlineEditId] = useState<string | null>(null);
