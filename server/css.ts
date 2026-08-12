@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type Database from 'better-sqlite3';
+import { getAzureOpenAIConfig } from './chat/AzureServices.js';
 
 export type CssActivity = {
   activityId: string;
@@ -45,6 +46,26 @@ export type CssDocument = {
   extractionError: string | null;
   uploadedAt: string;
   processedAt: string | null;
+  analysisCount: number;
+  lastBatchId: string | null;
+  lastAnalyzedAt: string | null;
+  lastAiProvider: string | null;
+  lastAiModel: string | null;
+  lastExtractionNotes: string | null;
+  reusedExisting?: boolean;
+};
+
+export type CssDocumentBatchSummary = {
+  batchId: string;
+  documentId: string;
+  status: string;
+  aiProvider: string;
+  aiModel: string | null;
+  extractionNotes: string | null;
+  proposalCount: number;
+  createdAt: string;
+  validatedAt: string | null;
+  validatedBy: string | null;
 };
 
 type CssProposalPayload = {
@@ -119,6 +140,33 @@ type ProposalRow = {
 };
 
 const KNOWN_STATUSES = ['Action required', 'In progress', 'Opportunity', 'Planned', 'Done'] as const;
+const EXTRACTION_MODES = ['auto_heuristic_first', 'heuristic_only', 'azure_only'] as const;
+const NOISE_CUSTOMER_TOKENS = new Set([
+  'che',
+  'del',
+  'della',
+  'dello',
+  'dei',
+  'degli',
+  'delle',
+  'di',
+  'il',
+  'lo',
+  'la',
+  'i',
+  'gli',
+  'le',
+  'e',
+  'ed',
+  'a',
+  'da',
+  'in',
+  'su',
+  'per',
+  'con'
+]);
+
+type ExtractionMode = (typeof EXTRACTION_MODES)[number];
 
 const normalizeOwner = (value?: string | null): string | null => {
   const normalized = (value ?? '').trim();
@@ -162,6 +210,21 @@ const normalizeCustomerName = (value: string): string =>
   value
     .trim()
     .replace(/\s+/g, ' ');
+
+const normalizeCustomerMatchKey = (value: string): string =>
+  normalizeCustomerName(value)
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const normalizeCustomerRootKey = (value: string): string => {
+  const tokens = normalizeCustomerMatchKey(value)
+    .split(' ')
+    .filter((token) => token.length > 0)
+    .filter((token) => !['spa', 'srl', 'srls', 'snc', 'sas', 'societa', 'società'].includes(token));
+  return tokens.join(' ').trim();
+};
 
 const splitChoiceTokens = (value?: string | null): string[] => {
   const normalized = (value ?? '').trim();
@@ -260,16 +323,96 @@ const normalizeDate = (raw?: string | null): string | null => {
   return parsed.toISOString().slice(0, 10);
 };
 
-const ensureCustomer = (db: Database.Database, customerName: string): { customerId: string; customerName: string } => {
+const prependDateToDetails = (lastUpdate?: string | null, details?: string | null): string | null => {
+  const normalizedDetails = (details ?? '').trim();
+  if (!normalizedDetails) {
+    return null;
+  }
+  const normalizedDate = normalizeDate(lastUpdate);
+  if (!normalizedDate) {
+    return normalizedDetails;
+  }
+  const alreadyPrefixed = normalizedDetails.startsWith(`[${normalizedDate}]`);
+  if (alreadyPrefixed) {
+    return normalizedDetails;
+  }
+  return `[${normalizedDate}] ${normalizedDetails}`;
+};
+
+const resolveCustomer = (
+  db: Database.Database,
+  customerName: string,
+  options?: { excludeCustomerId?: string }
+): { customerId: string; customerName: string } | null => {
   const normalized = normalizeCustomerName(customerName);
   if (!normalized) {
     throw new Error('Nome cliente obbligatorio');
   }
+
+  const excluded = options?.excludeCustomerId;
+
   const existing = db
     .prepare(`SELECT customer_id, name FROM css_customers WHERE LOWER(name) = LOWER(?)`)
     .get(normalized) as { customer_id: string; name: string } | undefined;
   if (existing) {
+    if (excluded && existing.customer_id === excluded) {
+      return null;
+    }
     return { customerId: existing.customer_id, customerName: existing.name };
+  }
+
+  const rows = db.prepare(`
+    SELECT customer_id, name, aliases_json
+    FROM css_customers
+  `).all() as Array<{ customer_id: string; name: string; aliases_json: string }>;
+
+  const inputKey = normalizeCustomerMatchKey(normalized);
+  const inputRootKey = normalizeCustomerRootKey(normalized);
+  const aliasMatches: Array<{ customer_id: string; name: string }> = [];
+  const rootMatches: Array<{ customer_id: string; name: string }> = [];
+
+  for (const row of rows) {
+    if (excluded && row.customer_id === excluded) {
+      continue;
+    }
+    const aliases = toAliases(row.aliases_json);
+    const allKeys = [normalizeCustomerMatchKey(row.name), ...aliases.map(normalizeCustomerMatchKey)];
+    if (allKeys.includes(inputKey)) {
+      aliasMatches.push({ customer_id: row.customer_id, name: row.name });
+      continue;
+    }
+
+    const rootKeys = [normalizeCustomerRootKey(row.name), ...aliases.map(normalizeCustomerRootKey)].filter(Boolean);
+    if (inputRootKey && rootKeys.includes(inputRootKey)) {
+      rootMatches.push({ customer_id: row.customer_id, name: row.name });
+    }
+  }
+
+  if (aliasMatches.length === 1) {
+    return { customerId: aliasMatches[0].customer_id, customerName: aliasMatches[0].name };
+  }
+  if (rootMatches.length === 1) {
+    return { customerId: rootMatches[0].customer_id, customerName: rootMatches[0].name };
+  }
+  return null;
+};
+
+const ensureCustomer = (
+  db: Database.Database,
+  customerName: string,
+  options?: { createIfMissing?: boolean }
+): { customerId: string; customerName: string } => {
+  const normalized = normalizeCustomerName(customerName);
+  if (!normalized) {
+    throw new Error('Nome cliente obbligatorio');
+  }
+  const resolved = resolveCustomer(db, normalized);
+  if (resolved) {
+    return resolved;
+  }
+
+  if (options?.createIfMissing === false) {
+    throw new Error(`Cliente non trovato in anagrafica: ${normalized}`);
   }
 
   const now = new Date().toISOString();
@@ -342,9 +485,7 @@ export const createCssCustomer = (
     throw new Error('Nome cliente obbligatorio');
   }
 
-  const existing = db
-    .prepare(`SELECT customer_id FROM css_customers WHERE LOWER(name) = LOWER(?)`)
-    .get(normalizedName) as { customer_id: string } | undefined;
+  const existing = resolveCustomer(db, normalizedName);
   if (existing) {
     throw new Error('Cliente già esistente');
   }
@@ -391,9 +532,7 @@ export const updateCssCustomer = (
   }
 
   if (nextName.toLowerCase() !== current.name.toLowerCase()) {
-    const duplicate = db
-      .prepare(`SELECT customer_id FROM css_customers WHERE LOWER(name) = LOWER(?) AND customer_id <> ?`)
-      .get(nextName, customerId) as { customer_id: string } | undefined;
+    const duplicate = resolveCustomer(db, nextName, { excludeCustomerId: customerId });
     if (duplicate) {
       throw new Error('Esiste già un cliente con questo nome');
     }
@@ -521,6 +660,110 @@ const sanitizeIssueStatus = (status?: string | null): string => {
   return match ?? normalized;
 };
 
+const normalizeText = (value?: string | null): string =>
+  (value ?? '')
+    .trim()
+    .replace(/\s+/g, ' ');
+
+const hasLetter = (value: string): boolean => /[A-Za-zÀ-ÖØ-öø-ÿ]/.test(value);
+
+const isLikelyCustomerName = (value: string): boolean => {
+  if (!value || value.length < 3 || value.length > 120) {
+    return false;
+  }
+  if (!hasLetter(value)) {
+    return false;
+  }
+  const tokens = value.toLowerCase().split(/\s+/).filter(Boolean);
+  if (tokens.length === 1 && NOISE_CUSTOMER_TOKENS.has(tokens[0])) {
+    return false;
+  }
+  return true;
+};
+
+const isLikelyIssue = (value: string): boolean => {
+  if (!value || value.length < 5 || value.length > 300) {
+    return false;
+  }
+  return hasLetter(value);
+};
+
+const normalizeProposalPayload = (payload: CssProposalPayload): CssProposalPayload | null => {
+  const customerName = normalizeCustomerName(normalizeText(payload.customerName));
+  const issue = normalizeText(payload.issue);
+  if (!isLikelyCustomerName(customerName) || !isLikelyIssue(issue)) {
+    return null;
+  }
+
+  return {
+    customerName,
+    issue,
+    issueStatus: sanitizeIssueStatus(payload.issueStatus),
+    cssOwner: normalizeOwner(payload.cssOwner) ?? null,
+    blBu: normalizeChoiceValue(payload.blBu) ?? null,
+    details: normalizeText(payload.details) || null,
+    lastUpdate: normalizeDate(payload.lastUpdate) ?? new Date().toISOString().slice(0, 10)
+  };
+};
+
+const normalizeDraftProposal = (
+  proposal: Omit<CssProposal, 'proposalId' | 'batchId' | 'decisionStatus' | 'decisionNote' | 'createdAt' | 'updatedAt'>
+): Omit<CssProposal, 'proposalId' | 'batchId' | 'decisionStatus' | 'decisionNote' | 'createdAt' | 'updatedAt'> | null => {
+  const payload = normalizeProposalPayload(proposal.payload);
+  if (!payload) {
+    return null;
+  }
+  return {
+    ...proposal,
+    payload
+  };
+};
+
+const dedupeProposals = (
+  proposals: Array<Omit<CssProposal, 'proposalId' | 'batchId' | 'decisionStatus' | 'decisionNote' | 'createdAt' | 'updatedAt'>>
+): Array<Omit<CssProposal, 'proposalId' | 'batchId' | 'decisionStatus' | 'decisionNote' | 'createdAt' | 'updatedAt'>> => {
+  const seen = new Set<string>();
+  return proposals.filter((proposal) => {
+    const key = `${proposal.payload.customerName.toLowerCase()}::${proposal.payload.issue.toLowerCase()}`;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+};
+
+const getCssExtractionMode = (): ExtractionMode => {
+  const raw = normalizeText(process.env.CSS_IMPORT_EXTRACTION_MODE).toLowerCase();
+  if (!raw || raw === 'auto' || raw === 'auto_heuristic_first') {
+    return 'auto_heuristic_first';
+  }
+  if (raw === 'heuristic' || raw === 'heuristic_only') {
+    return 'heuristic_only';
+  }
+  if (raw === 'azure' || raw === 'azure_only') {
+    return 'azure_only';
+  }
+  return 'auto_heuristic_first';
+};
+
+const inferPrimaryCustomerName = (text: string): string | null => {
+  const patterns = [
+    /(?:object|oggetto)\s*:\s*(?:visita|incontro)\s+a\s+([A-Z][A-Z0-9& .-]{1,60})/i,
+    /\bvisita\s+a\s+([A-Z][A-Z0-9& .-]{1,60})/i,
+    /\bdedicat[oa]\s+ad\s+([A-Z][A-Z0-9& .-]{1,60})/i,
+    /\ba\s+([A-Z]{2,}(?:\s+[A-Z0-9&.-]{2,}){0,4})\b/
+  ];
+  for (const pattern of patterns) {
+    const match = pattern.exec(text);
+    const candidate = normalizeCustomerName(normalizeText(match?.[1]));
+    if (candidate && isLikelyCustomerName(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+};
+
 const extractTextFromDocx = async (buffer: Buffer): Promise<string> => {
   const { default: JSZip } = await import('jszip');
   const zip = await JSZip.loadAsync(buffer);
@@ -532,7 +775,8 @@ const extractTextFromDocx = async (buffer: Buffer): Promise<string> => {
   return xml
     .replace(/<w:p[^>]*>/g, '\n')
     .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
+    .replace(/[^\S\n]+/g, ' ')
+    .replace(/\n+/g, '\n')
     .replace(/\n\s+/g, '\n')
     .trim();
 };
@@ -555,32 +799,40 @@ const extractTextFromPdf = (buffer: Buffer): string => {
 };
 
 const extractWithHeuristics = (text: string): Array<Omit<CssProposal, 'proposalId' | 'batchId' | 'decisionStatus' | 'decisionNote' | 'createdAt' | 'updatedAt'>> => {
+  const inferredCustomer = inferPrimaryCustomerName(text);
   const lines = text
     .split(/\r?\n|[.;]/)
     .map((line) => line.trim())
     .filter((line) => line.length > 10);
 
   const proposals: Array<Omit<CssProposal, 'proposalId' | 'batchId' | 'decisionStatus' | 'decisionNote' | 'createdAt' | 'updatedAt'>> = [];
-  for (const line of lines.slice(0, 25)) {
+  const actionSentencePattern = /\b(si\s+(?:organizzer[aà]|dovr[aà]|allineer[aà]|proceder[aà])|definizione delle attivit[aà]|presentazione|demo|riprendere l'argomento|approfondimento)\b/i;
+
+  for (const line of lines.slice(0, 120)) {
     const customerMatch = /cliente[:\s-]+([^,;|]+)/i.exec(line);
     const issueMatch = /(attivita|azione|issue|task)[:\s-]+([^,;|]+)/i.exec(line);
     const ownerMatch = /(owner|responsabile|css owner)[:\s-]+([^,;|]+)/i.exec(line);
     const statusMatch = /(status|stato)[:\s-]+([^,;|]+)/i.exec(line);
     const dateMatch = /(scadenza|due date|data)[:\s-]+([0-9]{1,2}\/[0-9]{1,2}\/[0-9]{4}|[0-9]{4}-[0-9]{2}-[0-9]{2})/i.exec(line);
 
-    const customerName = customerMatch?.[1]?.trim();
-    const issue = issueMatch?.[2]?.trim();
-    if (!customerName || !issue) {
+    const customerCandidate = normalizeCustomerName(normalizeText(customerMatch?.[1])) || inferredCustomer;
+    const issueCandidate = normalizeText(issueMatch?.[2]);
+    const heuristicIssue = issueCandidate && isLikelyIssue(issueCandidate)
+      ? issueCandidate
+      : actionSentencePattern.test(line)
+      ? normalizeText(line).slice(0, 220)
+      : '';
+    if (!customerCandidate || !isLikelyCustomerName(customerCandidate) || !heuristicIssue) {
       continue;
     }
 
     proposals.push({
       actionType: 'create',
       targetActivityId: null,
-      confidence: 0.64,
+      confidence: issueCandidate ? 0.64 : 0.56,
       payload: {
-        customerName,
-        issue,
+        customerName: customerCandidate,
+        issue: heuristicIssue,
         issueStatus: sanitizeIssueStatus(statusMatch?.[2]),
         cssOwner: ownerMatch?.[2]?.trim() ?? null,
         details: line,
@@ -592,19 +844,53 @@ const extractWithHeuristics = (text: string): Array<Omit<CssProposal, 'proposalI
   return proposals;
 };
 
-const shouldUseAzureOpenAi = (): boolean =>
-  Boolean(
-    process.env.AZURE_OPENAI_ENDPOINT &&
-      process.env.AZURE_OPENAI_API_KEY &&
-      process.env.AZURE_OPENAI_DEPLOYMENT
-  );
+const shouldUseAzureOpenAi = (): boolean => Boolean(getAzureOpenAIConfig());
+
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+let azureThrottleUntilMs = 0;
+
+const parseRetryDelayMs = (response: Response, attempt: number): number => {
+  const retryAfterMs = response.headers.get('retry-after-ms');
+  const parsedRetryAfterMs = retryAfterMs ? Number.parseInt(retryAfterMs, 10) : Number.NaN;
+  if (Number.isFinite(parsedRetryAfterMs) && parsedRetryAfterMs > 0) {
+    return Math.min(parsedRetryAfterMs, 30_000);
+  }
+
+  const retryAfter = response.headers.get('retry-after');
+  if (retryAfter) {
+    const retryAfterSeconds = Number.parseInt(retryAfter, 10);
+    if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
+      return Math.min(retryAfterSeconds * 1000, 30_000);
+    }
+    const retryDate = new Date(retryAfter);
+    if (!Number.isNaN(retryDate.getTime())) {
+      const delta = retryDate.getTime() - Date.now();
+      if (delta > 0) {
+        return Math.min(delta, 30_000);
+      }
+    }
+  }
+
+  const backoff = 1000 * 2 ** attempt;
+  return Math.min(backoff, 10_000);
+};
 
 const extractWithAzureOpenAi = async (text: string): Promise<CssProposalPayload[]> => {
-  const endpoint = process.env.AZURE_OPENAI_ENDPOINT!;
-  const apiKey = process.env.AZURE_OPENAI_API_KEY!;
-  const deployment = process.env.AZURE_OPENAI_DEPLOYMENT!;
-  const version = process.env.AZURE_OPENAI_API_VERSION || '2024-06-01';
+  const config = getAzureOpenAIConfig();
+  if (!config) {
+    throw new Error('Azure OpenAI non configurato');
+  }
+  const { endpoint, apiKey, deployment, apiVersion } = config;
+  const version = apiVersion || '2024-10-21';
   const url = `${endpoint.replace(/\/$/, '')}/openai/deployments/${deployment}/chat/completions?api-version=${version}`;
+  const maxCharsRaw = Number.parseInt(process.env.CSS_AZURE_MAX_TEXT_CHARS ?? '10000', 10);
+  const maxChars = Number.isFinite(maxCharsRaw) && maxCharsRaw > 0 ? Math.min(Math.max(maxCharsRaw, 3000), 20000) : 10000;
+  const now = Date.now();
+  if (now < azureThrottleUntilMs) {
+    const waitSeconds = Math.ceil((azureThrottleUntilMs - now) / 1000);
+    throw new Error(`Azure OpenAI temporaneamente in throttling (cooldown ${waitSeconds}s)`);
+  }
 
   const prompt = `
 Estrai azioni cliente da questo meeting report.
@@ -612,28 +898,59 @@ Rispondi SOLO JSON valido con array "items".
 Ogni item: customerName, issue, issueStatus, cssOwner, blBu, details, lastUpdate (YYYY-MM-DD o null).
 Se non sei sicuro, usa issueStatus "Action required".
 Testo:
-${text.slice(0, 15000)}
+${text.slice(0, maxChars)}
 `;
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'api-key': apiKey
-    },
-    body: JSON.stringify({
-      messages: [
-        { role: 'system', content: 'You are an extraction engine that outputs strict JSON.' },
-        { role: 'user', content: prompt }
-      ],
-      temperature: 0.1,
-      response_format: { type: 'json_object' }
-    })
-  });
+  const maxAttemptsRaw = Number.parseInt(process.env.CSS_AZURE_RETRY_MAX_ATTEMPTS ?? '3', 10);
+  const maxAttempts = Number.isFinite(maxAttemptsRaw) && maxAttemptsRaw > 0 ? Math.min(maxAttemptsRaw, 6) : 3;
 
-  if (!response.ok) {
-    const message = await response.text();
-    throw new Error(`Azure OpenAI error (${response.status}): ${message.slice(0, 300)}`);
+  let response: Response | null = null;
+  let lastErrorBody = '';
+  let lastStatus = 0;
+  let lastRetryDelayMs = 0;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'api-key': apiKey
+      },
+      body: JSON.stringify({
+        messages: [
+          { role: 'system', content: 'You are an extraction engine that outputs strict JSON.' },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.1,
+        response_format: { type: 'json_object' }
+      })
+    });
+
+    if (response.ok) {
+      break;
+    }
+
+    lastStatus = response.status;
+    lastErrorBody = await response.text();
+    const retryableStatus = response.status === 429 || response.status === 503;
+    const hasMoreAttempts = attempt < maxAttempts - 1;
+    if (retryableStatus && hasMoreAttempts) {
+      const delayMs = parseRetryDelayMs(response, attempt);
+      lastRetryDelayMs = delayMs;
+      await sleep(delayMs);
+      continue;
+    }
+    break;
+  }
+
+  if (!response || !response.ok) {
+    const status = response?.status ?? lastStatus;
+    const body = lastErrorBody || (response ? await response.text() : '');
+    if (status === 429) {
+      const cooldownMs = Math.max(lastRetryDelayMs, 30_000);
+      azureThrottleUntilMs = Date.now() + cooldownMs;
+      throw new Error(`Azure OpenAI rate limit (429), cooldown ${Math.ceil(cooldownMs / 1000)}s`);
+    }
+    throw new Error(`Azure OpenAI error (${status}): ${body.slice(0, 300)}`);
   }
 
   const payload = (await response.json()) as {
@@ -940,6 +1257,34 @@ export const uploadCssDocument = async (
 
   const fileHash = createHash('sha256').update(fileBuffer).digest('hex');
   const now = new Date().toISOString();
+  const existing = db.prepare(`
+    SELECT document_id
+    FROM css_meeting_documents
+    WHERE file_hash = ?
+    ORDER BY uploaded_at DESC
+    LIMIT 1
+  `).get(fileHash) as { document_id: string } | undefined;
+
+  if (existing) {
+    db.prepare(`
+      UPDATE css_meeting_documents
+      SET filename = ?, mime_type = ?, uploaded_by = ?, uploaded_at = ?, content_base64 = ?
+      WHERE document_id = ?
+    `).run(
+      data.filename.trim(),
+      data.mimeType?.trim() || null,
+      data.uploadedBy?.trim() || null,
+      now,
+      data.contentBase64,
+      existing.document_id
+    );
+    const current = getCssDocumentSummaryById(db, existing.document_id);
+    if (!current) {
+      throw new Error('Documento duplicato trovato ma non recuperabile');
+    }
+    return { ...current, reusedExisting: true };
+  }
+
   const documentId = randomUUID();
 
   db.prepare(`
@@ -958,44 +1303,299 @@ export const uploadCssDocument = async (
     now
   );
 
-  return {
-    documentId,
-    filename: data.filename.trim(),
-    mimeType: data.mimeType?.trim() || null,
-    fileType,
-    extractionStatus: 'pending',
-    extractionError: null,
-    uploadedAt: now,
-    processedAt: null
-  };
+  const inserted = getCssDocumentSummaryById(db, documentId);
+  if (!inserted) {
+    throw new Error('Documento creato ma non recuperabile');
+  }
+  return inserted;
+};
+
+type DocumentSummaryRow = {
+  document_id: string;
+  filename: string;
+  mime_type: string | null;
+  file_type: 'docx' | 'doc' | 'pdf';
+  extraction_status: 'pending' | 'processed' | 'failed';
+  extraction_error: string | null;
+  uploaded_at: string;
+  processed_at: string | null;
+  analysis_count: number;
+  last_batch_id: string | null;
+  last_analyzed_at: string | null;
+  last_ai_provider: string | null;
+  last_ai_model: string | null;
+  last_extraction_notes: string | null;
+};
+
+const mapDocumentSummary = (row: DocumentSummaryRow): CssDocument => ({
+  documentId: row.document_id,
+  filename: row.filename,
+  mimeType: row.mime_type,
+  fileType: row.file_type,
+  extractionStatus: row.extraction_status,
+  extractionError: row.extraction_error,
+  uploadedAt: row.uploaded_at,
+  processedAt: row.processed_at,
+  analysisCount: Number(row.analysis_count) || 0,
+  lastBatchId: row.last_batch_id,
+  lastAnalyzedAt: row.last_analyzed_at,
+  lastAiProvider: row.last_ai_provider,
+  lastAiModel: row.last_ai_model,
+  lastExtractionNotes: row.last_extraction_notes
+});
+
+const DOCS_SUMMARY_CTE = `
+  WITH ranked_docs AS (
+    SELECT
+      d.document_id,
+      d.filename,
+      d.mime_type,
+      d.file_type,
+      d.file_hash,
+      d.extraction_status,
+      d.extraction_error,
+      d.uploaded_at,
+      d.processed_at,
+      ROW_NUMBER() OVER (PARTITION BY d.file_hash ORDER BY d.uploaded_at DESC, d.document_id DESC) AS row_num
+    FROM css_meeting_documents d
+  ),
+  latest_docs AS (
+    SELECT *
+    FROM ranked_docs
+    WHERE row_num = 1
+  )
+`;
+
+const getCssDocumentSummaryById = (db: Database.Database, documentId: string): CssDocument | null => {
+  const row = db.prepare(`
+    ${DOCS_SUMMARY_CTE}
+    SELECT
+      ld.document_id,
+      ld.filename,
+      ld.mime_type,
+      ld.file_type,
+      ld.extraction_status,
+      ld.extraction_error,
+      ld.uploaded_at,
+      ld.processed_at,
+      (
+        SELECT COUNT(*)
+        FROM css_validation_batches vb
+        JOIN css_meeting_documents d2 ON d2.document_id = vb.document_id
+        WHERE d2.file_hash = ld.file_hash
+      ) AS analysis_count,
+      (
+        SELECT vb.batch_id
+        FROM css_validation_batches vb
+        JOIN css_meeting_documents d2 ON d2.document_id = vb.document_id
+        WHERE d2.file_hash = ld.file_hash
+        ORDER BY vb.created_at DESC
+        LIMIT 1
+      ) AS last_batch_id,
+      (
+        SELECT vb.created_at
+        FROM css_validation_batches vb
+        JOIN css_meeting_documents d2 ON d2.document_id = vb.document_id
+        WHERE d2.file_hash = ld.file_hash
+        ORDER BY vb.created_at DESC
+        LIMIT 1
+      ) AS last_analyzed_at,
+      (
+        SELECT vb.ai_provider
+        FROM css_validation_batches vb
+        JOIN css_meeting_documents d2 ON d2.document_id = vb.document_id
+        WHERE d2.file_hash = ld.file_hash
+        ORDER BY vb.created_at DESC
+        LIMIT 1
+      ) AS last_ai_provider,
+      (
+        SELECT vb.ai_model
+        FROM css_validation_batches vb
+        JOIN css_meeting_documents d2 ON d2.document_id = vb.document_id
+        WHERE d2.file_hash = ld.file_hash
+        ORDER BY vb.created_at DESC
+        LIMIT 1
+      ) AS last_ai_model,
+      (
+        SELECT vb.extraction_notes
+        FROM css_validation_batches vb
+        JOIN css_meeting_documents d2 ON d2.document_id = vb.document_id
+        WHERE d2.file_hash = ld.file_hash
+        ORDER BY vb.created_at DESC
+        LIMIT 1
+      ) AS last_extraction_notes
+    FROM latest_docs ld
+    WHERE ld.document_id = ?
+  `).get(documentId) as DocumentSummaryRow | undefined;
+
+  return row ? mapDocumentSummary(row) : null;
 };
 
 export const listCssDocuments = (db: Database.Database): CssDocument[] => {
   const rows = db.prepare(`
-    SELECT document_id, filename, mime_type, file_type, extraction_status, extraction_error, uploaded_at, processed_at
-    FROM css_meeting_documents
-    ORDER BY uploaded_at DESC
+    ${DOCS_SUMMARY_CTE}
+    SELECT
+      ld.document_id,
+      ld.filename,
+      ld.mime_type,
+      ld.file_type,
+      ld.extraction_status,
+      ld.extraction_error,
+      ld.uploaded_at,
+      ld.processed_at,
+      (
+        SELECT COUNT(*)
+        FROM css_validation_batches vb
+        JOIN css_meeting_documents d2 ON d2.document_id = vb.document_id
+        WHERE d2.file_hash = ld.file_hash
+      ) AS analysis_count,
+      (
+        SELECT vb.batch_id
+        FROM css_validation_batches vb
+        JOIN css_meeting_documents d2 ON d2.document_id = vb.document_id
+        WHERE d2.file_hash = ld.file_hash
+        ORDER BY vb.created_at DESC
+        LIMIT 1
+      ) AS last_batch_id,
+      (
+        SELECT vb.created_at
+        FROM css_validation_batches vb
+        JOIN css_meeting_documents d2 ON d2.document_id = vb.document_id
+        WHERE d2.file_hash = ld.file_hash
+        ORDER BY vb.created_at DESC
+        LIMIT 1
+      ) AS last_analyzed_at,
+      (
+        SELECT vb.ai_provider
+        FROM css_validation_batches vb
+        JOIN css_meeting_documents d2 ON d2.document_id = vb.document_id
+        WHERE d2.file_hash = ld.file_hash
+        ORDER BY vb.created_at DESC
+        LIMIT 1
+      ) AS last_ai_provider,
+      (
+        SELECT vb.ai_model
+        FROM css_validation_batches vb
+        JOIN css_meeting_documents d2 ON d2.document_id = vb.document_id
+        WHERE d2.file_hash = ld.file_hash
+        ORDER BY vb.created_at DESC
+        LIMIT 1
+      ) AS last_ai_model,
+      (
+        SELECT vb.extraction_notes
+        FROM css_validation_batches vb
+        JOIN css_meeting_documents d2 ON d2.document_id = vb.document_id
+        WHERE d2.file_hash = ld.file_hash
+        ORDER BY vb.created_at DESC
+        LIMIT 1
+      ) AS last_extraction_notes
+    FROM latest_docs ld
+    ORDER BY ld.uploaded_at DESC
     LIMIT 50
-  `).all() as Array<{
+  `).all() as DocumentSummaryRow[];
+  return rows.map(mapDocumentSummary);
+};
+
+export const listCssDocumentBatches = (db: Database.Database, documentId: string): CssDocumentBatchSummary[] => {
+  const document = db.prepare(`
+    SELECT file_hash
+    FROM css_meeting_documents
+    WHERE document_id = ?
+  `).get(documentId) as { file_hash: string } | undefined;
+  if (!document) {
+    throw new Error('Documento non trovato');
+  }
+
+  const rows = db.prepare(`
+    SELECT
+      vb.batch_id,
+      vb.document_id,
+      vb.status,
+      vb.ai_provider,
+      vb.ai_model,
+      vb.extraction_notes,
+      vb.created_at,
+      vb.validated_at,
+      vb.validated_by,
+      (
+        SELECT COUNT(*)
+        FROM css_activity_proposals p
+        WHERE p.batch_id = vb.batch_id
+      ) AS proposal_count
+    FROM css_validation_batches vb
+    JOIN css_meeting_documents d ON d.document_id = vb.document_id
+    WHERE d.file_hash = ?
+    ORDER BY vb.created_at DESC
+    LIMIT 40
+  `).all(document.file_hash) as Array<{
+    batch_id: string;
     document_id: string;
-    filename: string;
-    mime_type: string | null;
-    file_type: 'docx' | 'doc' | 'pdf';
-    extraction_status: 'pending' | 'processed' | 'failed';
-    extraction_error: string | null;
-    uploaded_at: string;
-    processed_at: string | null;
+    status: string;
+    ai_provider: string;
+    ai_model: string | null;
+    extraction_notes: string | null;
+    created_at: string;
+    validated_at: string | null;
+    validated_by: string | null;
+    proposal_count: number;
   }>;
+
   return rows.map((row) => ({
+    batchId: row.batch_id,
     documentId: row.document_id,
-    filename: row.filename,
-    mimeType: row.mime_type,
-    fileType: row.file_type,
-    extractionStatus: row.extraction_status,
-    extractionError: row.extraction_error,
-    uploadedAt: row.uploaded_at,
-    processedAt: row.processed_at
+    status: row.status,
+    aiProvider: row.ai_provider,
+    aiModel: row.ai_model,
+    extractionNotes: row.extraction_notes,
+    proposalCount: Number(row.proposal_count) || 0,
+    createdAt: row.created_at,
+    validatedAt: row.validated_at,
+    validatedBy: row.validated_by
   }));
+};
+
+export const deleteCssDocument = (
+  db: Database.Database,
+  documentId: string
+): { deletedDocuments: number; deletedBatches: number; deletedProposals: number } => {
+  const document = db.prepare(`
+    SELECT file_hash
+    FROM css_meeting_documents
+    WHERE document_id = ?
+  `).get(documentId) as { file_hash: string } | undefined;
+  if (!document) {
+    throw new Error('Documento non trovato');
+  }
+
+  const deleted = db.transaction(() => {
+    const deletedBatches = db.prepare(`
+      SELECT COUNT(*) AS count
+      FROM css_validation_batches vb
+      JOIN css_meeting_documents d ON d.document_id = vb.document_id
+      WHERE d.file_hash = ?
+    `).get(document.file_hash) as { count: number };
+
+    const deletedProposals = db.prepare(`
+      SELECT COUNT(*) AS count
+      FROM css_activity_proposals p
+      JOIN css_validation_batches vb ON vb.batch_id = p.batch_id
+      JOIN css_meeting_documents d ON d.document_id = vb.document_id
+      WHERE d.file_hash = ?
+    `).get(document.file_hash) as { count: number };
+
+    const removedDocs = db.prepare(`
+      DELETE FROM css_meeting_documents
+      WHERE file_hash = ?
+    `).run(document.file_hash);
+
+    return {
+      deletedDocuments: removedDocs.changes,
+      deletedBatches: Number(deletedBatches.count) || 0,
+      deletedProposals: Number(deletedProposals.count) || 0
+    };
+  })();
+
+  return deleted;
 };
 
 export const bulkUpdateCssActivityStatus = (
@@ -1054,39 +1654,88 @@ export const processCssDocument = async (
     throw new Error('Nessun testo estraibile trovato nel documento');
   }
 
+  const extractionMode = getCssExtractionMode();
   const aiEnabled = shouldUseAzureOpenAi();
   let aiProvider = 'none';
   let aiModel: string | null = null;
-  let extractionNotes: string | null = null;
-  let extractedPayloads: CssProposalPayload[] = [];
+  const notes: string[] = [`mode=${extractionMode}`];
 
-  if (aiEnabled) {
-    try {
-      extractedPayloads = await extractWithAzureOpenAi(extractedText);
-      aiProvider = 'azure_openai';
-      aiModel = process.env.AZURE_OPENAI_DEPLOYMENT || null;
-    } catch (error) {
-      extractionNotes = error instanceof Error ? error.message : 'Errore AI sconosciuto';
-    }
-  }
+  const heuristic = dedupeProposals(
+    extractWithHeuristics(extractedText)
+      .map((proposal) => normalizeDraftProposal(proposal))
+      .filter((proposal): proposal is Omit<CssProposal, 'proposalId' | 'batchId' | 'decisionStatus' | 'decisionNote' | 'createdAt' | 'updatedAt'> => Boolean(proposal))
+  );
 
-  const heuristic = extractWithHeuristics(extractedText);
-  const merged = extractedPayloads.length > 0
-    ? extractedPayloads.map((payload) => ({
+  const runAzureExtraction = async (): Promise<Array<Omit<CssProposal, 'proposalId' | 'batchId' | 'decisionStatus' | 'decisionNote' | 'createdAt' | 'updatedAt'>>> => {
+    const extractedPayloads = await extractWithAzureOpenAi(extractedText);
+    aiProvider = 'azure_openai';
+    aiModel = process.env.AZURE_OPENAI_DEPLOYMENT || null;
+    const aiProposals = extractedPayloads
+      .map((payload) => normalizeProposalPayload(payload))
+      .filter((payload): payload is CssProposalPayload => Boolean(payload))
+      .map((payload) => ({
         actionType: 'create' as const,
         targetActivityId: null,
         confidence: 0.82,
-        payload: {
-          customerName: payload.customerName?.trim() || 'Cliente da validare',
-          issue: payload.issue?.trim() || 'Azione da validare',
-          issueStatus: sanitizeIssueStatus(payload.issueStatus),
-          cssOwner: payload.cssOwner?.trim() || null,
-          blBu: payload.blBu?.trim() || null,
-          details: payload.details?.trim() || null,
-          lastUpdate: normalizeDate(payload.lastUpdate) ?? new Date().toISOString().slice(0, 10)
+        payload
+      }));
+    return dedupeProposals(aiProposals);
+  };
+
+  let merged: Array<Omit<CssProposal, 'proposalId' | 'batchId' | 'decisionStatus' | 'decisionNote' | 'createdAt' | 'updatedAt'>> = [];
+
+  if (extractionMode === 'heuristic_only') {
+    merged = heuristic;
+    notes.push(`heuristic=${heuristic.length}`);
+  } else if (extractionMode === 'azure_only') {
+    if (!aiEnabled) {
+      throw new Error('Modalità azure_only attiva ma Azure OpenAI non configurato');
+    }
+    merged = await runAzureExtraction();
+    notes.push(`azure=${merged.length}`);
+  } else {
+    notes.push(`heuristic=${heuristic.length}`);
+    if (aiEnabled) {
+      try {
+        const azure = await runAzureExtraction();
+        notes.push(`azure=${azure.length}`);
+        // In auto mode prefer AI candidates, but keep heuristic-only insights as fallback.
+        merged = dedupeProposals([...azure, ...heuristic]);
+        if (azure.length > 0 && heuristic.length > 0) {
+          aiProvider = 'hybrid';
         }
-      }))
-    : heuristic;
+      } catch (error) {
+        const rawMessage = error instanceof Error ? error.message : 'errore sconosciuto';
+        const compactMessage = rawMessage.replace(/\s+/g, ' ').slice(0, 140);
+        notes.push(`azure_error=${compactMessage}`);
+        merged = heuristic;
+      }
+    } else {
+      notes.push('azure=disabled');
+      merged = heuristic;
+    }
+  }
+
+  if (merged.length === 0) {
+    const fallbackCustomer = inferPrimaryCustomerName(extractedText) ?? 'Cliente da validare';
+    merged = [
+      {
+        actionType: 'create',
+        targetActivityId: null,
+        confidence: 0.35,
+        payload: {
+          customerName: fallbackCustomer,
+          issue: 'Review meeting report e definire azioni operative',
+          issueStatus: 'Action required',
+          details: normalizeText(extractedText).slice(0, 400),
+          lastUpdate: new Date().toISOString().slice(0, 10)
+        }
+      }
+    ];
+    notes.push('manual_review_fallback=1');
+  }
+
+  const extractionNotes = notes.join(' | ');
 
   const now = new Date().toISOString();
   const batchId = randomUUID();
@@ -1192,6 +1841,8 @@ export const validateCssBatch = (
         ...proposal.payload,
         ...(decision?.payloadOverride ?? {})
       };
+      mergedPayload.lastUpdate = normalizeDate(mergedPayload.lastUpdate) ?? new Date().toISOString().slice(0, 10);
+      mergedPayload.details = prependDateToDetails(mergedPayload.lastUpdate, mergedPayload.details);
 
       if (finalDecision === 'approved') {
         if (proposal.actionType === 'update' && proposal.targetActivityId) {

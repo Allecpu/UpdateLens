@@ -28,6 +28,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Run CSS extract benchmark
+        env:
+          AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+          AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+          AZURE_OPENAI_DEPLOYMENT: ${{ vars.AZURE_OPENAI_DEPLOYMENT }}
+          AZURE_OPENAI_API_VERSION: ${{ vars.AZURE_OPENAI_API_VERSION }}
+          CSS_EXTRACT_REQUIRE_AI: "true"
+          CSS_AZURE_RETRY_MAX_ATTEMPTS: "3"
+          CSS_AZURE_MAX_TEXT_CHARS: "10000"
+        run: npm run test:css-extract
+
       - name: Build frontend (Vite)
         env:
           VITE_CHAT_BACKEND_ENABLED: "true"

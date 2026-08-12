@@ -895,12 +895,34 @@ export const createApi = () => {
     }
   });
 
+  app.delete('/api/css/documents/:id', (req, res) => {
+    try {
+      const result = css.deleteCssDocument(db, req.params.id);
+      res.json(result);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Errore durante eliminazione documento';
+      const status = message.includes('non trovato') ? 404 : 400;
+      res.status(status).json({ error: message });
+    }
+  });
+
   app.post('/api/css/documents/:id/extract', async (req, res) => {
     try {
       const result = await css.processCssDocument(db, req.params.id);
       res.status(201).json(result);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Errore durante l\'estrazione documento';
+      const status = message.includes('non trovato') ? 404 : 400;
+      res.status(status).json({ error: message });
+    }
+  });
+
+  app.get('/api/css/documents/:id/batches', (req, res) => {
+    try {
+      const items = css.listCssDocumentBatches(db, req.params.id);
+      res.json({ items, total: items.length });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Errore durante il recupero storico analisi documento';
       const status = message.includes('non trovato') ? 404 : 400;
       res.status(status).json({ error: message });
     }

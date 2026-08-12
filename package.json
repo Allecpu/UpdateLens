@@ -23,7 +23,8 @@
         "test:chat-api": "tsx tools/testChatApi.ts",
         "test:chat-intent": "tsx tools/testChatIntent.ts",
         "test:chat-response": "tsx tools/testChatResponse.ts",
-        "test:chat-unit": "npm run test:chat-intent && npm run test:chat-response"
+        "test:chat-unit": "npm run test:chat-intent && npm run test:chat-response",
+        "test:css-extract": "tsx tools/testCssExtract.ts"
     },
     "dependencies": {
         "better-sqlite3": "^9.6.0",

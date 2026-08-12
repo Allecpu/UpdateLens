@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { CssActivity, CssCustomer, CssProposal } from '../../models/Css';
+import type { CssActivity, CssCustomer, CssDocument, CssDocumentBatchSummary, CssProposal, CssProposalPayload } from '../../models/Css';
 import { cssService } from '../../services/CssService';
 import { loadCustomerIndex } from '../../services/CustomerStorage';
 import { useCssControlsStore } from '../store/cssControlsStore';
@@ -36,6 +36,13 @@ const formatDate = (value?: string | null): string => {
   return parsed.toLocaleDateString('it-IT');
 };
 
+const formatDateTime = (value?: string | null): string => {
+  if (!value) return '-';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' });
+};
+
 const toDateInputValue = (value?: string | null): string => {
   if (!value) return '';
   const direct = value.trim();
@@ -67,6 +74,23 @@ const normalizeOwnerLabel = (value: string): string => {
 
 const normalizeCustomerKey = (value: string): string =>
   value.trim().replace(/\s+/g, ' ').toLowerCase();
+
+const normalizeCustomerRootKey = (value: string): string =>
+  normalizeCustomerKey(value)
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .split(' ')
+    .filter((token) => token.length > 0)
+    .filter((token) => !['spa', 'srl', 'srls', 'snc', 'sas', 'societa', 'società'].includes(token))
+    .join(' ')
+    .trim();
+
+const buildDetailsWithDate = (lastUpdate?: string | null, details?: string | null): string => {
+  const text = (details ?? '').trim();
+  if (!text) return '';
+  const date = toDateInputValue(lastUpdate);
+  if (!date) return text;
+  return text.startsWith(`[${date}]`) ? text : `[${date}] ${text}`;
+};
 
 const ensureFilterArray = (value?: string | string[]): string[] => {
   if (Array.isArray(value)) {
@@ -606,11 +630,19 @@ const CssPage = () => {
 
   const [uploading, setUploading] = useState(false);
   const [extractingId, setExtractingId] = useState<string | null>(null);
-  const [documents, setDocuments] = useState<Array<{ documentId: string; filename: string; extractionStatus: string; uploadedAt: string; extractionError: string | null }>>([]);
+  const [deletingDocumentId, setDeletingDocumentId] = useState<string | null>(null);
+  const [documents, setDocuments] = useState<CssDocument[]>([]);
+  const [expandedDocumentHistory, setExpandedDocumentHistory] = useState<Record<string, boolean>>({});
+  const [documentBatchesById, setDocumentBatchesById] = useState<Record<string, CssDocumentBatchSummary[]>>({});
+  const [loadingDocumentHistoryId, setLoadingDocumentHistoryId] = useState<string | null>(null);
   const [activeBatchId, setActiveBatchId] = useState<string | null>(null);
   const [proposals, setProposals] = useState<CssProposal[]>([]);
+  const [proposalOverrides, setProposalOverrides] = useState<Record<string, Partial<CssProposalPayload>>>({});
+  const [aliasTargetByProposal, setAliasTargetByProposal] = useState<Record<string, string>>({});
+  const [addingAliasProposalId, setAddingAliasProposalId] = useState<string | null>(null);
   const [approved, setApproved] = useState<Record<string, boolean>>({});
   const [validating, setValidating] = useState(false);
+  const [extractionSummary, setExtractionSummary] = useState<string | null>(null);
   const [validationSummary, setValidationSummary] = useState<string | null>(null);
   const [quickUpdatingId, setQuickUpdatingId] = useState<string | null>(null);
   const [choiceEditor, setChoiceEditor] = useState<{ activityId: string; field: EditableChoiceField } | null>(null);
@@ -623,6 +655,7 @@ const CssPage = () => {
   const [creatingCustomer, setCreatingCustomer] = useState(false);
   const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
   const [editingCustomerName, setEditingCustomerName] = useState('');
+  const [editingCustomerAliases, setEditingCustomerAliases] = useState('');
   const [savingCustomer, setSavingCustomer] = useState(false);
   const [mergePrimaryCustomerId, setMergePrimaryCustomerId] = useState('');
   const [mergeSecondaryCustomerId, setMergeSecondaryCustomerId] = useState('');
@@ -1001,7 +1034,10 @@ const CssPage = () => {
     setUploading(true);
     setError(null);
     try {
-      await cssService.uploadDocument(file);
+      const uploaded = await cssService.uploadDocument(file);
+      if (uploaded.reusedExisting) {
+        setExtractionSummary(`Documento già presente: aggiornato record esistente (${uploaded.filename}).`);
+      }
       await refreshDocuments();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Errore upload documento');
@@ -1013,21 +1049,200 @@ const CssPage = () => {
   const onExtract = async (documentId: string) => {
     setExtractingId(documentId);
     setError(null);
+    setExtractionSummary(null);
     setValidationSummary(null);
     try {
       const result = await cssService.extractDocument(documentId);
       setActiveBatchId(result.batchId);
       setProposals(result.proposals);
+      setProposalOverrides({});
+      setAliasTargetByProposal({});
       const decisions: Record<string, boolean> = {};
       result.proposals.forEach((proposal) => {
         decisions[proposal.proposalId] = true;
       });
       setApproved(decisions);
+      const provider = result.aiProvider === 'none' ? 'heuristic' : result.aiProvider;
+      const model = result.aiModel ? ` • Modello: ${result.aiModel}` : '';
+      const notes = result.notes ? ` • Note: ${result.notes}` : '';
+      setExtractionSummary(`Estrazione completata: ${result.proposals.length} proposte • Provider: ${provider}${model}${notes}`);
+      setDocumentBatchesById((prev) => {
+        const next = { ...prev };
+        delete next[documentId];
+        return next;
+      });
       await refreshDocuments();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Errore estrazione documento');
     } finally {
       setExtractingId(null);
+    }
+  };
+
+  const onDeleteDocument = async (document: CssDocument) => {
+    const confirmDelete = window.confirm(`Eliminare il documento "${document.filename}" e tutto lo storico analisi collegato?`);
+    if (!confirmDelete) return;
+
+    setDeletingDocumentId(document.documentId);
+    setError(null);
+    try {
+      const result = await cssService.deleteDocument(document.documentId);
+      setExpandedDocumentHistory((prev) => {
+        const next = { ...prev };
+        delete next[document.documentId];
+        return next;
+      });
+      setDocumentBatchesById((prev) => {
+        const next = { ...prev };
+        delete next[document.documentId];
+        return next;
+      });
+      if (document.lastBatchId && document.lastBatchId === activeBatchId) {
+        setActiveBatchId(null);
+        setProposals([]);
+        setApproved({});
+      }
+      setExtractionSummary(
+        `Documento eliminato: ${result.deletedDocuments} record documento, ${result.deletedBatches} batch e ${result.deletedProposals} proposte rimossi.`
+      );
+      await refreshDocuments();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Errore eliminazione documento');
+    } finally {
+      setDeletingDocumentId(null);
+    }
+  };
+
+  const toggleDocumentHistory = async (documentId: string) => {
+    const isOpen = expandedDocumentHistory[documentId] === true;
+    if (isOpen) {
+      setExpandedDocumentHistory((prev) => ({ ...prev, [documentId]: false }));
+      return;
+    }
+    if (!documentBatchesById[documentId]) {
+      setLoadingDocumentHistoryId(documentId);
+      try {
+        const result = await cssService.listDocumentBatches(documentId);
+        setDocumentBatchesById((prev) => ({ ...prev, [documentId]: result.items }));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Errore caricamento storico analisi');
+        return;
+      } finally {
+        setLoadingDocumentHistoryId(null);
+      }
+    }
+    setExpandedDocumentHistory((prev) => ({ ...prev, [documentId]: true }));
+  };
+
+  const customerResolutionMaps = useMemo(() => {
+    const exact = new Map<string, string>();
+    const root = new Map<string, string>();
+
+    const setUnique = (map: Map<string, string>, key: string, canonical: string) => {
+      const existing = map.get(key);
+      if (!existing) {
+        map.set(key, canonical);
+        return;
+      }
+      if (existing !== canonical) {
+        map.set(key, '');
+      }
+    };
+
+    cssCustomers.forEach((customer) => {
+      const canonical = customer.name;
+      const names = [customer.name, ...customer.aliases];
+      names.forEach((name) => {
+        const exactKey = normalizeCustomerKey(name);
+        if (exactKey) setUnique(exact, exactKey, canonical);
+        const rootKey = normalizeCustomerRootKey(name);
+        if (rootKey) setUnique(root, rootKey, canonical);
+      });
+    });
+
+    return { exact, root };
+  }, [cssCustomers]);
+
+  const resolveCanonicalCustomer = (rawName: string): string | null => {
+    const exactKey = normalizeCustomerKey(rawName);
+    const exactMatch = customerResolutionMaps.exact.get(exactKey);
+    if (exactMatch !== undefined) {
+      return exactMatch || null;
+    }
+    const rootKey = normalizeCustomerRootKey(rawName);
+    const rootMatch = customerResolutionMaps.root.get(rootKey);
+    if (rootMatch !== undefined) {
+      return rootMatch || null;
+    }
+    return null;
+  };
+
+  const getProposalDraft = (proposal: CssProposal): CssProposalPayload => {
+    const override = proposalOverrides[proposal.proposalId] ?? {};
+    return {
+      ...proposal.payload,
+      ...override
+    };
+  };
+
+  const updateProposalDraft = (
+    proposalId: string,
+    patch: Partial<CssProposalPayload>
+  ) => {
+    setProposalOverrides((prev) => ({
+      ...prev,
+      [proposalId]: {
+        ...(prev[proposalId] ?? {}),
+        ...patch
+      }
+    }));
+  };
+
+  const onAddProposalCustomerAsAlias = async (proposal: CssProposal) => {
+    const draft = getProposalDraft(proposal);
+    const candidateAlias = (draft.customerName ?? '').trim();
+    if (!candidateAlias) {
+      setError('Nome cliente proposta vuoto: impossibile creare alias');
+      return;
+    }
+
+    const targetCustomerId = aliasTargetByProposal[proposal.proposalId];
+    if (!targetCustomerId) {
+      setError('Seleziona un cliente canonico prima di aggiungere l’alias');
+      return;
+    }
+
+    const targetCustomer = cssCustomers.find((customer) => customer.customerId === targetCustomerId);
+    if (!targetCustomer) {
+      setError('Cliente canonico non trovato');
+      return;
+    }
+
+    const aliasNormalized = normalizeCustomerKey(candidateAlias);
+    const canonicalNormalized = normalizeCustomerKey(targetCustomer.name);
+    if (aliasNormalized === canonicalNormalized) {
+      updateProposalDraft(proposal.proposalId, { customerName: targetCustomer.name });
+      return;
+    }
+
+    setAddingAliasProposalId(proposal.proposalId);
+    setError(null);
+    try {
+      const mergedAliases = Array.from(
+        new Set(
+          [...targetCustomer.aliases, candidateAlias]
+            .map((alias) => alias.trim())
+            .filter((alias) => alias.length > 0)
+        )
+      );
+      await cssService.updateCustomer(targetCustomer.customerId, { aliases: mergedAliases });
+      await Promise.all([refreshCssCustomers(), refreshMeta()]);
+      updateProposalDraft(proposal.proposalId, { customerName: targetCustomer.name });
+      setExtractionSummary(`Alias aggiunto: "${candidateAlias}" -> ${targetCustomer.name}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Errore aggiunta alias cliente');
+    } finally {
+      setAddingAliasProposalId(null);
     }
   };
 
@@ -1037,10 +1252,24 @@ const CssPage = () => {
     setError(null);
     setValidationSummary(null);
     try {
-      const decisions = proposals.map((proposal) => ({
-        proposalId: proposal.proposalId,
-        decision: approved[proposal.proposalId] ? ('approved' as const) : ('rejected' as const)
-      }));
+      const decisions = proposals.map((proposal) => {
+        const draft = getProposalDraft(proposal);
+        const canonicalCustomer = resolveCanonicalCustomer(draft.customerName) ?? draft.customerName;
+        const payloadOverride: Partial<CssProposalPayload> = {
+          customerName: canonicalCustomer,
+          issue: draft.issue,
+          issueStatus: draft.issueStatus,
+          cssOwner: draft.cssOwner ?? null,
+          blBu: draft.blBu ?? null,
+          lastUpdate: toDateInputValue(draft.lastUpdate) || draft.lastUpdate || null,
+          details: buildDetailsWithDate(draft.lastUpdate, draft.details ?? null)
+        };
+        return {
+          proposalId: proposal.proposalId,
+          decision: approved[proposal.proposalId] ? ('approved' as const) : ('rejected' as const),
+          payloadOverride
+        };
+      });
       const result = await cssService.validateBatch(activeBatchId, {
         decisions
       });
@@ -1750,6 +1979,7 @@ const CssPage = () => {
   const startEditCssCustomer = (customer: CssCustomer) => {
     setEditingCustomerId(customer.customerId);
     setEditingCustomerName(customer.name);
+    setEditingCustomerAliases(customer.aliases.join(', '));
   };
 
   const onSaveCssCustomer = async () => {
@@ -1759,9 +1989,14 @@ const CssPage = () => {
     setSavingCustomer(true);
     setError(null);
     try {
-      await cssService.updateCustomer(editingCustomerId, { name: candidate });
+      const aliases = editingCustomerAliases
+        .split(',')
+        .map((alias) => alias.trim())
+        .filter((alias) => alias.length > 0);
+      await cssService.updateCustomer(editingCustomerId, { name: candidate, aliases });
       setEditingCustomerId(null);
       setEditingCustomerName('');
+      setEditingCustomerAliases('');
       await Promise.all([refreshCssCustomers(), refreshActivities(), refreshMeta()]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Errore aggiornamento cliente');
@@ -1899,6 +2134,12 @@ const CssPage = () => {
       {validationSummary && (
         <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-300">
           {validationSummary}
+        </div>
+      )}
+
+      {extractionSummary && (
+        <div className="rounded-xl border border-sky-500/30 bg-sky-500/10 p-3 text-sm text-sky-700 dark:text-sky-300">
+          {extractionSummary}
         </div>
       )}
 
@@ -2846,22 +3087,35 @@ const CssPage = () => {
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="min-w-0 flex-1">
                         {editingCustomerId === customer.customerId ? (
-                          <input
-                            className="ul-input"
-                            value={editingCustomerName}
-                            onChange={(event) => setEditingCustomerName(event.target.value)}
-                            onKeyDown={(event) => {
-                              if (event.key === 'Enter') {
-                                void onSaveCssCustomer();
-                              }
-                            }}
-                          />
+                          <div className="space-y-2">
+                            <input
+                              className="ul-input"
+                              value={editingCustomerName}
+                              onChange={(event) => setEditingCustomerName(event.target.value)}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter') {
+                                  void onSaveCssCustomer();
+                                }
+                              }}
+                            />
+                            <input
+                              className="ul-input"
+                              placeholder="Alias separati da virgola (es: AEB, AEB Italia, Nordica)"
+                              value={editingCustomerAliases}
+                              onChange={(event) => setEditingCustomerAliases(event.target.value)}
+                            />
+                          </div>
                         ) : (
                           <div className="font-medium">{customer.name}</div>
                         )}
                         <div className="mt-1 text-xs text-muted-foreground">
                           Attività collegate: {customer.activityCount} • Stato: {customer.isActive ? 'Attivo' : 'Inattivo'}
                         </div>
+                        {customer.aliases.length > 0 && (
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            Alias: {customer.aliases.join(', ')}
+                          </div>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         {editingCustomerId === customer.customerId ? (
@@ -3179,20 +3433,70 @@ const CssPage = () => {
                 <div>
                   <div className="font-medium">{document.filename}</div>
                   <div className="text-xs text-muted-foreground">
-                    Stato: {document.extractionStatus} • Caricato: {formatDate(document.uploadedAt)}
+                    Stato: {document.extractionStatus} • Caricato: {formatDate(document.uploadedAt)} • Analisi: {document.analysisCount}
+                    {document.lastAnalyzedAt ? ` • Ultima analisi: ${formatDateTime(document.lastAnalyzedAt)}` : ''}
                   </div>
+                  {(document.lastAiProvider || document.lastExtractionNotes) && (
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      Ultimo provider: {document.lastAiProvider ?? 'n/a'}
+                      {document.lastAiModel ? ` • Modello: ${document.lastAiModel}` : ''}
+                      {document.lastExtractionNotes ? ` • Note: ${document.lastExtractionNotes}` : ''}
+                    </div>
+                  )}
                   {document.extractionError && (
                     <div className="mt-1 text-xs text-destructive">{document.extractionError}</div>
                   )}
                 </div>
-                <button
-                  className="ul-button ul-button-ghost"
-                  onClick={() => void onExtract(document.documentId)}
-                  disabled={extractingId === document.documentId}
-                >
-                  {extractingId === document.documentId ? 'Analisi...' : 'Analizza'}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    className="ul-button ul-button-ghost text-red-600"
+                    onClick={() => void onDeleteDocument(document)}
+                    disabled={deletingDocumentId === document.documentId || extractingId === document.documentId}
+                  >
+                    {deletingDocumentId === document.documentId ? 'Eliminazione...' : 'Elimina'}
+                  </button>
+                  <button
+                    className="ul-button ul-button-ghost"
+                    onClick={() => void toggleDocumentHistory(document.documentId)}
+                    disabled={loadingDocumentHistoryId === document.documentId || deletingDocumentId === document.documentId}
+                  >
+                    {loadingDocumentHistoryId === document.documentId
+                      ? 'Caricamento...'
+                      : expandedDocumentHistory[document.documentId]
+                      ? 'Nascondi storico'
+                      : 'Storico'}
+                  </button>
+                  <button
+                    className="ul-button ul-button-ghost"
+                    onClick={() => void onExtract(document.documentId)}
+                    disabled={extractingId === document.documentId || deletingDocumentId === document.documentId}
+                  >
+                    {extractingId === document.documentId ? 'Analisi...' : 'Analizza'}
+                  </button>
+                </div>
               </div>
+              {expandedDocumentHistory[document.documentId] && (
+                <div className="mt-3 rounded-lg border border-border bg-muted/20 p-3">
+                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Storico analisi</div>
+                  {(documentBatchesById[document.documentId] ?? []).length === 0 ? (
+                    <div className="text-sm text-muted-foreground">Nessuna analisi disponibile.</div>
+                  ) : (
+                    <div className="space-y-2">
+                      {(documentBatchesById[document.documentId] ?? []).map((batch) => (
+                        <div key={batch.batchId} className="rounded-md border border-border bg-background p-2 text-xs">
+                          <div>
+                            Batch: {batch.batchId} • Stato: {batch.status} • Proposte: {batch.proposalCount} • Data: {formatDateTime(batch.createdAt)}
+                          </div>
+                          <div className="mt-1 text-muted-foreground">
+                            Provider: {batch.aiProvider}{batch.aiModel ? ` • Modello: ${batch.aiModel}` : ''}
+                            {batch.extractionNotes ? ` • Note: ${batch.extractionNotes}` : ''}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -3236,19 +3540,83 @@ const CssPage = () => {
         ) : (
           <>
             <div className="mt-3 space-y-2">
-              {proposals.map((proposal) => (
+              {proposals.map((proposal) => {
+                const draft = getProposalDraft(proposal);
+                const resolvedCustomer = resolveCanonicalCustomer(draft.customerName);
+                const datePrefixedDetails = buildDetailsWithDate(draft.lastUpdate, draft.details ?? null);
+                return (
                 <div key={proposal.proposalId} className="rounded-xl border border-border p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
                       <div className="font-medium">
-                        [{proposal.actionType.toUpperCase()}] {proposal.payload.customerName} - {proposal.payload.issue}
+                        [{proposal.actionType.toUpperCase()}] {draft.customerName} - {draft.issue}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        Status proposto: {proposal.payload.issueStatus} • Confidence: {(proposal.confidence * 100).toFixed(0)}%
+                        Status proposto: {draft.issueStatus} • Confidence: {(proposal.confidence * 100).toFixed(0)}%
                       </div>
-                      {proposal.payload.details && (
-                        <p className="mt-1 text-sm text-muted-foreground">{proposal.payload.details}</p>
+                      {resolvedCustomer && normalizeCustomerKey(resolvedCustomer) !== normalizeCustomerKey(draft.customerName) && (
+                        <div className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                          Cliente riconosciuto: <strong>{resolvedCustomer}</strong> (da alias: {draft.customerName})
+                        </div>
                       )}
+                      {!resolvedCustomer && (
+                        <div className="mt-2 rounded-lg border border-amber-300/60 bg-amber-50/50 p-2 text-xs text-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+                          Nuova società rilevata: <strong>{draft.customerName}</strong>. Vuoi aggiungerla come alias a un cliente canonico?
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <select
+                              className="ul-input h-9 min-w-[240px]"
+                              value={aliasTargetByProposal[proposal.proposalId] ?? ''}
+                              onChange={(event) =>
+                                setAliasTargetByProposal((prev) => ({
+                                  ...prev,
+                                  [proposal.proposalId]: event.target.value
+                                }))
+                              }
+                            >
+                              <option value="">Seleziona cliente canonico...</option>
+                              {cssCustomers.map((customer) => (
+                                <option key={customer.customerId} value={customer.customerId}>
+                                  {customer.name}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              className="ul-button ul-button-ghost h-9 px-3"
+                              onClick={() => void onAddProposalCustomerAsAlias(proposal)}
+                              disabled={addingAliasProposalId === proposal.proposalId}
+                            >
+                              {addingAliasProposalId === proposal.proposalId ? 'Aggiunta...' : 'Aggiungi alias'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      <div className="mt-3 grid gap-2 md:grid-cols-2">
+                        <input
+                          className="ul-input"
+                          value={draft.customerName}
+                          onChange={(event) => updateProposalDraft(proposal.proposalId, { customerName: event.target.value })}
+                          placeholder="Cliente"
+                        />
+                        <input
+                          className="ul-input"
+                          value={toDateInputValue(draft.lastUpdate)}
+                          onChange={(event) => updateProposalDraft(proposal.proposalId, { lastUpdate: event.target.value })}
+                          type="date"
+                        />
+                        <input
+                          className="ul-input md:col-span-2"
+                          value={draft.issue}
+                          onChange={(event) => updateProposalDraft(proposal.proposalId, { issue: event.target.value })}
+                          placeholder="Testo attività"
+                        />
+                        <textarea
+                          className="ul-textarea md:col-span-2 min-h-[92px]"
+                          value={datePrefixedDetails}
+                          onChange={(event) => updateProposalDraft(proposal.proposalId, { details: event.target.value })}
+                          placeholder="Dettagli attività"
+                        />
+                      </div>
                     </div>
                     <label className="inline-flex items-center gap-2 text-sm">
                       <input
@@ -3262,7 +3630,7 @@ const CssPage = () => {
                     </label>
                   </div>
                 </div>
-              ))}
+              )})}
             </div>
             <div className="mt-4">
               <button className="ul-button ul-button-primary" onClick={() => void onValidateBatch()} disabled={validating || !activeBatchId}>

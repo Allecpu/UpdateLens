@@ -48,6 +48,26 @@ export type CssDocument = {
   extractionError: string | null;
   uploadedAt: string;
   processedAt: string | null;
+  analysisCount: number;
+  lastBatchId: string | null;
+  lastAnalyzedAt: string | null;
+  lastAiProvider: string | null;
+  lastAiModel: string | null;
+  lastExtractionNotes: string | null;
+  reusedExisting?: boolean;
+};
+
+export type CssDocumentBatchSummary = {
+  batchId: string;
+  documentId: string;
+  status: string;
+  aiProvider: string;
+  aiModel: string | null;
+  extractionNotes: string | null;
+  proposalCount: number;
+  createdAt: string;
+  validatedAt: string | null;
+  validatedBy: string | null;
 };
 
 export type CssProposalPayload = {

@@ -1,4 +1,4 @@
-import type { CssActivity, CssCustomer, CssDocument, CssMeta, CssProposal } from '../models/Css';
+import type { CssActivity, CssCustomer, CssDocument, CssDocumentBatchSummary, CssMeta, CssProposal } from '../models/Css';
 
 type ActivityFilters = {
   customer?: string;
@@ -173,10 +173,23 @@ export const cssService = {
     });
   },
 
+  async deleteDocument(documentId: string): Promise<{ deletedDocuments: number; deletedBatches: number; deletedProposals: number }> {
+    return request<{ deletedDocuments: number; deletedBatches: number; deletedProposals: number }>(
+      `/api/css/documents/${encodeURIComponent(documentId)}`,
+      { method: 'DELETE' }
+    );
+  },
+
   async extractDocument(documentId: string): Promise<{ batchId: string; proposals: CssProposal[]; aiProvider: string; aiModel: string | null; notes: string | null }> {
     return request<{ batchId: string; proposals: CssProposal[]; aiProvider: string; aiModel: string | null; notes: string | null }>(
       `/api/css/documents/${encodeURIComponent(documentId)}/extract`,
       { method: 'POST' }
+    );
+  },
+
+  async listDocumentBatches(documentId: string): Promise<{ items: CssDocumentBatchSummary[]; total: number }> {
+    return request<{ items: CssDocumentBatchSummary[]; total: number }>(
+      `/api/css/documents/${encodeURIComponent(documentId)}/batches`
     );
   },
 

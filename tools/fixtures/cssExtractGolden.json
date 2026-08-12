@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "thresholds": {
+    "precisionMin": 0.8
+  },
+  "cases": [
+    {
+      "id": "aeb-2025-12-11",
+      "filePath": "docs/CSS/CSS_AEB_ReportMeeting_11122025.docx",
+      "expected": [
+        {
+          "customerName": "AEB",
+          "issueKeywords": ["demo", "IAE", "Intercompany", "consolidamento"]
+        },
+        {
+          "customerName": "AEB",
+          "issueKeywords": ["manutenzione", "impianti", "secondo semestre"]
+        },
+        {
+          "customerName": "AEB",
+          "issueKeywords": ["MES", "demo", "approfondimento"]
+        },
+        {
+          "customerName": "AEB",
+          "issueKeywords": ["presentazione", "soluzioni EOS", "consolidamento"]
+        },
+        {
+          "customerName": "AEB",
+          "issueKeywords": ["roll-out", "consociate", "attività necessarie"]
+        }
+      ]
+    }
+  ]
+}
