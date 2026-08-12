@@ -1,6 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Route, Routes } from 'react-router-dom';
-import ClientsPage from './app/pages/ClientsPage';
 import DashboardPage from './app/pages/DashboardPage';
 import GlobalFiltersPage from './app/pages/GlobalFiltersPage';
 import LearnPage from './app/pages/LearnPage';
@@ -19,7 +18,6 @@ import { useAuthStore } from './app/store/useAuthStore';
 import { useBootstrapFilters } from './hooks/useBootstrapFilters';
 import { useBootstrapPresets } from './hooks/useBootstrapPresets';
 
-const isEntryActive = (entry: { isActive?: boolean }): boolean => entry.isActive !== false;
 type NavItem = {
   to: string;
   label: string;
@@ -28,7 +26,6 @@ type NavItem = {
 
 const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Dashboard', end: true },
-  { to: '/clienti', label: 'Clienti' },
   { to: '/filtri-globali', label: 'Filtri globali' },
   { to: '/learn', label: 'Learn' },
   { to: '/versione', label: 'Versione' },
@@ -44,6 +41,8 @@ const getNavLinkClassName = (isActive: boolean): string =>
       ? 'border-primary text-foreground'
       : 'border-transparent text-muted-foreground hover:-translate-y-0.5 hover:border-border/80 hover:text-foreground'
   }`;
+
+const isEntryActive = (entry: { isActive?: boolean }): boolean => entry.isActive !== false;
 
 const CustomerPicker = () => {
   const { index, activeCustomerId, setActiveCustomer } = useCustomerStore();
@@ -341,7 +340,6 @@ const App = () => {
       <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
         <Routes>
           <Route path="/" element={<DashboardPage />} />
-          <Route path="/clienti" element={<ClientsPage />} />
           <Route path="/filtri-globali" element={<GlobalFiltersPage />} />
           <Route path="/learn" element={<LearnPage />} />
           <Route path="/learn/:productKey" element={<LearnPage />} />

@@ -706,6 +706,69 @@ export const createApi = () => {
   // CSS API Endpoints
   // ============================================
 
+  app.get('/api/css/customers', (_req, res) => {
+    try {
+      res.json({ items: css.listCssCustomers(db) });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Errore durante il recupero clienti CSS';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  app.post('/api/css/customers', (req, res) => {
+    try {
+      const { name, aliases, isActive } = req.body ?? {};
+      if (!name || typeof name !== 'string') {
+        return res.status(400).json({ error: 'name obbligatorio' });
+      }
+      const created = css.createCssCustomer(db, {
+        name,
+        aliases: Array.isArray(aliases) ? aliases.filter((item: unknown) => typeof item === 'string') : [],
+        isActive: typeof isActive === 'boolean' ? isActive : true
+      });
+      res.status(201).json(created);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Errore durante la creazione cliente CSS';
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.patch('/api/css/customers/:id', (req, res) => {
+    try {
+      const { name, aliases, isActive } = req.body ?? {};
+      const updated = css.updateCssCustomer(db, req.params.id, {
+        name: typeof name === 'string' ? name : undefined,
+        aliases: Array.isArray(aliases)
+          ? aliases.filter((item: unknown) => typeof item === 'string')
+          : undefined,
+        isActive: typeof isActive === 'boolean' ? isActive : undefined
+      });
+      res.json(updated);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Errore durante aggiornamento cliente CSS';
+      const status = message.includes('non trovato') ? 404 : 400;
+      res.status(status).json({ error: message });
+    }
+  });
+
+  app.post('/api/css/customers/merge', (req, res) => {
+    try {
+      const { primaryCustomerId, secondaryCustomerId } = req.body ?? {};
+      if (!primaryCustomerId || typeof primaryCustomerId !== 'string') {
+        return res.status(400).json({ error: 'primaryCustomerId obbligatorio' });
+      }
+      if (!secondaryCustomerId || typeof secondaryCustomerId !== 'string') {
+        return res.status(400).json({ error: 'secondaryCustomerId obbligatorio' });
+      }
+      const result = css.mergeCssCustomers(db, { primaryCustomerId, secondaryCustomerId });
+      res.json(result);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Errore durante merge clienti CSS';
+      const status = message.includes('non trovato') ? 404 : 400;
+      res.status(status).json({ error: message });
+    }
+  });
+
   app.get('/api/css/meta', (_req, res) => {
     try {
       res.json(css.getCssMeta(db));

@@ -29,6 +29,16 @@ export type CssMeta = {
   customers: string[];
 };
 
+export type CssCustomer = {
+  customerId: string;
+  name: string;
+  aliases: string[];
+  isActive: boolean;
+  activityCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type CssDocument = {
   documentId: string;
   filename: string;

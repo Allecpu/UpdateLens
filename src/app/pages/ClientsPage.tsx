@@ -56,7 +56,11 @@ const resolveTargetCustomerIds = (
   return Array.from(selected);
 };
 
-const ClientsPage = () => {
+type ClientsPageProps = {
+  hideGroups?: boolean;
+};
+
+const ClientsPage = ({ hideGroups = false }: ClientsPageProps) => {
   const rulesConfig = loadRulesConfig();
   const [snapshotItems, setSnapshotItems] = useState<ReleaseItem[]>([]);
   const [snapshotErrors, setSnapshotErrors] = useState<string[]>([]);
@@ -564,6 +568,7 @@ const ClientsPage = () => {
         </aside>
 
         <div className="space-y-6">
+          {!hideGroups && (
           <section className="ul-surface p-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-lg font-semibold">
@@ -621,6 +626,7 @@ const ClientsPage = () => {
               </button>
             </div>
           </section>
+          )}
 
           <section className="ul-surface p-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -802,7 +808,7 @@ const ClientsPage = () => {
         </div>
       )}
 
-      {groupToDelete && (
+      {!hideGroups && groupToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="ul-surface w-full max-w-md p-6">
             <h3 className="text-lg font-semibold">Conferma eliminazione</h3>
@@ -828,4 +834,3 @@ const ClientsPage = () => {
 };
 
 export default ClientsPage;
-

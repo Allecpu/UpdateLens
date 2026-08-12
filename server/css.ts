@@ -26,6 +26,16 @@ export type CssActivity = {
   updatedAt: string;
 };
 
+export type CssCustomer = {
+  customerId: string;
+  name: string;
+  aliases: string[];
+  isActive: boolean;
+  activityCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type CssDocument = {
   documentId: string;
   filename: string;
@@ -148,6 +158,11 @@ const normalizeOwnerForStorage = (value?: string | null): string | null => {
 const normalizeFilterToken = (value?: string | null): string =>
   (value ?? '').trim().toLowerCase();
 
+const normalizeCustomerName = (value: string): string =>
+  value
+    .trim()
+    .replace(/\s+/g, ' ');
+
 const splitChoiceTokens = (value?: string | null): string[] => {
   const normalized = (value ?? '').trim();
   if (!normalized) {
@@ -246,7 +261,7 @@ const normalizeDate = (raw?: string | null): string | null => {
 };
 
 const ensureCustomer = (db: Database.Database, customerName: string): { customerId: string; customerName: string } => {
-  const normalized = customerName.trim();
+  const normalized = normalizeCustomerName(customerName);
   if (!normalized) {
     throw new Error('Nome cliente obbligatorio');
   }
@@ -264,6 +279,220 @@ const ensureCustomer = (db: Database.Database, customerName: string): { customer
     VALUES (?, ?, '[]', 1, ?, ?)
   `).run(customerId, normalized, now, now);
   return { customerId, customerName: normalized };
+};
+
+const toAliases = (raw: string): string[] => {
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return Array.from(
+      new Set(
+        parsed
+          .filter((item): item is string => typeof item === 'string')
+          .map((item) => normalizeCustomerName(item))
+          .filter((item) => item.length > 0)
+      )
+    );
+  } catch {
+    return [];
+  }
+};
+
+export const listCssCustomers = (db: Database.Database): CssCustomer[] => {
+  const rows = db.prepare(`
+    SELECT
+      c.customer_id,
+      c.name,
+      c.aliases_json,
+      c.is_active,
+      c.created_at,
+      c.updated_at,
+      COUNT(a.activity_id) AS activity_count
+    FROM css_customers c
+    LEFT JOIN css_activities a ON a.customer_id = c.customer_id
+    GROUP BY c.customer_id, c.name, c.aliases_json, c.is_active, c.created_at, c.updated_at
+    ORDER BY c.is_active DESC, c.name ASC
+  `).all() as Array<{
+    customer_id: string;
+    name: string;
+    aliases_json: string;
+    is_active: number;
+    created_at: string;
+    updated_at: string;
+    activity_count: number;
+  }>;
+
+  return rows.map((row) => ({
+    customerId: row.customer_id,
+    name: row.name,
+    aliases: toAliases(row.aliases_json),
+    isActive: row.is_active === 1,
+    activityCount: Number(row.activity_count) || 0,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  }));
+};
+
+export const createCssCustomer = (
+  db: Database.Database,
+  payload: { name: string; aliases?: string[] | null; isActive?: boolean }
+): CssCustomer => {
+  const normalizedName = normalizeCustomerName(payload.name);
+  if (!normalizedName) {
+    throw new Error('Nome cliente obbligatorio');
+  }
+
+  const existing = db
+    .prepare(`SELECT customer_id FROM css_customers WHERE LOWER(name) = LOWER(?)`)
+    .get(normalizedName) as { customer_id: string } | undefined;
+  if (existing) {
+    throw new Error('Cliente già esistente');
+  }
+
+  const now = new Date().toISOString();
+  const customerId = randomUUID();
+  const aliases = Array.from(
+    new Set(
+      (payload.aliases ?? [])
+        .map((alias) => normalizeCustomerName(alias))
+        .filter((alias) => alias.length > 0 && alias.toLowerCase() !== normalizedName.toLowerCase())
+    )
+  );
+  db.prepare(`
+    INSERT INTO css_customers (customer_id, name, aliases_json, is_active, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(customerId, normalizedName, JSON.stringify(aliases), payload.isActive === false ? 0 : 1, now, now);
+
+  const created = listCssCustomers(db).find((item) => item.customerId === customerId);
+  if (!created) {
+    throw new Error('Errore creazione cliente');
+  }
+  return created;
+};
+
+export const updateCssCustomer = (
+  db: Database.Database,
+  customerId: string,
+  patch: { name?: string; aliases?: string[] | null; isActive?: boolean }
+): CssCustomer => {
+  const current = db.prepare(`
+    SELECT customer_id, name, aliases_json, is_active
+    FROM css_customers
+    WHERE customer_id = ?
+  `).get(customerId) as { customer_id: string; name: string; aliases_json: string; is_active: number } | undefined;
+
+  if (!current) {
+    throw new Error('Cliente non trovato');
+  }
+
+  const nextName = patch.name !== undefined ? normalizeCustomerName(patch.name) : current.name;
+  if (!nextName) {
+    throw new Error('Nome cliente obbligatorio');
+  }
+
+  if (nextName.toLowerCase() !== current.name.toLowerCase()) {
+    const duplicate = db
+      .prepare(`SELECT customer_id FROM css_customers WHERE LOWER(name) = LOWER(?) AND customer_id <> ?`)
+      .get(nextName, customerId) as { customer_id: string } | undefined;
+    if (duplicate) {
+      throw new Error('Esiste già un cliente con questo nome');
+    }
+  }
+
+  const nextAliases = patch.aliases !== undefined
+    ? Array.from(
+        new Set(
+          (patch.aliases ?? [])
+            .map((alias) => normalizeCustomerName(alias))
+            .filter((alias) => alias.length > 0 && alias.toLowerCase() !== nextName.toLowerCase())
+        )
+      )
+    : toAliases(current.aliases_json);
+
+  const now = new Date().toISOString();
+  db.prepare(`
+    UPDATE css_customers
+    SET name = ?, aliases_json = ?, is_active = ?, updated_at = ?
+    WHERE customer_id = ?
+  `).run(
+    nextName,
+    JSON.stringify(nextAliases),
+    patch.isActive === undefined ? current.is_active : patch.isActive ? 1 : 0,
+    now,
+    customerId
+  );
+
+  const updated = listCssCustomers(db).find((item) => item.customerId === customerId);
+  if (!updated) {
+    throw new Error('Cliente non trovato dopo aggiornamento');
+  }
+  return updated;
+};
+
+export const mergeCssCustomers = (
+  db: Database.Database,
+  payload: { primaryCustomerId: string; secondaryCustomerId: string }
+): { primary: CssCustomer; mergedActivities: number } => {
+  const primary = db.prepare(`
+    SELECT customer_id, name, aliases_json
+    FROM css_customers
+    WHERE customer_id = ?
+  `).get(payload.primaryCustomerId) as { customer_id: string; name: string; aliases_json: string } | undefined;
+
+  const secondary = db.prepare(`
+    SELECT customer_id, name, aliases_json
+    FROM css_customers
+    WHERE customer_id = ?
+  `).get(payload.secondaryCustomerId) as { customer_id: string; name: string; aliases_json: string } | undefined;
+
+  if (!primary || !secondary) {
+    throw new Error('Cliente primario o secondario non trovato');
+  }
+  if (primary.customer_id === secondary.customer_id) {
+    throw new Error('Impossibile unire lo stesso cliente');
+  }
+
+  const mergedAliases = Array.from(
+    new Set(
+      [
+        ...toAliases(primary.aliases_json),
+        ...toAliases(secondary.aliases_json),
+        secondary.name
+      ]
+        .map((alias) => normalizeCustomerName(alias))
+        .filter((alias) => alias.length > 0 && alias.toLowerCase() !== primary.name.toLowerCase())
+    )
+  );
+
+  const now = new Date().toISOString();
+  const tx = db.transaction(() => {
+    const activityResult = db.prepare(`
+      UPDATE css_activities
+      SET customer_id = ?, updated_at = ?
+      WHERE customer_id = ?
+    `).run(primary.customer_id, now, secondary.customer_id);
+
+    db.prepare(`
+      UPDATE css_customers
+      SET aliases_json = ?, updated_at = ?
+      WHERE customer_id = ?
+    `).run(JSON.stringify(mergedAliases), now, primary.customer_id);
+
+    db.prepare(`DELETE FROM css_customers WHERE customer_id = ?`).run(secondary.customer_id);
+
+    return activityResult.changes;
+  });
+
+  const mergedActivities = tx();
+  const updatedPrimary = listCssCustomers(db).find((item) => item.customerId === primary.customer_id);
+  if (!updatedPrimary) {
+    throw new Error('Cliente primario non trovato dopo merge');
+  }
+
+  return {
+    primary: updatedPrimary,
+    mergedActivities
+  };
 };
 
 const findMatchingActivity = (

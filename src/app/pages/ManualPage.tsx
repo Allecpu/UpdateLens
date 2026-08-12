@@ -21,7 +21,7 @@ const SECTIONS: ManualSection[] = [
     whenToUse:
       'Usala per preparare un aggiornamento cliente, controllare le prossime release o costruire una selezione da esportare.',
     steps: [
-      'Scegli "Tutti i clienti" o un cliente specifico dal selettore nell\'intestazione.',
+      'Applica il perimetro clienti direttamente dalle impostazioni clienti/filtro in CSS.',
       'Seleziona un preset e, se necessario, modifica i filtri laterali per questa analisi.',
       'Apri una scheda per leggere dettaglio, stato, data, prodotti e collegamenti alla fonte.',
       'Aggiungi ai segnalibri gli elementi da conservare oppure limita la vista ai soli segnalibri.',
@@ -34,22 +34,20 @@ const SECTIONS: ManualSection[] = [
   },
   {
     id: 'clienti',
-    title: 'Clienti e gruppi',
+    title: 'Clienti (in CSS)',
     purpose:
       'Definisce il perimetro commerciale usato per associare prodotti, Owner CSS e aggiornamenti ai clienti.',
     whenToUse:
-      'Aggiorna questa area quando entra un nuovo cliente, cambia il portafoglio prodotti o serve un nuovo raggruppamento.',
+      'Aggiorna questa area quando entra un nuovo cliente o cambia il portafoglio prodotti.',
     steps: [
       'Crea il cliente e compila nome, Owner CSS e prodotti rilevanti.',
       'Disattiva un cliente non piu operativo senza perdere la configurazione esistente.',
-      'Crea gruppi per applicare lo stesso target a piu clienti.',
-      'Controlla l\'anteprima del gruppo prima di usarlo nei Filtri globali.',
       'Usa Import / Export JSON per backup o trasferimenti controllati.'
     ],
     note:
       'Una modifica ai prodotti del cliente cambia i risultati mostrati quando quel cliente viene selezionato.',
-    route: '/clienti',
-    action: 'Apri Clienti'
+    route: '/css',
+    action: 'Apri CSS'
   },
   {
     id: 'filtri',

@@ -33,6 +33,21 @@ export function ViewsPanel({ compact = false }: ViewsPanelProps) {
   const customViews = views.filter((v) => !v.isSystem);
   const systemViews = views.filter((v) => v.isSystem);
 
+  const handleCreateView = () => {
+    const nextName = newViewName.trim();
+    if (!nextName) return;
+    createView({
+      name: nextName,
+      visibleColumns: (activeView?.visibleColumns || {}) as Record<ColumnKey, boolean>,
+      filters: activeView?.filters || {},
+      sortBy: activeView?.sortBy,
+      sortDirection: activeView?.sortDirection,
+    });
+    setNewViewName('');
+    setIsCreating(false);
+    setShowAll(true);
+  };
+
   const handleDeleteView = (id: string) => {
     deleteView(id);
     setConfirmDeleteId(null);
@@ -198,58 +213,98 @@ export function ViewsPanel({ compact = false }: ViewsPanelProps) {
   // Early return per compact mode - solo pillole
   if (compact) {
     return (
-      <div className="flex flex-wrap items-center gap-1">
-        {/* System Views */}
-        {systemViews.map((view) => (
-          <button
-            key={view.id}
-            onClick={() => switchView(view.id)}
-            className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-medium transition ${
-              activeViewId === view.id
-                ? 'bg-blue-600 text-white shadow-sm'
-                : 'bg-gray-200 text-gray-900 hover:bg-gray-300'
-            }`}
-            title={view.description}
-          >
-            {view.name}
-            {view.isSystem && <span className="text-sm">🔒</span>}
-          </button>
-        ))}
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-1">
+          {/* System Views */}
+          {systemViews.map((view) => (
+            <button
+              key={view.id}
+              onClick={() => switchView(view.id)}
+              className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-medium transition ${
+                activeViewId === view.id
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'bg-gray-200 text-gray-900 hover:bg-gray-300'
+              }`}
+              title={view.description}
+            >
+              {view.name}
+              {view.isSystem && <span className="text-sm">🔒</span>}
+            </button>
+          ))}
 
-        {/* Custom Views */}
-        {(showAll || customViews.length <= 3) && customViews.map((view) => (
-          <button
-            key={view.id}
-            onClick={() => switchView(view.id)}
-            className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-medium transition ${
-              activeViewId === view.id
-                ? 'bg-purple-600 text-white shadow-sm'
-                : 'bg-purple-100 text-purple-900 hover:bg-purple-200'
-            }`}
-            title={view.description}
-          >
-            {view.name}
-          </button>
-        ))}
+          {/* Custom Views */}
+          {(showAll || customViews.length <= 3) && customViews.map((view) => (
+            <div key={view.id} className="inline-flex items-center gap-1 rounded-full bg-purple-100 pr-1">
+              <button
+                onClick={() => switchView(view.id)}
+                className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium transition ${
+                  activeViewId === view.id
+                    ? 'bg-purple-600 text-white shadow-sm'
+                    : 'text-purple-900 hover:bg-purple-200'
+                }`}
+                title={view.description}
+              >
+                {view.name}
+              </button>
+              <button
+                type="button"
+                className="h-6 w-6 rounded-full text-xs font-bold text-purple-700 hover:bg-purple-200"
+                title={`Elimina vista "${view.name}"`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  if (confirm(`Eliminare la vista "${view.name}"?`)) {
+                    deleteView(view.id);
+                  }
+                }}
+              >
+                ×
+              </button>
+            </div>
+          ))}
 
-        {customViews.length > 3 && !showAll && (
+          {customViews.length > 3 && !showAll && (
+            <button
+              onClick={() => setShowAll(true)}
+              className="rounded-full bg-gray-100 px-2 py-1 text-sm font-medium text-gray-600 hover:bg-gray-200"
+              title={`${customViews.length - 3} viste nascoste`}
+            >
+              +{customViews.length - 3}
+            </button>
+          )}
+
+          {/* Quick add */}
           <button
-            onClick={() => setShowAll(true)}
-            className="rounded-full bg-gray-100 px-2 py-1 text-sm font-medium text-gray-600 hover:bg-gray-200"
-            title={`${customViews.length - 3} viste nascoste`}
+            onClick={() => setIsCreating(!isCreating)}
+            className="rounded-full bg-emerald-100 px-2 py-1 text-sm font-medium text-emerald-700 hover:bg-emerald-200"
+            title="Crea nuova vista"
           >
-            +{customViews.length - 3}
+            {isCreating ? '✕' : '+'}
           </button>
+        </div>
+
+        {isCreating && (
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-2">
+            <input
+              type="text"
+              value={newViewName}
+              onChange={(e) => setNewViewName(e.target.value)}
+              placeholder="Nome nuova vista..."
+              className="h-8 min-w-[220px] flex-1 rounded border border-emerald-300 bg-white px-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleCreateView();
+                if (e.key === 'Escape') setIsCreating(false);
+              }}
+              autoFocus
+            />
+            <button
+              type="button"
+              onClick={handleCreateView}
+              className="rounded bg-emerald-600 px-3 py-1 text-sm font-medium text-white hover:bg-emerald-700"
+            >
+              Crea
+            </button>
+          </div>
         )}
-
-        {/* Quick add */}
-        <button
-          onClick={() => setIsCreating(!isCreating)}
-          className="rounded-full bg-emerald-100 px-2 py-1 text-sm font-medium text-emerald-700 hover:bg-emerald-200"
-          title="Crea nuova vista"
-        >
-          {isCreating ? '✕' : '+'}
-        </button>
       </div>
     );
   }
@@ -357,35 +412,14 @@ export function ViewsPanel({ compact = false }: ViewsPanelProps) {
               onChange={(e) => setNewViewName(e.target.value)}
               placeholder="Nome vista (es: My Items, Closed Issues)..."
               className="flex-1 rounded border border-emerald-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              onKeyPress={(e) => {
-                if (e.key === 'Enter' && newViewName.trim()) {
-                  createView({
-                    name: newViewName.trim(),
-                    visibleColumns: (activeView?.visibleColumns || {}) as Record<ColumnKey, boolean>,
-                    filters: activeView?.filters || {},
-                    sortBy: activeView?.sortBy,
-                    sortDirection: activeView?.sortDirection,
-                  });
-                  setNewViewName('');
-                  setIsCreating(false);
-                }
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleCreateView();
+                if (e.key === 'Escape') setIsCreating(false);
               }}
               autoFocus
             />
             <button
-              onClick={() => {
-                if (newViewName.trim()) {
-                  createView({
-                    name: newViewName.trim(),
-                    visibleColumns: (activeView?.visibleColumns || {}) as Record<ColumnKey, boolean>,
-                    filters: activeView?.filters || {},
-                    sortBy: activeView?.sortBy,
-                    sortDirection: activeView?.sortDirection,
-                  });
-                  setNewViewName('');
-                  setIsCreating(false);
-                }
-              }}
+              onClick={handleCreateView}
               className="rounded bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
             >
               Crea

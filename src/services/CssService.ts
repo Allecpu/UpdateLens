@@ -1,4 +1,4 @@
-import type { CssActivity, CssDocument, CssMeta, CssProposal } from '../models/Css';
+import type { CssActivity, CssCustomer, CssDocument, CssMeta, CssProposal } from '../models/Css';
 
 type ActivityFilters = {
   customer?: string;
@@ -73,6 +73,37 @@ const request = async <T>(path: string, options?: RequestInit): Promise<T> => {
 };
 
 export const cssService = {
+  async listCustomers(): Promise<{ items: CssCustomer[] }> {
+    return request<{ items: CssCustomer[] }>('/api/css/customers');
+  },
+
+  async createCustomer(payload: { name: string; aliases?: string[]; isActive?: boolean }): Promise<CssCustomer> {
+    return request<CssCustomer>('/api/css/customers', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  },
+
+  async updateCustomer(
+    customerId: string,
+    payload: { name?: string; aliases?: string[]; isActive?: boolean }
+  ): Promise<CssCustomer> {
+    return request<CssCustomer>(`/api/css/customers/${encodeURIComponent(customerId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload)
+    });
+  },
+
+  async mergeCustomers(payload: {
+    primaryCustomerId: string;
+    secondaryCustomerId: string;
+  }): Promise<{ primary: CssCustomer; mergedActivities: number }> {
+    return request<{ primary: CssCustomer; mergedActivities: number }>('/api/css/customers/merge', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  },
+
   async getMeta(): Promise<CssMeta> {
     return request<CssMeta>('/api/css/meta');
   },

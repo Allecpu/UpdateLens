@@ -27,9 +27,9 @@ export interface CssView {
   isDefault?: boolean;
   visibleColumns: Record<ColumnKey, boolean>;
   filters: {
-    customer?: string;
-    owner?: string;
-    status?: string;
+    customer?: string | string[];
+    owner?: string | string[];
+    status?: string | string[];
     rating?: string;
     query?: string;
   };
@@ -172,6 +172,8 @@ export const useViewsStore = create<ViewsStore>()(
                 createdAt: Date.now(),
               },
             ],
+            activeViewId: id,
+            hasUnsavedChanges: false,
           };
         }),
 

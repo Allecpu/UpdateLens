@@ -14,8 +14,99 @@ import { GroupingPanel, type GroupByKey } from './GroupingPanel';
 import { AdvancedFiltersPanel } from './AdvancedFiltersPanel';
 import { ColumnCustomizerPanel } from './ColumnCustomizerPanel';
 import { ExportPanel } from './ExportPanel';
-import { AuditTrail } from './AuditTrail';
 import type { AdvancedFilters } from '../hooks/useAdvancedFilters';
+
+interface MultiSelectFilterProps {
+  label: string;
+  allLabel: string;
+  values: string[];
+  selected: string[];
+  onChange: (next: string[]) => void;
+  menuKey: 'customer' | 'owner' | 'status';
+  openMultiFilter: 'customer' | 'owner' | 'status' | null;
+  setOpenMultiFilter: React.Dispatch<React.SetStateAction<'customer' | 'owner' | 'status' | null>>;
+  searchable?: boolean;
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
+}
+
+function MultiSelectFilter({
+  label,
+  allLabel,
+  values,
+  selected,
+  onChange,
+  menuKey,
+  openMultiFilter,
+  setOpenMultiFilter,
+  searchable = false,
+  searchValue = '',
+  onSearchChange
+}: MultiSelectFilterProps) {
+  const toggleMultiValue = (current: string[], value: string) => {
+    if (current.includes(value)) {
+      onChange(current.filter((item) => item !== value));
+      return;
+    }
+    onChange([...current, value]);
+  };
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        className="h-9 min-w-[160px] rounded-md border border-border bg-background px-3 text-left text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+        onClick={() => setOpenMultiFilter((prev) => (prev === menuKey ? null : menuKey))}
+      >
+        {selected.length === 0 ? allLabel : `${label}: ${selected.length}`}
+      </button>
+      {openMultiFilter === menuKey && (
+        <div className="absolute left-0 z-30 mt-1 w-72 rounded-md border border-border bg-card p-2 shadow-lg">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="text-xs font-semibold text-muted-foreground">{label}</span>
+            {selected.length > 0 && (
+              <button
+                type="button"
+                className="text-xs text-primary hover:underline"
+                onClick={() => onChange([])}
+              >
+                Pulisci
+              </button>
+            )}
+          </div>
+          {searchable && (
+            <input
+              type="text"
+              value={searchValue}
+              onChange={(event) => onSearchChange?.(event.target.value)}
+              placeholder={`Cerca ${label.toLowerCase()}...`}
+              className="mb-2 h-8 w-full rounded-md border border-border bg-background px-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            />
+          )}
+          <div className="max-h-56 overflow-y-auto pr-1">
+            {values
+              .filter((value) => {
+                if (!searchable) return true;
+                const q = searchValue.trim().toLowerCase();
+                if (!q) return true;
+                return value.toLowerCase().includes(q);
+              })
+              .map((value) => (
+                <label key={value} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-muted/60">
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(value)}
+                    onChange={() => toggleMultiValue(selected, value)}
+                  />
+                  <span className="truncate">{value}</span>
+                </label>
+              ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface ModernListsLayoutProps {
   activities: CssActivity[];
@@ -25,12 +116,12 @@ interface ModernListsLayoutProps {
   onGroupByChange: (groupBy: GroupByKey) => void;
   advancedFilters: AdvancedFilters;
   onAdvancedFiltersChange: (filters: AdvancedFilters) => void;
-  customerFilter: string;
-  onCustomerFilterChange: (value: string) => void;
-  ownerFilter: string;
-  onOwnerFilterChange: (value: string) => void;
-  statusFilter: string;
-  onStatusFilterChange: (value: string) => void;
+  customerFilter: string[];
+  onCustomerFilterChange: (value: string[]) => void;
+  ownerFilter: string[];
+  onOwnerFilterChange: (value: string[]) => void;
+  statusFilter: string[];
+  onStatusFilterChange: (value: string[]) => void;
   ratingFilter: string;
   onRatingFilterChange: (value: string) => void;
   query: string;
@@ -71,153 +162,114 @@ export function ModernListsLayout({
   children
 }: ModernListsLayoutProps) {
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
-  const [showAuditTrail, setShowAuditTrail] = useState(false);
+  const [openMultiFilter, setOpenMultiFilter] = useState<'customer' | 'owner' | 'status' | null>(null);
+  const [customerFilterQuery, setCustomerFilterQuery] = useState('');
 
   // Quick filter badges
   const hasActiveFilters =
-    customerFilter || ownerFilter || statusFilter || ratingFilter || query ||
+    customerFilter.length > 0 || ownerFilter.length > 0 || statusFilter.length > 0 || ratingFilter || query ||
     (advancedFilters.rules && advancedFilters.rules.length > 0);
 
   return (
     <div className="space-y-0">
-      {/* 1. Views Bar - Pill/Tab Style */}
-      <div className="border-b border-border bg-background px-4 py-2.5">
+      <div className="border-b border-border/80 bg-card px-4 py-3">
         <div className="flex items-center gap-3">
-          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Viste:</span>
-          <div className="flex-1 overflow-x-auto">
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Viste:</span>
+          <div className="min-w-0 flex-1 overflow-x-auto">
             <ViewsPanel compact={true} />
           </div>
         </div>
       </div>
 
-      {/* 2. Command Bar */}
-      <div className="flex flex-wrap items-center gap-3 border-b border-border bg-background px-4 py-2.5 [&>*:first-child]:mr-1 [&>*:first-child]:pr-2 [&>*:first-child]:border-r [&>*:first-child]:border-border/50">
-        {/* Main Actions */}
-        <button
-          type="button"
-          className="ul-button ul-button-primary h-8 px-4 text-sm font-semibold"
-          onClick={onCreateActivity}
-        >
-          ➕ Nuova attività
-        </button>
-
-        <div className="h-6 w-px bg-border/30" />
-
-        {/* Quick Filters as Pills */}
-        <div className="flex flex-wrap items-center gap-1">
-          {customerFilter && (
+      <div className="border-b border-border/80 bg-card px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
-              className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-1 text-sm font-medium text-blue-700 dark:bg-blue-900 dark:text-blue-100 hover:bg-blue-200 dark:hover:bg-blue-800"
-              onClick={() => onCustomerFilterChange('')}
-              title="Clicca per rimuovere"
+              className="inline-flex h-10 items-center gap-2 rounded-md bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700"
+              onClick={onCreateActivity}
             >
-              👤 {customerFilter} ✕
+              Nuova attivita
             </button>
-          )}
-          {ownerFilter && (
+            {statusFilter.length > 0 && (
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-100 px-3 py-1 text-sm font-medium text-amber-800"
+                onClick={() => onStatusFilterChange([])}
+                title="Rimuovi filtro stato"
+              >
+                Status: {statusFilter.length}
+                <span aria-hidden="true" className="text-amber-700">x</span>
+              </button>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="text"
+              placeholder="Cerca attivita..."
+              value={query}
+              onChange={(e) => onQueryChange(e.target.value)}
+              className="h-10 w-64 rounded-md border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            />
             <button
               type="button"
-              className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-1 text-sm font-medium text-purple-700 dark:bg-purple-900 dark:text-purple-100 hover:bg-purple-200 dark:hover:bg-purple-800"
-              onClick={() => onOwnerFilterChange('')}
-              title="Clicca per rimuovere"
+              className={`inline-flex h-10 items-center rounded-md border px-3 text-sm font-medium transition-colors ${
+                showAdvancedOptions
+                  ? 'border-indigo-200 bg-indigo-50 text-indigo-700'
+                  : 'border-border bg-background text-muted-foreground hover:bg-muted/70 hover:text-foreground'
+              }`}
+              onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+              title="Filtri avanzati, raggruppamento, esportazione"
             >
-              👨‍💼 {ownerFilter} ✕
+              Opzioni
             </button>
-          )}
-          {statusFilter && (
-            <button
-              type="button"
-              className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-sm font-medium text-amber-700 dark:bg-amber-900 dark:text-amber-100 hover:bg-amber-200 dark:hover:bg-amber-800"
-              onClick={() => onStatusFilterChange('')}
-              title="Clicca per rimuovere"
-            >
-              ⚠️ {statusFilter} ✕
-            </button>
-          )}
-          {ratingFilter && (
-            <button
-              type="button"
-              className="inline-flex items-center gap-1 rounded-full bg-yellow-100 px-2 py-1 text-sm font-medium text-yellow-700 dark:bg-yellow-900 dark:text-yellow-100 hover:bg-yellow-200 dark:hover:bg-yellow-800"
-              onClick={() => onRatingFilterChange('')}
-              title="Clicca per rimuovere"
-            >
-              ⭐ Rating {ratingFilter} ✕
-            </button>
-          )}
-        </div>
-
-        <div className="ml-auto flex items-center gap-1">
-          {/* Search */}
-          <input
-            type="text"
-              placeholder="🔍 Cerca attività..."
-            value={query}
-            onChange={(e) => onQueryChange(e.target.value)}
-              className="ul-input h-8 w-48 px-3 text-sm"
-          />
-
-          {/* More Options */}
-          <button
-            type="button"
-            className={`ul-button ${showAdvancedOptions ? 'ul-button-primary' : 'ul-button-ghost'} h-8 px-4 text-sm font-medium`}
-            onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
-            title="Filtri avanzati, raggruppamento, esportazione"
-          >
-            ⚙️ Opzioni
-          </button>
-
-          <button
-            type="button"
-            className={`ul-button ${showAuditTrail ? 'ul-button-primary' : 'ul-button-ghost'} h-8 px-4 text-sm font-medium`}
-            onClick={() => setShowAuditTrail(!showAuditTrail)}
-            title="Visualizza cronologia"
-          >
-            📋 Cronologia
-          </button>
+          </div>
         </div>
       </div>
 
-      {/* 3. Quick Filters - Inline Dropdowns */}
-      <div className="flex flex-wrap items-center gap-3 border-b border-border bg-background px-4 py-2.5">
-        <div className="flex items-center gap-3">
-          <select
-            value={customerFilter}
-            onChange={(e) => onCustomerFilterChange(e.target.value)}
-            className="ul-input h-8 w-40 px-2 text-sm"
-          >
-            <option value="">Tutti clienti</option>
-            {customers.map((customer) => (
-              <option key={customer} value={customer}>{customer}</option>
-            ))}
-          </select>
+      <div className="border-b border-border/80 bg-card px-4 py-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <MultiSelectFilter
+            label="Clienti"
+            allLabel="Tutti clienti"
+            values={customers}
+            selected={customerFilter}
+            onChange={onCustomerFilterChange}
+            menuKey="customer"
+            openMultiFilter={openMultiFilter}
+            setOpenMultiFilter={setOpenMultiFilter}
+            searchable
+            searchValue={customerFilterQuery}
+            onSearchChange={setCustomerFilterQuery}
+          />
 
-          <select
-            value={ownerFilter}
-            onChange={(e) => onOwnerFilterChange(e.target.value)}
-            className="ul-input h-8 w-40 px-2 text-sm"
-          >
-            <option value="">Tutti owner</option>
-            {owners.map((owner) => (
-              <option key={owner} value={owner}>{owner}</option>
-            ))}
-          </select>
+          <MultiSelectFilter
+            label="Owner"
+            allLabel="Tutti owner"
+            values={owners}
+            selected={ownerFilter}
+            onChange={onOwnerFilterChange}
+            menuKey="owner"
+            openMultiFilter={openMultiFilter}
+            setOpenMultiFilter={setOpenMultiFilter}
+          />
 
-          <select
-            value={statusFilter}
-            onChange={(e) => onStatusFilterChange(e.target.value)}
-            className="ul-input h-8 w-40 px-2 text-sm"
-          >
-            <option value="">Tutti status</option>
-            {statuses.map((status) => (
-              <option key={status} value={status}>{status}</option>
-            ))}
-          </select>
+          <MultiSelectFilter
+            label="Status"
+            allLabel="Tutti status"
+            values={statuses}
+            selected={statusFilter}
+            onChange={onStatusFilterChange}
+            menuKey="status"
+            openMultiFilter={openMultiFilter}
+            setOpenMultiFilter={setOpenMultiFilter}
+          />
 
           <select
             value={ratingFilter}
             onChange={(e) => onRatingFilterChange(e.target.value)}
-            className="ul-input h-8 w-36 px-2 text-sm"
+            className="h-9 rounded-md border border-border bg-background px-3 text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
           >
             <option value="">Rating</option>
             {ratingOptions.map((rating) => (
@@ -226,29 +278,28 @@ export function ModernListsLayout({
               </option>
             ))}
           </select>
-        </div>
 
-        {hasActiveFilters && (
-          <button
-            type="button"
-            className="ul-button ul-button-ghost h-8 px-3 text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-            onClick={() => {
-              onCustomerFilterChange('');
-              onOwnerFilterChange('');
-              onStatusFilterChange('');
-              onRatingFilterChange('');
-              onQueryChange('');
-              onAdvancedFiltersChange({ logic: 'AND', rules: [] });
-            }}
-          >
-            🗑️ Cancella filtri
-          </button>
-        )}
+          {hasActiveFilters && (
+            <button
+              type="button"
+              className="inline-flex h-9 items-center rounded-md bg-muted px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
+              onClick={() => {
+                onCustomerFilterChange([]);
+                onOwnerFilterChange([]);
+                onStatusFilterChange([]);
+                onRatingFilterChange('');
+                onQueryChange('');
+                onAdvancedFiltersChange({ logic: 'AND', rules: [] });
+              }}
+            >
+              Cancella filtri
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* 4. Advanced Options Panel - Collapsible */}
       {showAdvancedOptions && (
-        <div className="space-y-3 border-b border-border bg-muted/5 px-4 py-3">
+        <div className="space-y-3 border-b border-border bg-muted/10 px-4 py-3">
           <div className="grid gap-3 md:grid-cols-2">
             <AdvancedFiltersPanel
               activities={activities}
@@ -269,26 +320,17 @@ export function ModernListsLayout({
         </div>
       )}
 
-      {/* 5. Audit Trail - Collapsible */}
-      {showAuditTrail && (
-        <div className="border-b border-border bg-muted/5 px-4 py-3">
-          <AuditTrail />
+      <div className="border-b border-border bg-muted/5 px-4 py-2 text-sm text-muted-foreground">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span>
+            <strong className="text-foreground">{filteredActivities.length}</strong> di{' '}
+            <strong className="text-foreground">{activities.length}</strong> record visibili
+            {hasActiveFilters && <span className="ml-2 text-blue-600">Filtri attivi</span>}
+          </span>
         </div>
-      )}
-
-      {/* 6. Info Bar - Results count and status */}
-      <div className="flex items-center justify-between border-b border-border bg-muted/5 px-4 py-2 text-sm text-muted-foreground">
-        <span>
-          📊 <strong>{filteredActivities.length}</strong> di <strong>{activities.length}</strong> record visibili
-          {hasActiveFilters && <span className="ml-2">• 🔍 Filtri attivi</span>}
-        </span>
       </div>
 
-      {/* 7. Main Content - Table will go here */}
-      <div className="px-4 py-3">
-        {/* Table content passed as children */}
-        {children}
-      </div>
+      <div className="px-4 py-3">{children}</div>
     </div>
   );
 }
