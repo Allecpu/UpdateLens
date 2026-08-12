@@ -83,10 +83,13 @@ export type CssProposalPayload = {
 export type CssProposal = {
   proposalId: string;
   batchId: string;
-  actionType: 'create' | 'update';
+  actionType: 'create' | 'update' | 'ambiguous';
   targetActivityId: string | null;
   payload: CssProposalPayload;
   confidence: number;
+  matchReason: string | null;
+  matchScore: number | null;
+  matchCandidates: Array<{ activityId: string; issue: string; score: number }> | null;
   decisionStatus: 'pending' | 'approved' | 'rejected';
   decisionNote: string | null;
   createdAt: string;

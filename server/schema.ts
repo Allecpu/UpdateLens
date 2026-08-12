@@ -258,4 +258,9 @@ export const initSchema = (db: Database.Database): void => {
   ensureColumn(db, 'css_activities', 'due_date', 'due_date TEXT');
   ensureColumn(db, 'css_activities', 'rating', 'rating REAL');
   ensureColumn(db, 'css_activities', 'item_type', 'item_type TEXT');
+
+  // Migrations for enhanced proposal matching (UPDATE/CREATE/AMBIGUOUS logic)
+  ensureColumn(db, 'css_activity_proposals', 'match_reason', "match_reason TEXT");
+  ensureColumn(db, 'css_activity_proposals', 'match_score', "match_score REAL");
+  ensureColumn(db, 'css_activity_proposals', 'match_candidates', "match_candidates TEXT");
 };

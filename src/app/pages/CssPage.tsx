@@ -639,6 +639,7 @@ const CssPage = () => {
   const [proposals, setProposals] = useState<CssProposal[]>([]);
   const [proposalOverrides, setProposalOverrides] = useState<Record<string, Partial<CssProposalPayload>>>({});
   const [aliasTargetByProposal, setAliasTargetByProposal] = useState<Record<string, string>>({});
+  const [ambiguousTargetByProposal, setAmbiguousTargetByProposal] = useState<Record<string, string>>({});
   const [addingAliasProposalId, setAddingAliasProposalId] = useState<string | null>(null);
   const [approved, setApproved] = useState<Record<string, boolean>>({});
   const [validating, setValidating] = useState(false);
@@ -1057,6 +1058,7 @@ const CssPage = () => {
       setProposals(result.proposals);
       setProposalOverrides({});
       setAliasTargetByProposal({});
+      setAmbiguousTargetByProposal({});
       const decisions: Record<string, boolean> = {};
       result.proposals.forEach((proposal) => {
         decisions[proposal.proposalId] = true;
@@ -1248,14 +1250,28 @@ const CssPage = () => {
 
   const onValidateBatch = async () => {
     if (!activeBatchId) return;
-    setValidating(true);
     setError(null);
     setValidationSummary(null);
+
+    const missingTarget = proposals.find(
+      (proposal) =>
+        proposal.actionType === 'ambiguous' &&
+        (approved[proposal.proposalId] ?? true) &&
+        !ambiguousTargetByProposal[proposal.proposalId]
+    );
+    if (missingTarget) {
+      const draft = getProposalDraft(missingTarget);
+      setError(`Seleziona l'attività target per la proposta ambigua "${draft.customerName} - ${draft.issue}" prima di validare (oppure deseleziona "Applica").`);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    setValidating(true);
     try {
       const decisions = proposals.map((proposal) => {
         const draft = getProposalDraft(proposal);
         const canonicalCustomer = resolveCanonicalCustomer(draft.customerName) ?? draft.customerName;
-        const payloadOverride: Partial<CssProposalPayload> = {
+        const payloadOverride: Partial<CssProposalPayload> & { targetActivityId?: string } = {
           customerName: canonicalCustomer,
           issue: draft.issue,
           issueStatus: draft.issueStatus,
@@ -1264,6 +1280,12 @@ const CssPage = () => {
           lastUpdate: toDateInputValue(draft.lastUpdate) || draft.lastUpdate || null,
           details: buildDetailsWithDate(draft.lastUpdate, draft.details ?? null)
         };
+        if (proposal.actionType === 'ambiguous') {
+          const target = ambiguousTargetByProposal[proposal.proposalId];
+          if (target) {
+            payloadOverride.targetActivityId = target;
+          }
+        }
         return {
           proposalId: proposal.proposalId,
           decision: approved[proposal.proposalId] ? ('approved' as const) : ('rejected' as const),
@@ -1274,9 +1296,11 @@ const CssPage = () => {
         decisions
       });
       setValidationSummary(`Validazione completata: ${result.applied} applicate, ${result.rejected} scartate.`);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       await Promise.all([refreshActivities(), refreshMeta()]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Errore validazione batch');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setValidating(false);
     }
@@ -3549,11 +3573,41 @@ const CssPage = () => {
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="font-medium">
-                        [{proposal.actionType.toUpperCase()}] {draft.customerName} - {draft.issue}
+                        [{proposal.actionType === 'ambiguous' ? 'AMBIGUOUS?' : proposal.actionType.toUpperCase()}]{' '}
+                        {draft.customerName} - {draft.issue}
                       </div>
                       <div className="text-xs text-muted-foreground">
                         Status proposto: {draft.issueStatus} • Confidence: {(proposal.confidence * 100).toFixed(0)}%
+                        {proposal.matchScore !== null && ` • Match: ${(proposal.matchScore * 100).toFixed(0)}%`}
                       </div>
+                      {proposal.matchReason && (
+                        <div className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+                          Motivo: {proposal.matchReason}
+                        </div>
+                      )}
+                      {proposal.actionType === 'ambiguous' && proposal.matchCandidates && proposal.matchCandidates.length > 0 && (
+                        <div className="mt-2 rounded-lg border border-orange-300/60 bg-orange-50/50 p-2 text-xs text-orange-800 dark:bg-orange-900/20 dark:text-orange-200">
+                          <div className="mb-2 font-medium">Più attività compatibili, scegli il target:</div>
+                          <select
+                            className="ul-input h-9 w-full"
+                            value={ambiguousTargetByProposal[proposal.proposalId] ?? ''}
+                            onChange={(event) => {
+                              const targetId = event.target.value;
+                              setAmbiguousTargetByProposal((prev) => ({
+                                ...prev,
+                                [proposal.proposalId]: targetId
+                              }));
+                            }}
+                          >
+                            <option value="">Seleziona attività per update...</option>
+                            {proposal.matchCandidates.map((cand) => (
+                              <option key={cand.activityId} value={cand.activityId}>
+                                {cand.issue} (score: {(cand.score * 100).toFixed(0)}%)
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
                       {resolvedCustomer && normalizeCustomerKey(resolvedCustomer) !== normalizeCustomerKey(draft.customerName) && (
                         <div className="mt-1 text-xs text-amber-700 dark:text-amber-300">
                           Cliente riconosciuto: <strong>{resolvedCustomer}</strong> (da alias: {draft.customerName})

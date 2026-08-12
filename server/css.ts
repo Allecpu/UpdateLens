@@ -91,10 +91,13 @@ type CssProposalPayload = {
 export type CssProposal = {
   proposalId: string;
   batchId: string;
-  actionType: 'create' | 'update';
+  actionType: 'create' | 'update' | 'ambiguous';
   targetActivityId: string | null;
   payload: CssProposalPayload;
   confidence: number;
+  matchReason: string | null;
+  matchScore: number | null;
+  matchCandidates: Array<{ activityId: string; issue: string; score: number }> | null;
   decisionStatus: 'pending' | 'approved' | 'rejected';
   decisionNote: string | null;
   createdAt: string;
@@ -129,10 +132,13 @@ type ActivityRow = {
 type ProposalRow = {
   proposal_id: string;
   batch_id: string;
-  action_type: 'create' | 'update';
+  action_type: 'create' | 'update' | 'ambiguous';
   target_activity_id: string | null;
   payload_json: string;
   confidence: number;
+  match_reason: string | null;
+  match_score: number | null;
+  match_candidates: string | null;
   decision_status: 'pending' | 'approved' | 'rejected';
   decision_note: string | null;
   created_at: string;
@@ -279,6 +285,9 @@ const toProposal = (row: ProposalRow): CssProposal => ({
   targetActivityId: row.target_activity_id,
   payload: JSON.parse(row.payload_json) as CssProposalPayload,
   confidence: row.confidence,
+  matchReason: row.match_reason,
+  matchScore: row.match_score,
+  matchCandidates: row.match_candidates ? (JSON.parse(row.match_candidates) as Array<{ activityId: string; issue: string; score: number }>) : null,
   decisionStatus: row.decision_status,
   decisionNote: row.decision_note,
   createdAt: row.created_at,
@@ -637,16 +646,116 @@ export const mergeCssCustomers = (
 const findMatchingActivity = (
   db: Database.Database,
   payload: CssProposalPayload
-): { activity_id: string } | null => {
-  const row = db.prepare(`
-    SELECT a.activity_id
+): { decision: 'update' | 'create'; targetActivityId: string | null; matchReason: string | null; matchScore: number | null } => {
+  const normalizeIssueMatchKey = (value: string): string =>
+    value
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+  const resolved = resolveCustomer(db, payload.customerName);
+  const customerId = resolved?.customerId;
+
+  if (!customerId) {
+    return {
+      decision: 'create',
+      targetActivityId: null,
+      matchReason: 'customer_not_found',
+      matchScore: 0
+    };
+  }
+
+  const normalizedProposalIssue = normalizeIssueMatchKey(payload.issue);
+  if (normalizedProposalIssue.length < 3) {
+    return {
+      decision: 'create',
+      targetActivityId: null,
+      matchReason: 'issue_too_short',
+      matchScore: 0
+    };
+  }
+
+  const candidates = db.prepare(`
+    SELECT a.activity_id, a.issue
     FROM css_activities a
-    JOIN css_customers c ON c.customer_id = a.customer_id
-    WHERE LOWER(c.name) = LOWER(?)
-      AND LOWER(a.issue) = LOWER(?)
-    LIMIT 1
-  `).get(payload.customerName.trim(), payload.issue.trim()) as { activity_id: string } | undefined;
-  return row ?? null;
+    WHERE a.customer_id = ?
+  `).all(customerId) as Array<{ activity_id: string; issue: string | null }>;
+
+  if (candidates.length === 0) {
+    return {
+      decision: 'create',
+      targetActivityId: null,
+      matchReason: 'no_activities_for_customer',
+      matchScore: 0
+    };
+  }
+
+  let bestMatch: { activityId: string; score: number } | null = null;
+
+  for (const candidate of candidates) {
+    const candidateIssue = candidate.issue ?? '';
+    const normalizedCandidateIssue = normalizeIssueMatchKey(candidateIssue);
+
+    if (
+      normalizedProposalIssue.length >= 4 &&
+      normalizedCandidateIssue.length >= 4 &&
+      (normalizedProposalIssue.includes(normalizedCandidateIssue) ||
+        normalizedCandidateIssue.includes(normalizedProposalIssue))
+    ) {
+      return {
+        decision: 'update',
+        targetActivityId: candidate.activity_id,
+        matchReason: 'exact_contains',
+        matchScore: 1.0
+      };
+    }
+
+    const proposalTokens = new Set(
+      normalizedProposalIssue
+        .split(' ')
+        .filter((token) => token.length >= 3)
+    );
+    const candidateTokens = new Set(
+      normalizedCandidateIssue
+        .split(' ')
+        .filter((token) => token.length >= 3)
+    );
+
+    if (candidateTokens.size > 0 && proposalTokens.size > 0) {
+      let intersection = 0;
+      for (const token of proposalTokens) {
+        if (candidateTokens.has(token)) {
+          intersection += 1;
+        }
+      }
+      if (intersection > 0) {
+        const union = new Set([...proposalTokens, ...candidateTokens]).size;
+        const score = intersection / union;
+        if (!bestMatch || score > bestMatch.score) {
+          bestMatch = { activityId: candidate.activity_id, score };
+        }
+      }
+    }
+  }
+
+  if (bestMatch && bestMatch.score >= 0.5) {
+    return {
+      decision: 'update',
+      targetActivityId: bestMatch.activityId,
+      matchReason: `fuzzy_${(bestMatch.score * 100).toFixed(0)}`,
+      matchScore: bestMatch.score
+    };
+  }
+
+  return {
+    decision: 'create',
+    targetActivityId: null,
+    matchReason: 'no_matching_issue',
+    matchScore: 0
+  };
 };
 
 const sanitizeIssueStatus = (status?: string | null): string => {
@@ -734,17 +843,8 @@ const dedupeProposals = (
 };
 
 const getCssExtractionMode = (): ExtractionMode => {
-  const raw = normalizeText(process.env.CSS_IMPORT_EXTRACTION_MODE).toLowerCase();
-  if (!raw || raw === 'auto' || raw === 'auto_heuristic_first') {
-    return 'auto_heuristic_first';
-  }
-  if (raw === 'heuristic' || raw === 'heuristic_only') {
-    return 'heuristic_only';
-  }
-  if (raw === 'azure' || raw === 'azure_only') {
-    return 'azure_only';
-  }
-  return 'auto_heuristic_first';
+  // Force azure_only: full AI extraction without heuristic fallback
+  return 'azure_only';
 };
 
 const inferPrimaryCustomerName = (text: string): string | null => {
@@ -800,27 +900,77 @@ const extractTextFromPdf = (buffer: Buffer): string => {
 
 const extractWithHeuristics = (text: string): Array<Omit<CssProposal, 'proposalId' | 'batchId' | 'decisionStatus' | 'decisionNote' | 'createdAt' | 'updatedAt'>> => {
   const inferredCustomer = inferPrimaryCustomerName(text);
-  const lines = text
-    .split(/\r?\n|[.;]/)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 10);
-
   const proposals: Array<Omit<CssProposal, 'proposalId' | 'batchId' | 'decisionStatus' | 'decisionNote' | 'createdAt' | 'updatedAt'>> = [];
+
+  // Parse tabelle markdown: | Task | Aggiornamento | Stato | Owner |
+  const tableRowPattern = /\|\s*\*?\*?([^|*]+?)\*?\*?\s*\|\s*([^|]+?)\s*\|\s*\*?\*?([^|*]+?)\*?\*?\s*\|\s*([^|]*?)\s*\|/;
+  const lines = text.split(/\r?\n/);
+  const tableRows = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (line.startsWith('|') && line.endsWith('|') && !line.includes('---')) {
+      const match = tableRowPattern.exec(line);
+      if (match) {
+        const task = normalizeText(match[1]);
+        const update = normalizeText(match[2]);
+        const status = normalizeText(match[3]);
+        const owner = normalizeText(match[4]);
+
+        if (task.length >= 5 && update.length >= 10) {
+          tableRows.push({ task, update, status, owner });
+        }
+      }
+    }
+  }
+
+  // Se trovate righe di tabella, estrarre proposte da quelle
+  if (tableRows.length > 0) {
+    for (const row of tableRows) {
+      const customerCandidate = inferredCustomer || 'AEB SPA';
+      const issue = row.task;
+      const statusCandidate = row.status;
+
+      if (isLikelyCustomerName(customerCandidate) && isLikelyIssue(issue)) {
+        proposals.push({
+          actionType: 'create',
+          targetActivityId: null,
+          confidence: 0.72,
+          payload: {
+            customerName: customerCandidate,
+            issue,
+            issueStatus: sanitizeIssueStatus(statusCandidate),
+            details: row.update.slice(0, 350),
+            cssOwner: row.owner.length > 0 ? row.owner : null,
+            lastUpdate: new Date().toISOString().slice(0, 10)
+          }
+        });
+      }
+    }
+    return proposals;
+  }
+
+  // Fallback al parser originale line-by-line se no tabelle trovate
   const actionSentencePattern = /\b(si\s+(?:organizzer[aà]|dovr[aà]|allineer[aà]|proceder[aà])|definizione delle attivit[aà]|presentazione|demo|riprendere l'argomento|approfondimento)\b/i;
 
   for (const line of lines.slice(0, 120)) {
-    const customerMatch = /cliente[:\s-]+([^,;|]+)/i.exec(line);
-    const issueMatch = /(attivita|azione|issue|task)[:\s-]+([^,;|]+)/i.exec(line);
-    const ownerMatch = /(owner|responsabile|css owner)[:\s-]+([^,;|]+)/i.exec(line);
-    const statusMatch = /(status|stato)[:\s-]+([^,;|]+)/i.exec(line);
-    const dateMatch = /(scadenza|due date|data)[:\s-]+([0-9]{1,2}\/[0-9]{1,2}\/[0-9]{4}|[0-9]{4}-[0-9]{2}-[0-9]{2})/i.exec(line);
+    const trimmedLine = line.trim();
+    if (!trimmedLine || trimmedLine.length < 10) {
+      continue;
+    }
+
+    const customerMatch = /cliente[:\s-]+([^,;|]+)/i.exec(trimmedLine);
+    const issueMatch = /(attivita|azione|issue|task)[:\s-]+([^,;|]+)/i.exec(trimmedLine);
+    const ownerMatch = /(owner|responsabile|css owner)[:\s-]+([^,;|]+)/i.exec(trimmedLine);
+    const statusMatch = /(status|stato)[:\s-]+([^,;|]+)/i.exec(trimmedLine);
+    const dateMatch = /(scadenza|due date|data)[:\s-]+([0-9]{1,2}\/[0-9]{1,2}\/[0-9]{4}|[0-9]{4}-[0-9]{2}-[0-9]{2})/i.exec(trimmedLine);
 
     const customerCandidate = normalizeCustomerName(normalizeText(customerMatch?.[1])) || inferredCustomer;
     const issueCandidate = normalizeText(issueMatch?.[2]);
     const heuristicIssue = issueCandidate && isLikelyIssue(issueCandidate)
       ? issueCandidate
-      : actionSentencePattern.test(line)
-      ? normalizeText(line).slice(0, 220)
+      : actionSentencePattern.test(trimmedLine)
+      ? normalizeText(trimmedLine).slice(0, 220)
       : '';
     if (!customerCandidate || !isLikelyCustomerName(customerCandidate) || !heuristicIssue) {
       continue;
@@ -835,7 +985,7 @@ const extractWithHeuristics = (text: string): Array<Omit<CssProposal, 'proposalI
         issue: heuristicIssue,
         issueStatus: sanitizeIssueStatus(statusMatch?.[2]),
         cssOwner: ownerMatch?.[2]?.trim() ?? null,
-        details: line,
+        details: trimmedLine,
         lastUpdate: normalizeDate(dateMatch?.[2]) ?? new Date().toISOString().slice(0, 10)
       }
     });
@@ -893,11 +1043,60 @@ const extractWithAzureOpenAi = async (text: string): Promise<CssProposalPayload[
   }
 
   const prompt = `
-Estrai azioni cliente da questo meeting report.
-Rispondi SOLO JSON valido con array "items".
-Ogni item: customerName, issue, issueStatus, cssOwner, blBu, details, lastUpdate (YYYY-MM-DD o null).
-Se non sei sicuro, usa issueStatus "Action required".
-Testo:
+COMPITO: Estrai TUTTI i task, action items, decisioni e punti aperti da questo meeting report.
+
+CERCA:
+- Task assegnati (chi fa cosa, entro quando)
+- Decisioni prese
+- Punti verificare/da chiarire
+- Riunioni pianificate
+- Attività completate
+- Problemi aperti
+- Azioni di follow-up
+- Verifiche richieste
+
+FORMATI COMUNI (esempi, non esaustivo):
+- "Task X: ... Owner: ... Deadline: ..."
+- "- Azione: ... (Responsabile: ...)"
+- Tabelle: | Task | Update | Status | Owner |
+- "Stefano farà ... entro settembre"
+- "Da verificare: ..."
+- "Confermato che è fatto"
+- "Stand-by: ..."
+- "Nuovo task: ..."
+
+ISUESTATUS MAPPING:
+- "Chiuso" / "fatta" / "completata" / "closed" → "Chiuso"
+- "In progress" / "in corso" / "da fare" → "In progress"
+- "Stand-by" / "on hold" → "Stand-by"
+- "Da verificare" / "to verify" / "verif" → "Da verificare"
+- "Nuovo" / "new" / "proposta" → "Nuovo task"
+- Default: "Action required"
+
+RISPONDI CON JSON VALIDO:
+{
+  "items": [
+    {
+      "customerName": "AEB|Nordica|etc",
+      "issue": "Breve descrizione task",
+      "issueStatus": "Chiuso|In progress|Stand-by|Da verificare|Nuovo task|Action required",
+      "cssOwner": "Stefano|Alessandro|null",
+      "blBu": null,
+      "details": "Dettagli completi (max 350 car)",
+      "lastUpdate": "YYYY-MM-DD o null"
+    }
+  ]
+}
+
+REGOLE:
+- Estrai OGNI task distinto, anche implici
+- Un task = un "cosa" con potenziale owner/deadline
+- Non saltare task solo perché senza owner esplicito
+- Mantieni customer italiano/originale nel testo
+- Se deadline è una stagione/mese, estima data o lascia null
+- lastUpdate = data progettata o oggi
+
+TESTO DA ANALIZZARE:
 ${text.slice(0, maxChars)}
 `;
 
@@ -1654,67 +1853,30 @@ export const processCssDocument = async (
     throw new Error('Nessun testo estraibile trovato nel documento');
   }
 
-  const extractionMode = getCssExtractionMode();
+  // Force full AI extraction: azure_only mode
   const aiEnabled = shouldUseAzureOpenAi();
-  let aiProvider = 'none';
-  let aiModel: string | null = null;
-  const notes: string[] = [`mode=${extractionMode}`];
-
-  const heuristic = dedupeProposals(
-    extractWithHeuristics(extractedText)
-      .map((proposal) => normalizeDraftProposal(proposal))
-      .filter((proposal): proposal is Omit<CssProposal, 'proposalId' | 'batchId' | 'decisionStatus' | 'decisionNote' | 'createdAt' | 'updatedAt'> => Boolean(proposal))
-  );
-
-  const runAzureExtraction = async (): Promise<Array<Omit<CssProposal, 'proposalId' | 'batchId' | 'decisionStatus' | 'decisionNote' | 'createdAt' | 'updatedAt'>>> => {
-    const extractedPayloads = await extractWithAzureOpenAi(extractedText);
-    aiProvider = 'azure_openai';
-    aiModel = process.env.AZURE_OPENAI_DEPLOYMENT || null;
-    const aiProposals = extractedPayloads
-      .map((payload) => normalizeProposalPayload(payload))
-      .filter((payload): payload is CssProposalPayload => Boolean(payload))
-      .map((payload) => ({
-        actionType: 'create' as const,
-        targetActivityId: null,
-        confidence: 0.82,
-        payload
-      }));
-    return dedupeProposals(aiProposals);
-  };
-
-  let merged: Array<Omit<CssProposal, 'proposalId' | 'batchId' | 'decisionStatus' | 'decisionNote' | 'createdAt' | 'updatedAt'>> = [];
-
-  if (extractionMode === 'heuristic_only') {
-    merged = heuristic;
-    notes.push(`heuristic=${heuristic.length}`);
-  } else if (extractionMode === 'azure_only') {
-    if (!aiEnabled) {
-      throw new Error('Modalità azure_only attiva ma Azure OpenAI non configurato');
-    }
-    merged = await runAzureExtraction();
-    notes.push(`azure=${merged.length}`);
-  } else {
-    notes.push(`heuristic=${heuristic.length}`);
-    if (aiEnabled) {
-      try {
-        const azure = await runAzureExtraction();
-        notes.push(`azure=${azure.length}`);
-        // In auto mode prefer AI candidates, but keep heuristic-only insights as fallback.
-        merged = dedupeProposals([...azure, ...heuristic]);
-        if (azure.length > 0 && heuristic.length > 0) {
-          aiProvider = 'hybrid';
-        }
-      } catch (error) {
-        const rawMessage = error instanceof Error ? error.message : 'errore sconosciuto';
-        const compactMessage = rawMessage.replace(/\s+/g, ' ').slice(0, 140);
-        notes.push(`azure_error=${compactMessage}`);
-        merged = heuristic;
-      }
-    } else {
-      notes.push('azure=disabled');
-      merged = heuristic;
-    }
+  if (!aiEnabled) {
+    throw new Error('Azure OpenAI non configurato. L\'estrazione richiede Azure OpenAI.');
   }
+
+  let aiProvider = 'azure_openai';
+  let aiModel: string | null = null;
+  const notes: string[] = ['mode=azure_only'];
+
+  const extractedPayloads = await extractWithAzureOpenAi(extractedText);
+  aiProvider = 'azure_openai';
+  aiModel = process.env.AZURE_OPENAI_DEPLOYMENT || null;
+  const aiProposals = extractedPayloads
+    .map((payload) => normalizeProposalPayload(payload))
+    .filter((payload): payload is CssProposalPayload => Boolean(payload))
+    .map((payload) => ({
+      actionType: 'create' as const,
+      targetActivityId: null,
+      confidence: 0.82,
+      payload
+    }));
+  const merged = dedupeProposals(aiProposals);
+  notes.push(`azure=${merged.length}`);
 
   if (merged.length === 0) {
     const fallbackCustomer = inferPrimaryCustomerName(extractedText) ?? 'Cliente da validare';
@@ -1756,8 +1918,8 @@ export const processCssDocument = async (
     insertProposal.run(
       randomUUID(),
       batchId,
-      match ? 'update' : proposal.actionType,
-      match?.activity_id ?? null,
+      match.decision,
+      match.targetActivityId,
       JSON.stringify(proposal.payload),
       proposal.confidence,
       now,
@@ -1845,7 +2007,22 @@ export const validateCssBatch = (
       mergedPayload.details = prependDateToDetails(mergedPayload.lastUpdate, mergedPayload.details);
 
       if (finalDecision === 'approved') {
-        if (proposal.actionType === 'update' && proposal.targetActivityId) {
+        if (proposal.actionType === 'ambiguous') {
+          const decisionOverride = decision?.payloadOverride as Partial<CssProposalPayload> & { targetActivityId?: string } | undefined;
+          const targetId = decisionOverride?.targetActivityId;
+          if (!targetId) {
+            throw new Error(`Proposta ambigua ${proposal.proposalId} richiede targetActivityId esplicito`);
+          }
+          updateCssActivity(db, targetId, {
+            customerName: mergedPayload.customerName,
+            cssOwner: mergedPayload.cssOwner ?? null,
+            lastUpdate: mergedPayload.lastUpdate ?? null,
+            blBu: mergedPayload.blBu ?? null,
+            issue: mergedPayload.issue,
+            issueStatus: mergedPayload.issueStatus,
+            details: mergedPayload.details ?? null
+          });
+        } else if (proposal.actionType === 'update' && proposal.targetActivityId) {
           updateCssActivity(db, proposal.targetActivityId, {
             customerName: mergedPayload.customerName,
             cssOwner: mergedPayload.cssOwner ?? null,
