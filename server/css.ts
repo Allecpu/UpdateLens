@@ -145,7 +145,17 @@ type ProposalRow = {
   updated_at: string;
 };
 
-const KNOWN_STATUSES = ['Action required', 'In progress', 'Opportunity', 'Planned', 'Done'] as const;
+const KNOWN_STATUSES = [
+  'Action required',
+  'In progress',
+  'Planned',
+  'Requested',
+  'Stand By',
+  'Monitored',
+  'Closed',
+  'Aborted',
+  'Opportunity'
+] as const;
 const EXTRACTION_MODES = ['auto_heuristic_first', 'heuristic_only', 'azure_only'] as const;
 const NOISE_CUSTOMER_TOKENS = new Set([
   'che',
@@ -769,6 +779,50 @@ const sanitizeIssueStatus = (status?: string | null): string => {
   return match ?? normalized;
 };
 
+// Le proposte AI usano un prompt in italiano per la mappatura status; qui riportiamo eventuali
+// termini non allineati all'enum reale (case: il modello risponde comunque in italiano nonostante
+// le istruzioni) sui valori effettivamente supportati dalla UI, invece di lasciare passare testo libero.
+const PROPOSAL_STATUS_ALIASES: Record<string, (typeof KNOWN_STATUSES)[number]> = {
+  chiuso: 'Closed',
+  fatta: 'Closed',
+  completata: 'Closed',
+  closed: 'Closed',
+  done: 'Closed',
+  'in progress': 'In progress',
+  'in corso': 'In progress',
+  'stand-by': 'Stand By',
+  'stand by': 'Stand By',
+  standby: 'Stand By',
+  'on hold': 'Stand By',
+  'da verificare': 'Action required',
+  'to verify': 'Action required',
+  pianificato: 'Planned',
+  planned: 'Planned',
+  richiesto: 'Requested',
+  requested: 'Requested',
+  monitorato: 'Monitored',
+  monitored: 'Monitored',
+  annullato: 'Aborted',
+  aborted: 'Aborted',
+  opportunita: 'Opportunity',
+  opportunity: 'Opportunity',
+  'action required': 'Action required',
+  'azione richiesta': 'Action required'
+};
+
+const sanitizeProposalIssueStatus = (status?: string | null): string => {
+  const normalized = (status ?? '').trim().replace(/\s+/g, ' ');
+  if (!normalized) {
+    return 'Action required';
+  }
+  const exact = KNOWN_STATUSES.find((candidate) => candidate.toLowerCase() === normalized.toLowerCase());
+  if (exact) {
+    return exact;
+  }
+  const alias = PROPOSAL_STATUS_ALIASES[normalized.toLowerCase()];
+  return alias ?? 'Action required';
+};
+
 const normalizeText = (value?: string | null): string =>
   (value ?? '')
     .trim()
@@ -797,7 +851,74 @@ const isLikelyIssue = (value: string): boolean => {
   return hasLetter(value);
 };
 
-const normalizeProposalPayload = (payload: CssProposalPayload): CssProposalPayload | null => {
+// L'AI a volte scambia per "owner" il nome della persona citata nel task (es. un referente
+// cliente) invece del reale CSS Owner interno. Accettiamo il valore solo se coincide con un
+// owner gia' noto in anagrafica: altrimenti lo lasciamo vuoto e lo si assegna manualmente.
+const resolveKnownOwner = (value: string | null, knownOwnersLower: Set<string>): string | null => {
+  if (!value) return null;
+  return knownOwnersLower.has(value.toLowerCase()) ? value : null;
+};
+
+// BLs/BUs e' una tassonomia fissa (es. "Business Central - IMPL"): l'AI non puo' inventarla,
+// quindi accettiamo il valore solo se coincide con un token gia' presente in anagrafica.
+const resolveKnownBlBu = (value: string | null, knownBlBuLower: Set<string>): string | null => {
+  if (!value) return null;
+  return knownBlBuLower.has(value.toLowerCase()) ? value : null;
+};
+
+const getKnownBlBuTokens = (db: Database.Database): string[] => {
+  const rows = db
+    .prepare(`SELECT DISTINCT bl_bu FROM css_activities WHERE bl_bu IS NOT NULL AND bl_bu != ''`)
+    .all() as Array<{ bl_bu: string }>;
+  const tokens = new Set<string>();
+  rows.forEach((row) => splitChoiceTokens(row.bl_bu).forEach((token) => tokens.add(token)));
+  return Array.from(tokens).sort((a, b) => a.localeCompare(b));
+};
+
+// Status secondario (listStatus): stessa tassonomia di issueStatus ma opzionale, quindi se il
+// valore non e' riconosciuto lo lasciamo vuoto invece di forzare un default fuorviante.
+const sanitizeProposalListStatus = (status?: string | null): string | null => {
+  const normalized = (status ?? '').trim().replace(/\s+/g, ' ');
+  if (!normalized) return null;
+  const exact = KNOWN_STATUSES.find((candidate) => candidate.toLowerCase() === normalized.toLowerCase());
+  if (exact) return exact;
+  return PROPOSAL_STATUS_ALIASES[normalized.toLowerCase()] ?? null;
+};
+
+const PROPOSAL_PRIORITY_OPTIONS = ['Very High', 'High', 'Medium', 'Low', 'Undefined'] as const;
+
+const resolvePriority = (value?: string | null): string | null => {
+  const normalized = (value ?? '').trim();
+  if (!normalized) return null;
+  const match = PROPOSAL_PRIORITY_OPTIONS.find((option) => option.toLowerCase() === normalized.toLowerCase());
+  return match ?? null;
+};
+
+const resolveRating = (value?: number | string | null): number | null => {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(parsed)) return null;
+  const clamped = Math.max(0, Math.min(5, parsed));
+  return Math.round(clamped * 2) / 2;
+};
+
+// eosOwners puo' contenere piu' nomi: accettiamo solo quelli che combaciano con l'anagrafica nota,
+// scartando gli altri singolarmente invece di annullare l'intero campo.
+const resolveKnownOwnersMulti = (value: string | null, knownOwnersLower: Set<string>): string | null => {
+  if (!value) return null;
+  const candidates = value
+    .split(/[,;]/)
+    .map((token) => token.trim())
+    .filter((token) => token.length > 0);
+  const matched = Array.from(new Set(candidates.filter((token) => knownOwnersLower.has(token.toLowerCase()))));
+  return matched.length > 0 ? matched.join(', ') : null;
+};
+
+const normalizeProposalPayload = (
+  payload: CssProposalPayload,
+  knownOwnersLower: Set<string>,
+  knownBlBuLower: Set<string>
+): CssProposalPayload | null => {
   const customerName = normalizeCustomerName(normalizeText(payload.customerName));
   const issue = normalizeText(payload.issue);
   if (!isLikelyCustomerName(customerName) || !isLikelyIssue(issue)) {
@@ -807,18 +928,29 @@ const normalizeProposalPayload = (payload: CssProposalPayload): CssProposalPaylo
   return {
     customerName,
     issue,
-    issueStatus: sanitizeIssueStatus(payload.issueStatus),
-    cssOwner: normalizeOwner(payload.cssOwner) ?? null,
-    blBu: normalizeChoiceValue(payload.blBu) ?? null,
+    issueStatus: sanitizeProposalIssueStatus(payload.issueStatus),
+    listStatus: sanitizeProposalListStatus(payload.listStatus),
+    cssOwner: resolveKnownOwner(normalizeOwner(payload.cssOwner), knownOwnersLower),
+    blBu: resolveKnownBlBu(normalizeChoiceValue(payload.blBu), knownBlBuLower),
     details: normalizeText(payload.details) || null,
-    lastUpdate: normalizeDate(payload.lastUpdate) ?? new Date().toISOString().slice(0, 10)
+    lastUpdate: normalizeDate(payload.lastUpdate) ?? new Date().toISOString().slice(0, 10),
+    eosOwners: resolveKnownOwnersMulti(normalizeText(payload.eosOwners) || null, knownOwnersLower),
+    customerOwners: normalizeText(payload.customerOwners) || null,
+    cssAction: normalizeText(payload.cssAction) || null,
+    notes: normalizeText(payload.notes) || null,
+    customerPriority: resolvePriority(payload.customerPriority),
+    cssPriority: resolvePriority(payload.cssPriority),
+    dueDate: normalizeDate(payload.dueDate),
+    rating: resolveRating(payload.rating),
+    // itemType e' un campo legacy senza vocabolario affidabile da inferire dal testo del meeting.
+    itemType: null
   };
 };
 
 const normalizeDraftProposal = (
   proposal: Omit<CssProposal, 'proposalId' | 'batchId' | 'decisionStatus' | 'decisionNote' | 'createdAt' | 'updatedAt'>
 ): Omit<CssProposal, 'proposalId' | 'batchId' | 'decisionStatus' | 'decisionNote' | 'createdAt' | 'updatedAt'> | null => {
-  const payload = normalizeProposalPayload(proposal.payload);
+  const payload = normalizeProposalPayload(proposal.payload, new Set(), new Set());
   if (!payload) {
     return null;
   }
@@ -1026,7 +1158,11 @@ const parseRetryDelayMs = (response: Response, attempt: number): number => {
   return Math.min(backoff, 10_000);
 };
 
-const extractWithAzureOpenAi = async (text: string): Promise<CssProposalPayload[]> => {
+const extractWithAzureOpenAi = async (
+  text: string,
+  knownOwners: string[],
+  knownBlBu: string[]
+): Promise<CssProposalPayload[]> => {
   const config = getAzureOpenAIConfig();
   if (!config) {
     throw new Error('Azure OpenAI non configurato');
@@ -1073,6 +1209,24 @@ ISUESTATUS MAPPING:
 - "Nuovo" / "new" / "proposta" → "Nuovo task"
 - Default: "Action required"
 
+CSS OWNER: e' un membro interno del team CSS, NON il referente/contatto del cliente citato nel task.
+${knownOwners.length > 0 ? `Valori ammessi per "cssOwner" (usa ESATTAMENTE uno di questi se riconosci il team member, altrimenti null):\n${knownOwners.join(', ')}` : 'Nessun CSS Owner noto in anagrafica: lascia sempre "cssOwner": null.'}
+Se il nome nel testo non e' chiaramente uno di questi valori, non indovinare: usa null.
+"eosOwners" segue la stessa regola (uno o piu' valori dall'elenco sopra, separati da virgola, o null): sono i colleghi EOS coinvolti nel task, non i contatti del cliente.
+
+BLBU: e' una tassonomia fissa di Business Line/Business Unit, quasi mai deducibile con certezza dal testo di un meeting.
+${knownBlBu.length > 0 ? `Valori ammessi per "blBu" (usa ESATTAMENTE uno di questi solo se il testo lo indica in modo inequivocabile, altrimenti null):\n${knownBlBu.join(', ')}` : 'Nessun valore BLBU noto in anagrafica: lascia sempre "blBu": null.'}
+Nel dubbio usa sempre null: non inventare mai un valore non presente in questo elenco.
+
+ALTRI CAMPI:
+- "customerOwners": referenti/contatti lato cliente citati nel task (nomi liberi, es. "Mario Rossi (IT Manager)"), o null
+- "cssAction": la prossima azione concreta da fare (breve, max 200 car), o null se non esplicita
+- "notes": eventuali note aggiuntive non gia' coperte da details, o null
+- "customerPriority" / "cssPriority": SOLO uno tra "Very High","High","Medium","Low","Undefined" se esplicitamente indicato, altrimenti null
+- "dueDate": scadenza in formato YYYY-MM-DD se indicata, altrimenti null (diversa da lastUpdate)
+- "rating": numero 0-5 SOLO se il testo esprime esplicitamente una valutazione/soddisfazione cliente, altrimenti null
+- "listStatus": stesso enum di issueStatus, usalo solo se il testo distingue esplicitamente uno "status lista" diverso dallo status del task; nel dubbio null
+
 RISPONDI CON JSON VALIDO:
 {
   "items": [
@@ -1080,10 +1234,19 @@ RISPONDI CON JSON VALIDO:
       "customerName": "AEB|Nordica|etc",
       "issue": "Breve descrizione task",
       "issueStatus": "Chiuso|In progress|Stand-by|Da verificare|Nuovo task|Action required",
-      "cssOwner": "Stefano|Alessandro|null",
-      "blBu": null,
+      "listStatus": "stesso enum di issueStatus, oppure null",
+      "cssOwner": "uno dei valori ammessi sopra, oppure null",
+      "blBu": "uno dei valori ammessi sopra, oppure null (nel dubbio null)",
       "details": "Dettagli completi (max 350 car)",
-      "lastUpdate": "YYYY-MM-DD o null"
+      "lastUpdate": "YYYY-MM-DD o null",
+      "eosOwners": "uno o piu' valori ammessi separati da virgola, oppure null",
+      "customerOwners": "referenti cliente citati, oppure null",
+      "cssAction": "prossima azione concreta, oppure null",
+      "notes": "note aggiuntive, oppure null",
+      "customerPriority": "Very High|High|Medium|Low|Undefined|null",
+      "cssPriority": "Very High|High|Medium|Low|Undefined|null",
+      "dueDate": "YYYY-MM-DD o null",
+      "rating": "numero 0-5 o null"
     }
   ]
 }
@@ -1092,6 +1255,7 @@ REGOLE:
 - Estrai OGNI task distinto, anche implici
 - Un task = un "cosa" con potenziale owner/deadline
 - Non saltare task solo perché senza owner esplicito
+- Se un campo non è chiaramente determinabile dal testo, usa null: non inventare valori
 - Mantieni customer italiano/originale nel testo
 - Se deadline è una stagione/mese, estima data o lascia null
 - lastUpdate = data progettata o oggi
@@ -1863,11 +2027,16 @@ export const processCssDocument = async (
   let aiModel: string | null = null;
   const notes: string[] = ['mode=azure_only'];
 
-  const extractedPayloads = await extractWithAzureOpenAi(extractedText);
+  const knownOwners = getCssMeta(db).owners;
+  const knownOwnersLower = new Set(knownOwners.map((owner) => owner.toLowerCase()));
+  const knownBlBuTokens = getKnownBlBuTokens(db);
+  const knownBlBuLower = new Set(knownBlBuTokens.map((token) => token.toLowerCase()));
+
+  const extractedPayloads = await extractWithAzureOpenAi(extractedText, knownOwners, knownBlBuTokens);
   aiProvider = 'azure_openai';
   aiModel = process.env.AZURE_OPENAI_DEPLOYMENT || null;
   const aiProposals = extractedPayloads
-    .map((payload) => normalizeProposalPayload(payload))
+    .map((payload) => normalizeProposalPayload(payload, knownOwnersLower, knownBlBuLower))
     .filter((payload): payload is CssProposalPayload => Boolean(payload))
     .map((payload) => ({
       actionType: 'create' as const,
@@ -2019,8 +2188,18 @@ export const validateCssBatch = (
             lastUpdate: mergedPayload.lastUpdate ?? null,
             blBu: mergedPayload.blBu ?? null,
             issue: mergedPayload.issue,
+            listStatus: mergedPayload.listStatus ?? null,
             issueStatus: mergedPayload.issueStatus,
-            details: mergedPayload.details ?? null
+            details: mergedPayload.details ?? null,
+            eosOwners: mergedPayload.eosOwners ?? null,
+            customerOwners: mergedPayload.customerOwners ?? null,
+            cssAction: mergedPayload.cssAction ?? null,
+            notes: mergedPayload.notes ?? null,
+            customerPriority: mergedPayload.customerPriority ?? null,
+            cssPriority: mergedPayload.cssPriority ?? null,
+            dueDate: mergedPayload.dueDate ?? null,
+            rating: mergedPayload.rating ?? null,
+            itemType: mergedPayload.itemType ?? null
           });
         } else if (proposal.actionType === 'update' && proposal.targetActivityId) {
           updateCssActivity(db, proposal.targetActivityId, {
@@ -2029,8 +2208,18 @@ export const validateCssBatch = (
             lastUpdate: mergedPayload.lastUpdate ?? null,
             blBu: mergedPayload.blBu ?? null,
             issue: mergedPayload.issue,
+            listStatus: mergedPayload.listStatus ?? null,
             issueStatus: mergedPayload.issueStatus,
-            details: mergedPayload.details ?? null
+            details: mergedPayload.details ?? null,
+            eosOwners: mergedPayload.eosOwners ?? null,
+            customerOwners: mergedPayload.customerOwners ?? null,
+            cssAction: mergedPayload.cssAction ?? null,
+            notes: mergedPayload.notes ?? null,
+            customerPriority: mergedPayload.customerPriority ?? null,
+            cssPriority: mergedPayload.cssPriority ?? null,
+            dueDate: mergedPayload.dueDate ?? null,
+            rating: mergedPayload.rating ?? null,
+            itemType: mergedPayload.itemType ?? null
           });
         } else {
           createCssActivity(db, {
@@ -2039,8 +2228,18 @@ export const validateCssBatch = (
             lastUpdate: mergedPayload.lastUpdate ?? null,
             blBu: mergedPayload.blBu ?? null,
             issue: mergedPayload.issue,
+            listStatus: mergedPayload.listStatus ?? null,
             issueStatus: mergedPayload.issueStatus,
             details: mergedPayload.details ?? null,
+            eosOwners: mergedPayload.eosOwners ?? null,
+            customerOwners: mergedPayload.customerOwners ?? null,
+            cssAction: mergedPayload.cssAction ?? null,
+            notes: mergedPayload.notes ?? null,
+            customerPriority: mergedPayload.customerPriority ?? null,
+            cssPriority: mergedPayload.cssPriority ?? null,
+            dueDate: mergedPayload.dueDate ?? null,
+            rating: mergedPayload.rating ?? null,
+            itemType: mergedPayload.itemType ?? null,
             sourceRef: `batch:${batchId}`
           });
         }

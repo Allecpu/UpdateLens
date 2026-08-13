@@ -638,7 +638,7 @@ const CssPage = () => {
   const [activeBatchId, setActiveBatchId] = useState<string | null>(null);
   const [proposals, setProposals] = useState<CssProposal[]>([]);
   const [proposalOverrides, setProposalOverrides] = useState<Record<string, Partial<CssProposalPayload>>>({});
-  const [aliasTargetByProposal, setAliasTargetByProposal] = useState<Record<string, string>>({});
+  const [aliasTargetByCustomerKey, setAliasTargetByCustomerKey] = useState<Record<string, string>>({});
   const [ambiguousTargetByProposal, setAmbiguousTargetByProposal] = useState<Record<string, string>>({});
   const [addingAliasProposalId, setAddingAliasProposalId] = useState<string | null>(null);
   const [approved, setApproved] = useState<Record<string, boolean>>({});
@@ -1057,7 +1057,7 @@ const CssPage = () => {
       setActiveBatchId(result.batchId);
       setProposals(result.proposals);
       setProposalOverrides({});
-      setAliasTargetByProposal({});
+      setAliasTargetByCustomerKey({});
       setAmbiguousTargetByProposal({});
       const decisions: Record<string, boolean> = {};
       result.proposals.forEach((proposal) => {
@@ -1200,6 +1200,43 @@ const CssPage = () => {
     }));
   };
 
+  // Unisce candidateAlias al cliente canonico selezionato e riflette il nome risolto
+  // su tutte le proposte del batch che condividono lo stesso nome grezzo.
+  const mergeCustomerAliasForKey = async (customerKey: string, candidateAlias: string): Promise<string> => {
+    const targetCustomerId = aliasTargetByCustomerKey[customerKey];
+    if (!targetCustomerId) {
+      throw new Error(`Seleziona un cliente canonico per "${candidateAlias}" prima di validare`);
+    }
+    const targetCustomer = cssCustomers.find((customer) => customer.customerId === targetCustomerId);
+    if (!targetCustomer) {
+      throw new Error('Cliente canonico non trovato');
+    }
+
+    const applyToMatchingProposals = () => {
+      proposals
+        .filter((candidate) => normalizeCustomerKey(getProposalDraft(candidate).customerName) === customerKey)
+        .forEach((candidate) => updateProposalDraft(candidate.proposalId, { customerName: targetCustomer.name }));
+    };
+
+    const canonicalNormalized = normalizeCustomerKey(targetCustomer.name);
+    if (customerKey === canonicalNormalized) {
+      applyToMatchingProposals();
+      return targetCustomer.name;
+    }
+
+    const mergedAliases = Array.from(
+      new Set(
+        [...targetCustomer.aliases, candidateAlias]
+          .map((alias) => alias.trim())
+          .filter((alias) => alias.length > 0)
+      )
+    );
+    await cssService.updateCustomer(targetCustomer.customerId, { aliases: mergedAliases });
+    await Promise.all([refreshCssCustomers(), refreshMeta()]);
+    applyToMatchingProposals();
+    return targetCustomer.name;
+  };
+
   const onAddProposalCustomerAsAlias = async (proposal: CssProposal) => {
     const draft = getProposalDraft(proposal);
     const candidateAlias = (draft.customerName ?? '').trim();
@@ -1208,39 +1245,11 @@ const CssPage = () => {
       return;
     }
 
-    const targetCustomerId = aliasTargetByProposal[proposal.proposalId];
-    if (!targetCustomerId) {
-      setError('Seleziona un cliente canonico prima di aggiungere l’alias');
-      return;
-    }
-
-    const targetCustomer = cssCustomers.find((customer) => customer.customerId === targetCustomerId);
-    if (!targetCustomer) {
-      setError('Cliente canonico non trovato');
-      return;
-    }
-
-    const aliasNormalized = normalizeCustomerKey(candidateAlias);
-    const canonicalNormalized = normalizeCustomerKey(targetCustomer.name);
-    if (aliasNormalized === canonicalNormalized) {
-      updateProposalDraft(proposal.proposalId, { customerName: targetCustomer.name });
-      return;
-    }
-
     setAddingAliasProposalId(proposal.proposalId);
     setError(null);
     try {
-      const mergedAliases = Array.from(
-        new Set(
-          [...targetCustomer.aliases, candidateAlias]
-            .map((alias) => alias.trim())
-            .filter((alias) => alias.length > 0)
-        )
-      );
-      await cssService.updateCustomer(targetCustomer.customerId, { aliases: mergedAliases });
-      await Promise.all([refreshCssCustomers(), refreshMeta()]);
-      updateProposalDraft(proposal.proposalId, { customerName: targetCustomer.name });
-      setExtractionSummary(`Alias aggiunto: "${candidateAlias}" -> ${targetCustomer.name}`);
+      const canonicalName = await mergeCustomerAliasForKey(normalizeCustomerKey(candidateAlias), candidateAlias);
+      setExtractionSummary(`Alias aggiunto: "${candidateAlias}" -> ${canonicalName} (applicato a tutte le proposte corrispondenti)`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Errore aggiunta alias cliente');
     } finally {
@@ -1266,19 +1275,60 @@ const CssPage = () => {
       return;
     }
 
+    // Clienti nuovi non ancora risolti (una voce per nome grezzo, tra le proposte da applicare).
+    const unresolvedGroups = new Map<string, { candidateAlias: string }>();
+    proposals.forEach((proposal) => {
+      if (!(approved[proposal.proposalId] ?? true)) return;
+      const draft = getProposalDraft(proposal);
+      if (resolveCanonicalCustomer(draft.customerName)) return;
+      const key = normalizeCustomerKey(draft.customerName);
+      if (!key || unresolvedGroups.has(key)) return;
+      unresolvedGroups.set(key, { candidateAlias: (draft.customerName ?? '').trim() });
+    });
+
+    const missingAliasTarget = Array.from(unresolvedGroups.entries()).find(([key]) => !aliasTargetByCustomerKey[key]);
+    if (missingAliasTarget) {
+      setError(`Seleziona un cliente canonico per "${missingAliasTarget[1].candidateAlias}" prima di validare (oppure deseleziona "Applica" per quelle proposte).`);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    const resolvedAliasMap = new Map<string, string>();
+    try {
+      for (const [key, group] of unresolvedGroups) {
+        const canonicalName = await mergeCustomerAliasForKey(key, group.candidateAlias);
+        resolvedAliasMap.set(key, canonicalName);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Errore risoluzione alias cliente');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
     setValidating(true);
     try {
       const decisions = proposals.map((proposal) => {
         const draft = getProposalDraft(proposal);
-        const canonicalCustomer = resolveCanonicalCustomer(draft.customerName) ?? draft.customerName;
+        const customerKey = normalizeCustomerKey(draft.customerName);
+        const canonicalCustomer = resolvedAliasMap.get(customerKey) ?? resolveCanonicalCustomer(draft.customerName) ?? draft.customerName;
         const payloadOverride: Partial<CssProposalPayload> & { targetActivityId?: string } = {
           customerName: canonicalCustomer,
           issue: draft.issue,
           issueStatus: draft.issueStatus,
+          listStatus: draft.listStatus ?? null,
           cssOwner: draft.cssOwner ?? null,
           blBu: draft.blBu ?? null,
           lastUpdate: toDateInputValue(draft.lastUpdate) || draft.lastUpdate || null,
-          details: buildDetailsWithDate(draft.lastUpdate, draft.details ?? null)
+          details: buildDetailsWithDate(draft.lastUpdate, draft.details ?? null),
+          eosOwners: draft.eosOwners ?? null,
+          customerOwners: draft.customerOwners ?? null,
+          cssAction: draft.cssAction ?? null,
+          notes: draft.notes ?? null,
+          customerPriority: draft.customerPriority ?? null,
+          cssPriority: draft.cssPriority ?? null,
+          dueDate: draft.dueDate ? toDateInputValue(draft.dueDate) : null,
+          rating: draft.rating ?? null,
+          itemType: draft.itemType ?? null
         };
         if (proposal.actionType === 'ambiguous') {
           const target = ambiguousTargetByProposal[proposal.proposalId];
@@ -1307,6 +1357,22 @@ const CssPage = () => {
   };
 
   const extractedCount = useMemo(() => proposals.length, [proposals.length]);
+
+  // Per ogni cliente non riconosciuto mostra il pannello "aggiungi alias" una sola volta:
+  // le proposte successive con lo stesso nome si risolvono automaticamente insieme alla prima.
+  const firstUnresolvedProposalIdByCustomer = useMemo(() => {
+    const seen = new Set<string>();
+    const result: Record<string, boolean> = {};
+    proposals.forEach((proposal) => {
+      const draft = getProposalDraft(proposal);
+      if (resolveCanonicalCustomer(draft.customerName)) return;
+      const key = normalizeCustomerKey(draft.customerName);
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      result[proposal.proposalId] = true;
+    });
+    return result;
+  }, [proposals, proposalOverrides, customerResolutionMaps]);
   const filteredActivities = useMemo(() => {
     const customerTokens = customerFilter.map((value) => normalizeToken(value)).filter((value) => value.length > 0);
     const ownerFilterTokens = ownerFilter
@@ -3553,6 +3619,11 @@ const CssPage = () => {
       )}
 
       <section className="ul-surface p-5">
+        <datalist id="css-owner-options">
+          {owners.map((owner) => (
+            <option key={owner} value={owner} />
+          ))}
+        </datalist>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold">Proposte da validare</h2>
           <div className="text-sm text-muted-foreground">
@@ -3613,17 +3684,22 @@ const CssPage = () => {
                           Cliente riconosciuto: <strong>{resolvedCustomer}</strong> (da alias: {draft.customerName})
                         </div>
                       )}
-                      {!resolvedCustomer && (
+                      {!resolvedCustomer && firstUnresolvedProposalIdByCustomer[proposal.proposalId] && (
                         <div className="mt-2 rounded-lg border border-amber-300/60 bg-amber-50/50 p-2 text-xs text-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
                           Nuova società rilevata: <strong>{draft.customerName}</strong>. Vuoi aggiungerla come alias a un cliente canonico?
+                          {proposals.filter((p) => normalizeCustomerKey(getProposalDraft(p).customerName) === normalizeCustomerKey(draft.customerName)).length > 1 && (
+                            <div className="mt-1 italic">
+                              Si applicherà a tutte le {proposals.filter((p) => normalizeCustomerKey(getProposalDraft(p).customerName) === normalizeCustomerKey(draft.customerName)).length} proposte con questo nome cliente.
+                            </div>
+                          )}
                           <div className="mt-2 flex flex-wrap items-center gap-2">
                             <select
                               className="ul-input h-9 min-w-[240px]"
-                              value={aliasTargetByProposal[proposal.proposalId] ?? ''}
+                              value={aliasTargetByCustomerKey[normalizeCustomerKey(draft.customerName)] ?? ''}
                               onChange={(event) =>
-                                setAliasTargetByProposal((prev) => ({
+                                setAliasTargetByCustomerKey((prev) => ({
                                   ...prev,
-                                  [proposal.proposalId]: event.target.value
+                                  [normalizeCustomerKey(draft.customerName)]: event.target.value
                                 }))
                               }
                             >
@@ -3645,6 +3721,11 @@ const CssPage = () => {
                           </div>
                         </div>
                       )}
+                      {!resolvedCustomer && !firstUnresolvedProposalIdByCustomer[proposal.proposalId] && (
+                        <div className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                          Cliente "<strong>{draft.customerName}</strong>" in attesa di risoluzione (vedi la prima proposta con lo stesso nome).
+                        </div>
+                      )}
                       <div className="mt-3 grid gap-2 md:grid-cols-2">
                         <input
                           className="ul-input"
@@ -3664,12 +3745,135 @@ const CssPage = () => {
                           onChange={(event) => updateProposalDraft(proposal.proposalId, { issue: event.target.value })}
                           placeholder="Testo attività"
                         />
+                        <select
+                          className="ul-input"
+                          value={draft.issueStatus}
+                          onChange={(event) => updateProposalDraft(proposal.proposalId, { issueStatus: event.target.value })}
+                        >
+                          {ISSUE_STATUS_BASE_OPTIONS.map((status) => (
+                            <option key={status} value={status}>
+                              {status}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          className="ul-input"
+                          list="css-owner-options"
+                          value={draft.cssOwner ?? ''}
+                          onChange={(event) => updateProposalDraft(proposal.proposalId, { cssOwner: event.target.value || null })}
+                          placeholder="CSS Owner (vuoto se non certo)"
+                        />
+                        <select
+                          className="ul-input md:col-span-2"
+                          value={blBuOptions.includes(draft.blBu ?? '') ? (draft.blBu ?? '') : ''}
+                          onChange={(event) => updateProposalDraft(proposal.proposalId, { blBu: event.target.value || null })}
+                        >
+                          <option value="">BLs/BUs (vuoto se non certo)</option>
+                          {blBuOptions.map((option) => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </select>
                         <textarea
                           className="ul-textarea md:col-span-2 min-h-[92px]"
                           value={datePrefixedDetails}
                           onChange={(event) => updateProposalDraft(proposal.proposalId, { details: event.target.value })}
                           placeholder="Dettagli attività"
                         />
+                        <select
+                          className="ul-input"
+                          value={listStatusOptions.includes(draft.listStatus ?? '') ? (draft.listStatus ?? '') : ''}
+                          onChange={(event) => updateProposalDraft(proposal.proposalId, { listStatus: event.target.value || null })}
+                        >
+                          <option value="">Status (Lista) — vuoto se non certo</option>
+                          {listStatusOptions.map((status) => (
+                            <option key={status} value={status}>
+                              {status}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          className="ul-input"
+                          value={toDateInputValue(draft.dueDate)}
+                          onChange={(event) => updateProposalDraft(proposal.proposalId, { dueDate: event.target.value || null })}
+                          type="date"
+                          title="Due Date"
+                        />
+                        <select
+                          className="ul-input"
+                          value={(PRIORITY_BASE_OPTIONS as readonly string[]).includes(draft.customerPriority ?? '') ? (draft.customerPriority ?? '') : ''}
+                          onChange={(event) => updateProposalDraft(proposal.proposalId, { customerPriority: event.target.value || null })}
+                        >
+                          <option value="">Customer Priority — vuoto se non certo</option>
+                          {PRIORITY_BASE_OPTIONS.map((priority) => (
+                            <option key={priority} value={priority}>
+                              {priority}
+                            </option>
+                          ))}
+                        </select>
+                        <select
+                          className="ul-input"
+                          value={(PRIORITY_BASE_OPTIONS as readonly string[]).includes(draft.cssPriority ?? '') ? (draft.cssPriority ?? '') : ''}
+                          onChange={(event) => updateProposalDraft(proposal.proposalId, { cssPriority: event.target.value || null })}
+                        >
+                          <option value="">CSS Priority — vuoto se non certo</option>
+                          {PRIORITY_BASE_OPTIONS.map((priority) => (
+                            <option key={priority} value={priority}>
+                              {priority}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          className="ul-input"
+                          list="css-owner-options"
+                          value={draft.eosOwners ?? ''}
+                          onChange={(event) => updateProposalDraft(proposal.proposalId, { eosOwners: event.target.value || null })}
+                          placeholder="EOS Owners (vuoto se non certo)"
+                        />
+                        <input
+                          className="ul-input"
+                          value={draft.customerOwners ?? ''}
+                          onChange={(event) => updateProposalDraft(proposal.proposalId, { customerOwners: event.target.value || null })}
+                          placeholder="Customer Owners"
+                        />
+                        <textarea
+                          className="ul-textarea md:col-span-2 min-h-[70px]"
+                          value={draft.cssAction ?? ''}
+                          onChange={(event) => updateProposalDraft(proposal.proposalId, { cssAction: event.target.value || null })}
+                          placeholder="CSS Action (prossima azione, vuoto se non certo)"
+                        />
+                        <textarea
+                          className="ul-textarea md:col-span-2 min-h-[70px]"
+                          value={draft.notes ?? ''}
+                          onChange={(event) => updateProposalDraft(proposal.proposalId, { notes: event.target.value || null })}
+                          placeholder="Notes"
+                        />
+                        <input
+                          className="ul-input"
+                          value={draft.rating ?? ''}
+                          onChange={(event) => {
+                            const raw = event.target.value;
+                            updateProposalDraft(proposal.proposalId, { rating: raw === '' ? null : Number(raw) });
+                          }}
+                          type="number"
+                          min={0}
+                          max={5}
+                          step={0.5}
+                          placeholder="Rating (0-5)"
+                        />
+                        <select
+                          className="ul-input"
+                          value={itemTypeOptions.includes(draft.itemType ?? '') ? (draft.itemType ?? '') : ''}
+                          onChange={(event) => updateProposalDraft(proposal.proposalId, { itemType: event.target.value || null })}
+                        >
+                          <option value="">Item Type — vuoto se non certo</option>
+                          {itemTypeOptions.map((type) => (
+                            <option key={type} value={type}>
+                              {type}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     </div>
                     <label className="inline-flex items-center gap-2 text-sm">

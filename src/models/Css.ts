@@ -76,8 +76,18 @@ export type CssProposalPayload = {
   blBu?: string | null;
   issue: string;
   issueStatus: string;
+  listStatus?: string | null;
   details?: string | null;
   lastUpdate?: string | null;
+  eosOwners?: string | null;
+  customerOwners?: string | null;
+  cssAction?: string | null;
+  notes?: string | null;
+  customerPriority?: string | null;
+  cssPriority?: string | null;
+  dueDate?: string | null;
+  rating?: number | null;
+  itemType?: string | null;
 };
 
 export type CssProposal = {
