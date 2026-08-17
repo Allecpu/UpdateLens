@@ -1068,6 +1068,9 @@ const extractWithHeuristics = (text: string): Array<Omit<CssProposal, 'proposalI
           actionType: 'create',
           targetActivityId: null,
           confidence: 0.72,
+          matchReason: null,
+          matchScore: null,
+          matchCandidates: null,
           payload: {
             customerName: customerCandidate,
             issue,
@@ -1112,6 +1115,9 @@ const extractWithHeuristics = (text: string): Array<Omit<CssProposal, 'proposalI
       actionType: 'create',
       targetActivityId: null,
       confidence: issueCandidate ? 0.64 : 0.56,
+      matchReason: null,
+      matchScore: null,
+      matchCandidates: null,
       payload: {
         customerName: customerCandidate,
         issue: heuristicIssue,
@@ -2065,9 +2071,12 @@ export const processCssDocument = async (
       actionType: 'create' as const,
       targetActivityId: null,
       confidence: 0.82,
+      matchReason: null,
+      matchScore: null,
+      matchCandidates: null,
       payload
     }));
-  const merged = dedupeProposals(aiProposals);
+  let merged = dedupeProposals(aiProposals);
   notes.push(`azure=${merged.length}`);
 
   if (merged.length === 0) {
@@ -2077,6 +2086,9 @@ export const processCssDocument = async (
         actionType: 'create',
         targetActivityId: null,
         confidence: 0.35,
+        matchReason: null,
+        matchScore: null,
+        matchCandidates: null,
         payload: {
           customerName: fallbackCustomer,
           issue: 'Review meeting report e definire azioni operative',
