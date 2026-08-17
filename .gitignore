@@ -35,3 +35,6 @@ rg-updatelens*.json
 subid*.txt
 tagging_log.txt
 verify_log.txt
+
+# Backup temporaneo DB produzione (import-css-to-prod.js)
+/scripts/prod-db-backup/

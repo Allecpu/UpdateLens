@@ -6,7 +6,7 @@ const DEFAULT_CRON = '0 */6 * * *';
 export const runScheduledIngest = () => {
   const schedule = process.env.RELEASEPLANS_CRON ?? DEFAULT_CRON;
   cron.schedule(schedule, () => {
-    const child = spawn('node', ['--loader', 'tsx', 'server/ingest.ts'], {
+    const child = spawn(process.execPath, ['--import', 'tsx/esm', 'server/ingest.ts'], {
       stdio: 'inherit',
       env: process.env
     });
