@@ -28,8 +28,19 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check AI secrets availability
+        id: check_ai_secrets
+        env:
+          HAS_AZURE_OPENAI_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+        run: |
+          if [ -n "$HAS_AZURE_OPENAI_KEY" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Run CSS extract benchmark
-        if: ${{ secrets.AZURE_OPENAI_API_KEY != '' }}
+        if: steps.check_ai_secrets.outputs.available == 'true'
         env:
           AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
           AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
