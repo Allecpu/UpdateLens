@@ -139,6 +139,19 @@ export const cssService = {
     });
   },
 
+  async deleteActivity(activityId: string): Promise<{ deleted: boolean }> {
+    return request<{ deleted: boolean }>(`/api/css/activities/${encodeURIComponent(activityId)}`, {
+      method: 'DELETE'
+    });
+  },
+
+  async bulkDeleteActivities(activityIds: string[]): Promise<{ deleted: number }> {
+    return request<{ deleted: number }>('/api/css/activities/bulk-delete', {
+      method: 'POST',
+      body: JSON.stringify({ activityIds })
+    });
+  },
+
   async listDocuments(): Promise<{ items: CssDocument[] }> {
     return request<{ items: CssDocument[] }>('/api/css/documents');
   },

@@ -844,6 +844,34 @@ export const createApi = () => {
     }
   });
 
+  app.delete('/api/css/activities/:id', (req, res) => {
+    try {
+      const result = css.deleteCssActivity(db, req.params.id);
+      res.json(result);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Errore durante eliminazione attività CSS';
+      const status = message.includes('non trovata') ? 404 : 400;
+      res.status(status).json({ error: message });
+    }
+  });
+
+  app.post('/api/css/activities/bulk-delete', (req, res) => {
+    try {
+      const { activityIds } = req.body ?? {};
+      if (!Array.isArray(activityIds) || activityIds.length === 0) {
+        return res.status(400).json({ error: 'activityIds obbligatorio (array non vuoto)' });
+      }
+      const result = css.bulkDeleteCssActivities(
+        db,
+        activityIds.filter((id: unknown) => typeof id === 'string')
+      );
+      res.json(result);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Errore bulk delete attività CSS';
+      res.status(400).json({ error: message });
+    }
+  });
+
   app.post('/api/css/activities/bulk-status', (req, res) => {
     try {
       const { activityIds, issueStatus } = req.body ?? {};

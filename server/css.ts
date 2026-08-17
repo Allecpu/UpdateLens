@@ -1602,6 +1602,29 @@ export const updateCssActivity = (
   return toActivity(updated);
 };
 
+export const deleteCssActivity = (db: Database.Database, activityId: string): { deleted: boolean } => {
+  const result = db.prepare('DELETE FROM css_activities WHERE activity_id = ?').run(activityId);
+  if (result.changes === 0) {
+    throw new Error('Attività non trovata');
+  }
+  return { deleted: true };
+};
+
+export const bulkDeleteCssActivities = (
+  db: Database.Database,
+  activityIds: string[]
+): { deleted: number } => {
+  const stmt = db.prepare('DELETE FROM css_activities WHERE activity_id = ?');
+  const run = db.transaction((ids: string[]) => {
+    let deleted = 0;
+    for (const id of ids) {
+      deleted += stmt.run(id).changes;
+    }
+    return deleted;
+  });
+  return { deleted: run(activityIds) };
+};
+
 export const uploadCssDocument = async (
   db: Database.Database,
   data: { filename: string; mimeType?: string | null; contentBase64: string; uploadedBy?: string | null }

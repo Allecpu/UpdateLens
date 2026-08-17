@@ -593,6 +593,7 @@ const CssPage = () => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkStatus, setBulkStatus] = useState('In progress');
   const [bulkUpdating, setBulkUpdating] = useState(false);
+  const [deletingActivityId, setDeletingActivityId] = useState<string | null>(null);
   const [isWideMode, setIsWideMode] = useState(true);
   const [showColumnPanel, setShowColumnPanel] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<Record<ColumnKey, boolean>>(DEFAULT_VISIBLE_COLUMNS);
@@ -641,6 +642,7 @@ const CssPage = () => {
   const [aliasTargetByCustomerKey, setAliasTargetByCustomerKey] = useState<Record<string, string>>({});
   const [ambiguousTargetByProposal, setAmbiguousTargetByProposal] = useState<Record<string, string>>({});
   const [addingAliasProposalId, setAddingAliasProposalId] = useState<string | null>(null);
+  const [creatingProposalCustomerId, setCreatingProposalCustomerId] = useState<string | null>(null);
   const [approved, setApproved] = useState<Record<string, boolean>>({});
   const [validating, setValidating] = useState(false);
   const [extractionSummary, setExtractionSummary] = useState<string | null>(null);
@@ -717,17 +719,24 @@ const CssPage = () => {
     };
   }, []);
 
-  // Apply Microsoft Lists Controls (hidden columns & auto-filters)
+  // Apply Microsoft Lists Controls (hidden columns & auto-filters).
+  // Le viste (vedi effetto sotto) definiscono esplicitamente la visibilita' di
+  // details/cssAction/notes per ogni vista, "Tutte" inclusa: se una vista e'
+  // attiva, questo default globale non deve sovrascriverla.
   useEffect(() => {
+    if (activeView) return;
     setVisibleColumns((prev) => ({
       ...prev,
       details: !isColumnHidden('details'),
       cssAction: !isColumnHidden('cssAction'),
       notes: !isColumnHidden('notes'),
     }));
-  }, [isColumnHidden]);
+  }, [isColumnHidden, activeView]);
 
-  // Apply active view configuration (columns, filters, sort)
+  // Apply active view configuration (columns, filters, sort).
+  // Deve girare DOPO il ripristino delle preferenze da localStorage (vedi
+  // effetto mount-only piu' sotto) cosi' che sia sempre la vista attiva ad
+  // avere l'ultima parola sulle colonne visibili, anche al primo caricamento.
   useEffect(() => {
     if (!activeView) return;
 
@@ -770,6 +779,10 @@ const CssPage = () => {
     return () => clearTimeout(timer);
   }, [visibleColumns, customerFilter, ownerFilter, statusFilter, ratingFilter, query, sortBy, sortDirection, activeView, activeViewId]);
 
+  // Nota: visibleColumns NON viene ripristinato da qui. La visibilita' delle
+  // colonne e' interamente governata dalla vista attiva (vedi effetto sopra),
+  // altrimenti un merge globale da questo localStorage puo' "inquinare" viste
+  // di sistema come "Tutte" con colonne nascoste lasciate da un'altra vista.
   useEffect(() => {
     try {
       const raw = localStorage.getItem(GRID_PREFS_STORAGE_KEY);
@@ -778,16 +791,12 @@ const CssPage = () => {
         version?: number;
         isWideMode?: boolean;
         showColumnPanel?: boolean;
-        visibleColumns?: Partial<Record<ColumnKey, boolean>>;
       };
       if (parsed.version !== GRID_PREFS_VERSION) {
         return;
       }
       if (typeof parsed.isWideMode === 'boolean') setIsWideMode(parsed.isWideMode);
       if (typeof parsed.showColumnPanel === 'boolean') setShowColumnPanel(parsed.showColumnPanel);
-      if (parsed.visibleColumns && typeof parsed.visibleColumns === 'object') {
-        setVisibleColumns((prev) => ({ ...prev, ...parsed.visibleColumns }));
-      }
     } catch (err) {
       console.warn('Impossibile caricare preferenze griglia CSS', err);
     }
@@ -1254,6 +1263,34 @@ const CssPage = () => {
       setError(err instanceof Error ? err.message : 'Errore aggiunta alias cliente');
     } finally {
       setAddingAliasProposalId(null);
+    }
+  };
+
+  // Crea un nuovo cliente canonico dal nome grezzo della proposta (nessun alias,
+  // nuova società non ancora presente in anagrafica). Applica il nome risolto
+  // a tutte le proposte del batch con lo stesso nome grezzo.
+  const onCreateProposalCustomer = async (proposal: CssProposal) => {
+    const draft = getProposalDraft(proposal);
+    const candidateName = (draft.customerName ?? '').trim();
+    if (!candidateName) {
+      setError('Nome cliente proposta vuoto: impossibile creare cliente');
+      return;
+    }
+
+    setCreatingProposalCustomerId(proposal.proposalId);
+    setError(null);
+    try {
+      await cssService.createCustomer({ name: candidateName, isActive: true });
+      await Promise.all([refreshCssCustomers(), refreshMeta()]);
+      const key = normalizeCustomerKey(candidateName);
+      proposals
+        .filter((candidate) => normalizeCustomerKey(getProposalDraft(candidate).customerName) === key)
+        .forEach((candidate) => updateProposalDraft(candidate.proposalId, { customerName: candidateName }));
+      setExtractionSummary(`Nuovo cliente creato: "${candidateName}" (applicato a tutte le proposte corrispondenti)`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Errore creazione cliente da proposta');
+    } finally {
+      setCreatingProposalCustomerId(null);
     }
   };
 
@@ -2048,6 +2085,43 @@ const CssPage = () => {
     }
   };
 
+  const onBulkDeleteActivities = async () => {
+    if (selectedIds.length === 0) {
+      return;
+    }
+    const confirmDelete = window.confirm(`Eliminare definitivamente ${selectedIds.length} attività selezionate?`);
+    if (!confirmDelete) return;
+
+    setBulkUpdating(true);
+    setError(null);
+    try {
+      await cssService.bulkDeleteActivities(selectedIds);
+      setSelectedIds([]);
+      await Promise.all([refreshActivities(), refreshMeta()]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Errore eliminazione massiva attività');
+    } finally {
+      setBulkUpdating(false);
+    }
+  };
+
+  const onDeleteActivity = async (activity: CssActivity) => {
+    const confirmDelete = window.confirm(`Eliminare l'attività "${activity.customerName} - ${activity.issue}"?`);
+    if (!confirmDelete) return;
+
+    setDeletingActivityId(activity.activityId);
+    setError(null);
+    try {
+      await cssService.deleteActivity(activity.activityId);
+      setSelectedIds((prev) => prev.filter((id) => id !== activity.activityId));
+      await Promise.all([refreshActivities(), refreshMeta()]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Errore eliminazione attività');
+    } finally {
+      setDeletingActivityId(null);
+    }
+  };
+
   const onCreateCssCustomer = async () => {
     const candidate = newCustomerName.trim();
     if (!candidate) {
@@ -2521,6 +2595,14 @@ const CssPage = () => {
                       disabled={bulkUpdating}
                     >
                       {bulkUpdating ? 'Aggiorno...' : 'Aggiorna stato selezionati'}
+                    </button>
+                    <button
+                      type="button"
+                      className="ml-2 rounded-md bg-red-600 px-2 py-1 text-xs text-white"
+                      onClick={() => void onBulkDeleteActivities()}
+                      disabled={bulkUpdating}
+                    >
+                      {bulkUpdating ? 'Eliminazione...' : 'Elimina selezionate'}
                     </button>
                   </td>
                 </tr>
@@ -2996,6 +3078,13 @@ const CssPage = () => {
                       <td className="px-3 py-2">
                         <div className="flex gap-3">
                           <button className="text-primary hover:underline" onClick={() => onEdit(activity)}>Form</button>
+                          <button
+                            className="text-red-600 hover:underline disabled:opacity-50"
+                            onClick={() => void onDeleteActivity(activity)}
+                            disabled={deletingActivityId === activity.activityId}
+                          >
+                            {deletingActivityId === activity.activityId ? 'Eliminazione...' : 'Elimina'}
+                          </button>
                         </div>
                       </td>
                     </>
@@ -3063,192 +3152,6 @@ const CssPage = () => {
             </datalist>
           </div>
         </ModernListsLayout>
-      </section>
-
-      <section className="ul-surface p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold">Gestione clienti (integrata in CSS)</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              I record CSS sono attività: qui la gestione usa l'anagrafica unificata backend (`css_customers`).
-            </p>
-          </div>
-          <button
-            type="button"
-            className="ul-button ul-button-ghost"
-            onClick={() => setShowCustomerManagement((prev) => !prev)}
-          >
-            {showCustomerManagement ? 'Nascondi' : 'Apri gestione clienti'}
-          </button>
-        </div>
-        <div className="mt-2 text-xs text-muted-foreground">
-          Clienti unici da attività: {uniqueCustomersCount} • Clienti anagrafica backend: {cssCustomers.length} • Attività totali: {activities.length}
-        </div>
-        {showCustomerManagement && (
-          <div className="mt-4 space-y-4 border-t border-border pt-4">
-            <div className="rounded-xl border border-border/60 p-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <div className="text-sm font-medium">Migrazione clienti legacy (localStorage)</div>
-                  <div className="text-xs text-muted-foreground">
-                    Importa in backend i clienti storici come attivi, evitando duplicati.
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className="ul-button ul-button-ghost"
-                  onClick={() => void onMigrateLegacyCustomers()}
-                  disabled={migratingLegacyCustomers}
-                >
-                  {migratingLegacyCustomers ? 'Migrazione...' : 'Importa clienti legacy'}
-                </button>
-              </div>
-              {customerMigrationSummary && (
-                <div className="mt-2 text-xs text-muted-foreground">{customerMigrationSummary}</div>
-              )}
-            </div>
-
-            <div className="grid gap-3 md:grid-cols-[1fr_auto]">
-              <input
-                className="ul-input"
-                placeholder="Nuovo cliente..."
-                value={newCustomerName}
-                onChange={(event) => setNewCustomerName(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    void onCreateCssCustomer();
-                  }
-                }}
-              />
-              <button
-                type="button"
-                className="ul-button ul-button-primary"
-                onClick={() => void onCreateCssCustomer()}
-                disabled={creatingCustomer}
-              >
-                {creatingCustomer ? 'Creazione...' : 'Aggiungi cliente'}
-              </button>
-            </div>
-
-            <div className="rounded-xl border border-border/60 p-3">
-              <div className="mb-2 text-sm font-medium">Merge clienti (deduplica)</div>
-              <div className="grid gap-2 md:grid-cols-3">
-                <select
-                  className="ul-input"
-                  value={mergePrimaryCustomerId}
-                  onChange={(event) => setMergePrimaryCustomerId(event.target.value)}
-                >
-                  <option value="">Cliente primario (da mantenere)</option>
-                  {cssCustomers.map((customer) => (
-                    <option key={customer.customerId} value={customer.customerId}>
-                      {customer.name}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  className="ul-input"
-                  value={mergeSecondaryCustomerId}
-                  onChange={(event) => setMergeSecondaryCustomerId(event.target.value)}
-                >
-                  <option value="">Cliente secondario (da unire)</option>
-                  {cssCustomers.map((customer) => (
-                    <option key={customer.customerId} value={customer.customerId}>
-                      {customer.name}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  className="ul-button ul-button-ghost"
-                  onClick={() => void onMergeCssCustomers()}
-                  disabled={mergingCustomers}
-                >
-                  {mergingCustomers ? 'Merge...' : 'Esegui merge'}
-                </button>
-              </div>
-            </div>
-
-            {loadingCssCustomers ? (
-              <div className="text-sm text-muted-foreground">Caricamento clienti...</div>
-            ) : (
-              <div className="space-y-2">
-                {cssCustomers.map((customer) => (
-                  <div key={customer.customerId} className="rounded-xl border border-border/60 p-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        {editingCustomerId === customer.customerId ? (
-                          <div className="space-y-2">
-                            <input
-                              className="ul-input"
-                              value={editingCustomerName}
-                              onChange={(event) => setEditingCustomerName(event.target.value)}
-                              onKeyDown={(event) => {
-                                if (event.key === 'Enter') {
-                                  void onSaveCssCustomer();
-                                }
-                              }}
-                            />
-                            <input
-                              className="ul-input"
-                              placeholder="Alias separati da virgola (es: AEB, AEB Italia, Nordica)"
-                              value={editingCustomerAliases}
-                              onChange={(event) => setEditingCustomerAliases(event.target.value)}
-                            />
-                          </div>
-                        ) : (
-                          <div className="font-medium">{customer.name}</div>
-                        )}
-                        <div className="mt-1 text-xs text-muted-foreground">
-                          Attività collegate: {customer.activityCount} • Stato: {customer.isActive ? 'Attivo' : 'Inattivo'}
-                        </div>
-                        {customer.aliases.length > 0 && (
-                          <div className="mt-1 text-xs text-muted-foreground">
-                            Alias: {customer.aliases.join(', ')}
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {editingCustomerId === customer.customerId ? (
-                          <>
-                            <button type="button" className="ul-button ul-button-primary" onClick={() => void onSaveCssCustomer()} disabled={savingCustomer}>
-                              Salva
-                            </button>
-                            <button type="button" className="ul-button ul-button-ghost" onClick={() => setEditingCustomerId(null)}>
-                              Annulla
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <button type="button" className="ul-button ul-button-ghost" onClick={() => startEditCssCustomer(customer)}>
-                              Modifica nome
-                            </button>
-                            <button
-                              type="button"
-                              className="ul-button ul-button-ghost"
-                              onClick={() => void onToggleCssCustomerActive(customer)}
-                              disabled={savingCustomer}
-                            >
-                              {customer.isActive ? 'Disattiva' : 'Riattiva'}
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                {cssCustomers.length === 0 && (
-                  <div className="text-sm text-muted-foreground">Nessun cliente in anagrafica backend.</div>
-                )}
-              </div>
-            )}
-
-            {backendCustomersNotInActivities.length > 0 && (
-              <div className="rounded-xl border border-amber-300/60 bg-amber-50/40 p-3 text-xs text-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
-                Clienti anagrafici senza attività associate: {backendCustomersNotInActivities.map((customer) => customer.name).join(', ')}
-              </div>
-            )}
-          </div>
-        )}
       </section>
 
       {isFormModalOpen && (
@@ -3686,7 +3589,7 @@ const CssPage = () => {
                       )}
                       {!resolvedCustomer && firstUnresolvedProposalIdByCustomer[proposal.proposalId] && (
                         <div className="mt-2 rounded-lg border border-amber-300/60 bg-amber-50/50 p-2 text-xs text-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
-                          Nuova società rilevata: <strong>{draft.customerName}</strong>. Vuoi aggiungerla come alias a un cliente canonico?
+                          Nuova società rilevata: <strong>{draft.customerName}</strong>. Vuoi aggiungerla come alias a un cliente canonico esistente, oppure crearla come nuovo cliente?
                           {proposals.filter((p) => normalizeCustomerKey(getProposalDraft(p).customerName) === normalizeCustomerKey(draft.customerName)).length > 1 && (
                             <div className="mt-1 italic">
                               Si applicherà a tutte le {proposals.filter((p) => normalizeCustomerKey(getProposalDraft(p).customerName) === normalizeCustomerKey(draft.customerName)).length} proposte con questo nome cliente.
@@ -3714,9 +3617,18 @@ const CssPage = () => {
                               type="button"
                               className="ul-button ul-button-ghost h-9 px-3"
                               onClick={() => void onAddProposalCustomerAsAlias(proposal)}
-                              disabled={addingAliasProposalId === proposal.proposalId}
+                              disabled={addingAliasProposalId === proposal.proposalId || creatingProposalCustomerId === proposal.proposalId}
                             >
                               {addingAliasProposalId === proposal.proposalId ? 'Aggiunta...' : 'Aggiungi alias'}
+                            </button>
+                            <span className="text-muted-foreground">oppure</span>
+                            <button
+                              type="button"
+                              className="ul-button ul-button-primary h-9 px-3"
+                              onClick={() => void onCreateProposalCustomer(proposal)}
+                              disabled={addingAliasProposalId === proposal.proposalId || creatingProposalCustomerId === proposal.proposalId}
+                            >
+                              {creatingProposalCustomerId === proposal.proposalId ? 'Creazione...' : `Crea nuovo cliente "${draft.customerName}"`}
                             </button>
                           </div>
                         </div>
@@ -3896,6 +3808,192 @@ const CssPage = () => {
               </button>
             </div>
           </>
+        )}
+      </section>
+
+      <section className="ul-surface p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold">Gestione clienti (integrata in CSS)</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              I record CSS sono attività: qui la gestione usa l'anagrafica unificata backend (`css_customers`).
+            </p>
+          </div>
+          <button
+            type="button"
+            className="ul-button ul-button-ghost"
+            onClick={() => setShowCustomerManagement((prev) => !prev)}
+          >
+            {showCustomerManagement ? 'Nascondi' : 'Apri gestione clienti'}
+          </button>
+        </div>
+        <div className="mt-2 text-xs text-muted-foreground">
+          Clienti unici da attività: {uniqueCustomersCount} • Clienti anagrafica backend: {cssCustomers.length} • Attività totali: {activities.length}
+        </div>
+        {showCustomerManagement && (
+          <div className="mt-4 space-y-4 border-t border-border pt-4">
+            <div className="rounded-xl border border-border/60 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <div className="text-sm font-medium">Migrazione clienti legacy (localStorage)</div>
+                  <div className="text-xs text-muted-foreground">
+                    Importa in backend i clienti storici come attivi, evitando duplicati.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="ul-button ul-button-ghost"
+                  onClick={() => void onMigrateLegacyCustomers()}
+                  disabled={migratingLegacyCustomers}
+                >
+                  {migratingLegacyCustomers ? 'Migrazione...' : 'Importa clienti legacy'}
+                </button>
+              </div>
+              {customerMigrationSummary && (
+                <div className="mt-2 text-xs text-muted-foreground">{customerMigrationSummary}</div>
+              )}
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+              <input
+                className="ul-input"
+                placeholder="Nuovo cliente..."
+                value={newCustomerName}
+                onChange={(event) => setNewCustomerName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    void onCreateCssCustomer();
+                  }
+                }}
+              />
+              <button
+                type="button"
+                className="ul-button ul-button-primary"
+                onClick={() => void onCreateCssCustomer()}
+                disabled={creatingCustomer}
+              >
+                {creatingCustomer ? 'Creazione...' : 'Aggiungi cliente'}
+              </button>
+            </div>
+
+            <div className="rounded-xl border border-border/60 p-3">
+              <div className="mb-2 text-sm font-medium">Merge clienti (deduplica)</div>
+              <div className="grid gap-2 md:grid-cols-3">
+                <select
+                  className="ul-input"
+                  value={mergePrimaryCustomerId}
+                  onChange={(event) => setMergePrimaryCustomerId(event.target.value)}
+                >
+                  <option value="">Cliente primario (da mantenere)</option>
+                  {cssCustomers.map((customer) => (
+                    <option key={customer.customerId} value={customer.customerId}>
+                      {customer.name}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className="ul-input"
+                  value={mergeSecondaryCustomerId}
+                  onChange={(event) => setMergeSecondaryCustomerId(event.target.value)}
+                >
+                  <option value="">Cliente secondario (da unire)</option>
+                  {cssCustomers.map((customer) => (
+                    <option key={customer.customerId} value={customer.customerId}>
+                      {customer.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="ul-button ul-button-ghost"
+                  onClick={() => void onMergeCssCustomers()}
+                  disabled={mergingCustomers}
+                >
+                  {mergingCustomers ? 'Merge...' : 'Esegui merge'}
+                </button>
+              </div>
+            </div>
+
+            {loadingCssCustomers ? (
+              <div className="text-sm text-muted-foreground">Caricamento clienti...</div>
+            ) : (
+              <div className="space-y-2">
+                {cssCustomers.map((customer) => (
+                  <div key={customer.customerId} className="rounded-xl border border-border/60 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        {editingCustomerId === customer.customerId ? (
+                          <div className="space-y-2">
+                            <input
+                              className="ul-input"
+                              value={editingCustomerName}
+                              onChange={(event) => setEditingCustomerName(event.target.value)}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter') {
+                                  void onSaveCssCustomer();
+                                }
+                              }}
+                            />
+                            <input
+                              className="ul-input"
+                              placeholder="Alias separati da virgola (es: AEB, AEB Italia, Nordica)"
+                              value={editingCustomerAliases}
+                              onChange={(event) => setEditingCustomerAliases(event.target.value)}
+                            />
+                          </div>
+                        ) : (
+                          <div className="font-medium">{customer.name}</div>
+                        )}
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          Attività collegate: {customer.activityCount} • Stato: {customer.isActive ? 'Attivo' : 'Inattivo'}
+                        </div>
+                        {customer.aliases.length > 0 && (
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            Alias: {customer.aliases.join(', ')}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {editingCustomerId === customer.customerId ? (
+                          <>
+                            <button type="button" className="ul-button ul-button-primary" onClick={() => void onSaveCssCustomer()} disabled={savingCustomer}>
+                              Salva
+                            </button>
+                            <button type="button" className="ul-button ul-button-ghost" onClick={() => setEditingCustomerId(null)}>
+                              Annulla
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button type="button" className="ul-button ul-button-ghost" onClick={() => startEditCssCustomer(customer)}>
+                              Modifica nome
+                            </button>
+                            <button
+                              type="button"
+                              className="ul-button ul-button-ghost"
+                              onClick={() => void onToggleCssCustomerActive(customer)}
+                              disabled={savingCustomer}
+                            >
+                              {customer.isActive ? 'Disattiva' : 'Riattiva'}
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {cssCustomers.length === 0 && (
+                  <div className="text-sm text-muted-foreground">Nessun cliente in anagrafica backend.</div>
+                )}
+              </div>
+            )}
+
+            {backendCustomersNotInActivities.length > 0 && (
+              <div className="rounded-xl border border-amber-300/60 bg-amber-50/40 p-3 text-xs text-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+                Clienti anagrafici senza attività associate: {backendCustomersNotInActivities.map((customer) => customer.name).join(', ')}
+              </div>
+            )}
+          </div>
         )}
       </section>
     </div>
