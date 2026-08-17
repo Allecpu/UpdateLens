@@ -46,7 +46,8 @@ export function ExportPanel({ activities, filters }: ExportPanelProps) {
   const handleExport = () => {
     setIsExporting(true);
     try {
-      const filename = `activities-${new Date().toISOString().split('T')[0]}.${selectedFormat === 'excel' ? 'xlsx' : selectedFormat}`;
+      const extensionByFormat: Record<ExportFormat, string> = { csv: 'csv', excel: 'xlsx', json: 'json', pdf: 'html' };
+      const filename = `activities-${new Date().toISOString().split('T')[0]}.${extensionByFormat[selectedFormat]}`;
       const options: ExportOptions = {
         filename,
         includeColumns: selectedColumns
@@ -69,7 +70,7 @@ export function ExportPanel({ activities, filters }: ExportPanelProps) {
   const formatLabels: Record<ExportFormat, { label: string; description: string }> = {
     csv: {
       label: 'CSV',
-      description: 'Comma-separated values, compatibile con Excel e fogli di calcolo'
+      description: 'Valori separati da ";", compatibile con Excel in italiano e fogli di calcolo'
     },
     excel: {
       label: 'Excel/TSV',

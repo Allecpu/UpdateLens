@@ -635,6 +635,9 @@ const CssPage = () => {
   const [documents, setDocuments] = useState<CssDocument[]>([]);
   const [expandedDocumentHistory, setExpandedDocumentHistory] = useState<Record<string, boolean>>({});
   const [documentBatchesById, setDocumentBatchesById] = useState<Record<string, CssDocumentBatchSummary[]>>({});
+  const [expandedBatchDetails, setExpandedBatchDetails] = useState<Record<string, boolean>>({});
+  const [batchProposalsById, setBatchProposalsById] = useState<Record<string, CssProposal[]>>({});
+  const [loadingBatchDetailId, setLoadingBatchDetailId] = useState<string | null>(null);
   const [loadingDocumentHistoryId, setLoadingDocumentHistoryId] = useState<string | null>(null);
   const [activeBatchId, setActiveBatchId] = useState<string | null>(null);
   const [proposals, setProposals] = useState<CssProposal[]>([]);
@@ -642,6 +645,7 @@ const CssPage = () => {
   const [aliasTargetByCustomerKey, setAliasTargetByCustomerKey] = useState<Record<string, string>>({});
   const [ambiguousTargetByProposal, setAmbiguousTargetByProposal] = useState<Record<string, string>>({});
   const [addingAliasProposalId, setAddingAliasProposalId] = useState<string | null>(null);
+  const [unlockedCustomerFields, setUnlockedCustomerFields] = useState<Record<string, boolean>>({});
   const [creatingProposalCustomerId, setCreatingProposalCustomerId] = useState<string | null>(null);
   const [approved, setApproved] = useState<Record<string, boolean>>({});
   const [validating, setValidating] = useState(false);
@@ -1145,6 +1149,57 @@ const CssPage = () => {
     setExpandedDocumentHistory((prev) => ({ ...prev, [documentId]: true }));
   };
 
+  const toggleBatchDetails = async (batchId: string) => {
+    const isOpen = expandedBatchDetails[batchId] === true;
+    if (isOpen) {
+      setExpandedBatchDetails((prev) => ({ ...prev, [batchId]: false }));
+      return;
+    }
+    if (!batchProposalsById[batchId]) {
+      setLoadingBatchDetailId(batchId);
+      try {
+        const result = await cssService.getProposals(batchId);
+        setBatchProposalsById((prev) => ({ ...prev, [batchId]: result.items }));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Errore caricamento dettaglio batch');
+        return;
+      } finally {
+        setLoadingBatchDetailId(null);
+      }
+    }
+    setExpandedBatchDetails((prev) => ({ ...prev, [batchId]: true }));
+  };
+
+  // Ricarica un batch non ancora validato (proposte "In attesa") nella sezione
+  // "Proposte da validare", cosi' l'utente puo' finire la decisione lasciata a metà.
+  const onResumeBatchValidation = async (batch: CssDocumentBatchSummary) => {
+    setError(null);
+    setLoadingBatchDetailId(batch.batchId);
+    try {
+      const cached = batchProposalsById[batch.batchId];
+      const items = cached ?? (await cssService.getProposals(batch.batchId)).items;
+      setBatchProposalsById((prev) => ({ ...prev, [batch.batchId]: items }));
+
+      setActiveBatchId(batch.batchId);
+      setProposals(items);
+      setProposalOverrides({});
+      setAliasTargetByCustomerKey({});
+      setAmbiguousTargetByProposal({});
+      const decisions: Record<string, boolean> = {};
+      items.forEach((proposal) => {
+        decisions[proposal.proposalId] = proposal.decisionStatus !== 'rejected';
+      });
+      setApproved(decisions);
+      setExtractionSummary(`Batch ripreso: ${items.length} proposte da completare.`);
+      setValidationSummary(null);
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Errore ripresa validazione batch');
+    } finally {
+      setLoadingBatchDetailId(null);
+    }
+  };
+
   const customerResolutionMaps = useMemo(() => {
     const exact = new Map<string, string>();
     const root = new Map<string, string>();
@@ -1344,6 +1399,7 @@ const CssPage = () => {
 
     setValidating(true);
     try {
+      const appliedCustomerNames = new Set<string>();
       const decisions = proposals.map((proposal) => {
         const draft = getProposalDraft(proposal);
         const customerKey = normalizeCustomerKey(draft.customerName);
@@ -1373,9 +1429,13 @@ const CssPage = () => {
             payloadOverride.targetActivityId = target;
           }
         }
+        const isApproved = approved[proposal.proposalId] ?? true;
+        if (isApproved && canonicalCustomer) {
+          appliedCustomerNames.add(canonicalCustomer);
+        }
         return {
           proposalId: proposal.proposalId,
-          decision: approved[proposal.proposalId] ? ('approved' as const) : ('rejected' as const),
+          decision: isApproved ? ('approved' as const) : ('rejected' as const),
           payloadOverride
         };
       });
@@ -1383,6 +1443,9 @@ const CssPage = () => {
         decisions
       });
       setValidationSummary(`Validazione completata: ${result.applied} applicate, ${result.rejected} scartate.`);
+      if (appliedCustomerNames.size > 0) {
+        setCustomerFilter(Array.from(appliedCustomerNames));
+      }
       window.scrollTo({ top: 0, behavior: 'smooth' });
       await Promise.all([refreshActivities(), refreshMeta()]);
     } catch (err) {
@@ -2888,7 +2951,13 @@ const CssPage = () => {
                           )}
                         </td>
                       )}
-                      {isColumnVisible('issue') && <td className="px-3 py-2">{activity.issue}</td>}
+                      {isColumnVisible('issue') && (
+                        <td className="px-3 py-2">
+                          <span className="block overflow-hidden text-ellipsis whitespace-nowrap" title={activity.issue}>
+                            {activity.issue}
+                          </span>
+                        </td>
+                      )}
                       {isColumnVisible('issueStatus') && (
                         <td className="px-3 py-2">
                           {isEditingChoice('issueStatus') ? (
@@ -2995,8 +3064,20 @@ const CssPage = () => {
                           </span>
                         </td>
                       )}
-                      {isColumnVisible('customerOwners') && <td className="px-3 py-2">{activity.customerOwners ?? '-'}</td>}
-                      {isColumnVisible('cssAction') && <td className="px-3 py-2">{activity.cssAction ?? '-'}</td>}
+                      {isColumnVisible('customerOwners') && (
+                        <td className="px-3 py-2">
+                          <span className="block overflow-hidden text-ellipsis whitespace-nowrap" title={activity.customerOwners ?? '-'}>
+                            {activity.customerOwners ?? '-'}
+                          </span>
+                        </td>
+                      )}
+                      {isColumnVisible('cssAction') && (
+                        <td className="px-3 py-2">
+                          <span className="block overflow-hidden text-ellipsis whitespace-nowrap" title={activity.cssAction ?? '-'}>
+                            {activity.cssAction ?? '-'}
+                          </span>
+                        </td>
+                      )}
                       {isColumnVisible('notes') && (
                         <td className="px-3 py-2">
                           <button
@@ -3076,14 +3157,40 @@ const CssPage = () => {
                       )}
                       {isColumnVisible('itemType') && <td className="px-3 py-2">{activity.itemType ?? '-'}</td>}
                       <td className="px-3 py-2">
-                        <div className="flex gap-3">
-                          <button className="text-primary hover:underline" onClick={() => onEdit(activity)}>Form</button>
+                        <div className="flex gap-2">
                           <button
-                            className="text-red-600 hover:underline disabled:opacity-50"
+                            type="button"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-primary hover:bg-primary/10"
+                            onClick={() => onEdit(activity)}
+                            title="Form"
+                            aria-label="Form"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                              <path d="m15 5 4 4" />
+                            </svg>
+                          </button>
+                          <button
+                            type="button"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-red-600 hover:bg-red-600/10 disabled:opacity-50"
                             onClick={() => void onDeleteActivity(activity)}
                             disabled={deletingActivityId === activity.activityId}
+                            title={deletingActivityId === activity.activityId ? 'Eliminazione...' : 'Elimina'}
+                            aria-label={deletingActivityId === activity.activityId ? 'Eliminazione...' : 'Elimina'}
                           >
-                            {deletingActivityId === activity.activityId ? 'Eliminazione...' : 'Elimina'}
+                            {deletingActivityId === activity.activityId ? (
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-spin">
+                                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                              </svg>
+                            ) : (
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M3 6h18" />
+                                <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                                <path d="M10 11v6" />
+                                <path d="M14 11v6" />
+                              </svg>
+                            )}
                           </button>
                         </div>
                       </td>
@@ -3477,13 +3584,79 @@ const CssPage = () => {
                     <div className="space-y-2">
                       {(documentBatchesById[document.documentId] ?? []).map((batch) => (
                         <div key={batch.batchId} className="rounded-md border border-border bg-background p-2 text-xs">
-                          <div>
-                            Batch: {batch.batchId} • Stato: {batch.status} • Proposte: {batch.proposalCount} • Data: {formatDateTime(batch.createdAt)}
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                              Batch: {batch.batchId} • Stato: {batch.status} • Proposte: {batch.proposalCount} • Data: {formatDateTime(batch.createdAt)}
+                              {batch.validatedAt && ` • Validato: ${formatDateTime(batch.validatedAt)}`}
+                              {batch.validatedBy && ` (${batch.validatedBy})`}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {batch.status !== 'validated' && (
+                                <button
+                                  type="button"
+                                  className="ul-button ul-button-primary h-7 px-2 text-xs"
+                                  onClick={() => void onResumeBatchValidation(batch)}
+                                  disabled={loadingBatchDetailId === batch.batchId}
+                                  title="Carica le proposte non ancora validate di questo batch nella sezione 'Proposte da validare'"
+                                >
+                                  Riprendi validazione
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                className="ul-button ul-button-ghost h-7 px-2 text-xs"
+                                onClick={() => void toggleBatchDetails(batch.batchId)}
+                                disabled={loadingBatchDetailId === batch.batchId}
+                              >
+                                {loadingBatchDetailId === batch.batchId
+                                  ? 'Caricamento...'
+                                  : expandedBatchDetails[batch.batchId]
+                                  ? 'Nascondi dettagli'
+                                  : 'Dettagli'}
+                              </button>
+                            </div>
                           </div>
                           <div className="mt-1 text-muted-foreground">
                             Provider: {batch.aiProvider}{batch.aiModel ? ` • Modello: ${batch.aiModel}` : ''}
                             {batch.extractionNotes ? ` • Note: ${batch.extractionNotes}` : ''}
                           </div>
+                          {expandedBatchDetails[batch.batchId] && (
+                            <div className="mt-2 space-y-1.5 border-t border-border pt-2">
+                              {(batchProposalsById[batch.batchId] ?? []).length === 0 ? (
+                                <div className="text-muted-foreground">Nessuna proposta in questo batch.</div>
+                              ) : (
+                                (batchProposalsById[batch.batchId] ?? []).map((proposal) => (
+                                  <div key={proposal.proposalId} className="rounded border border-border/60 bg-muted/20 p-1.5">
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      <span
+                                        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
+                                          proposal.decisionStatus === 'approved'
+                                            ? 'bg-emerald-100 text-emerald-700'
+                                            : proposal.decisionStatus === 'rejected'
+                                            ? 'bg-red-100 text-red-700'
+                                            : 'bg-amber-100 text-amber-700'
+                                        }`}
+                                      >
+                                        {proposal.decisionStatus === 'approved' ? 'Applicata' : proposal.decisionStatus === 'rejected' ? 'Rifiutata' : 'In attesa'}
+                                      </span>
+                                      <span className="text-[10px] uppercase text-muted-foreground">[{proposal.actionType}]</span>
+                                      <span className="font-medium">{proposal.payload.customerName} - {proposal.payload.issue}</span>
+                                    </div>
+                                    <div className="mt-0.5 text-muted-foreground">
+                                      Status proposto: {proposal.payload.issueStatus} • Confidence: {(proposal.confidence * 100).toFixed(0)}%
+                                      {proposal.matchScore !== null && ` • Match: ${(proposal.matchScore * 100).toFixed(0)}%`}
+                                    </div>
+                                    {proposal.matchReason && (
+                                      <div className="mt-0.5 text-muted-foreground">Motivo: {proposal.matchReason}</div>
+                                    )}
+                                    {proposal.decisionNote && (
+                                      <div className="mt-0.5 text-muted-foreground">Nota decisione: {proposal.decisionNote}</div>
+                                    )}
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -3639,12 +3812,35 @@ const CssPage = () => {
                         </div>
                       )}
                       <div className="mt-3 grid gap-2 md:grid-cols-2">
-                        <input
-                          className="ul-input"
-                          value={draft.customerName}
-                          onChange={(event) => updateProposalDraft(proposal.proposalId, { customerName: event.target.value })}
-                          placeholder="Cliente"
-                        />
+                        {resolvedCustomer &&
+                        normalizeCustomerKey(resolvedCustomer) === normalizeCustomerKey(draft.customerName) &&
+                        !unlockedCustomerFields[proposal.proposalId] ? (
+                          <div className="ul-input flex items-center justify-between gap-2 bg-muted/40">
+                            <span className="flex items-center gap-1.5 truncate">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-emerald-600">
+                                <path d="M20 6 9 17l-5-5" />
+                              </svg>
+                              {draft.customerName}
+                            </span>
+                            <button
+                              type="button"
+                              className="shrink-0 text-xs text-muted-foreground underline hover:text-foreground"
+                              onClick={() =>
+                                setUnlockedCustomerFields((prev) => ({ ...prev, [proposal.proposalId]: true }))
+                              }
+                            >
+                              Modifica
+                            </button>
+                          </div>
+                        ) : (
+                          <input
+                            className="ul-input"
+                            value={draft.customerName}
+                            onChange={(event) => updateProposalDraft(proposal.proposalId, { customerName: event.target.value })}
+                            placeholder="Cliente"
+                            list="css-customers-options"
+                          />
+                        )}
                         <input
                           className="ul-input"
                           value={toDateInputValue(draft.lastUpdate)}

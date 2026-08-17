@@ -3,6 +3,7 @@
  * Converts activities to different file formats
  */
 
+import * as XLSX from 'xlsx';
 import type { CssActivity } from '../../models/Css';
 
 export type ExportFormat = 'csv' | 'excel' | 'pdf' | 'json';
@@ -44,8 +45,12 @@ class CSVExporter {
 
     const columns = includeColumns?.filter((c) => defaultColumns.includes(c)) || defaultColumns;
 
+    // Excel su locale italiano usa ';' come separatore di elenco: con ',' l'intero
+    // file viene importato come colonna unica.
+    const SEPARATOR = ';';
+
     // Header
-    const header = columns.join(',');
+    const header = columns.join(SEPARATOR);
 
     // Rows
     const rows = activities.map((activity) =>
@@ -54,14 +59,14 @@ class CSVExporter {
           const value = (activity as any)[col];
           if (value == null) return '';
 
-          // Escape quotes and wrap in quotes if contains comma/quote/newline
+          // Escape quotes and wrap in quotes if contains separator/quote/newline
           const stringValue = String(value);
-          if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+          if (stringValue.includes(SEPARATOR) || stringValue.includes('"') || stringValue.includes('\n')) {
             return `"${stringValue.replace(/"/g, '""')}"`;
           }
           return stringValue;
         })
-        .join(',')
+        .join(SEPARATOR)
     );
 
     const csv = [header, ...rows].join('\n');
@@ -70,7 +75,8 @@ class CSVExporter {
 
   static download(activities: CssActivity[], filename: string = 'export.csv', options: ExportOptions = {}) {
     const csv = this.export(activities, options);
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    // BOM UTF-8: senza, Excel interpreta i caratteri accentati (à, è, ù...) come testo corrotto.
+    const blob = new Blob(['﻿', csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = filename;
@@ -116,8 +122,7 @@ class JSONExporter {
  * For now, we'll create a basic implementation using CSV-like format with tabs
  */
 class ExcelExporter {
-  static export(activities: CssActivity[], options: ExportOptions = {}): string {
-    // Use tab-separated values which Excel can open
+  static download(activities: CssActivity[], filename: string = 'export.xlsx', options: ExportOptions = {}) {
     const { includeColumns } = options;
 
     const defaultColumns = [
@@ -142,30 +147,22 @@ class ExcelExporter {
 
     const columns = includeColumns?.filter((c) => defaultColumns.includes(c)) || defaultColumns;
 
-    // Header
-    const header = columns.join('\t');
-
-    // Rows
     const rows = activities.map((activity) =>
-      columns
-        .map((col) => {
-          const value = (activity as any)[col];
-          return value == null ? '' : String(value);
-        })
-        .join('\t')
+      Object.fromEntries(columns.map((col) => [col, (activity as any)[col] ?? '']))
     );
 
-    const tsv = [header, ...rows].join('\n');
-    return tsv;
-  }
+    const worksheet = XLSX.utils.json_to_sheet(rows, { header: columns });
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Attività');
 
-  static download(activities: CssActivity[], filename: string = 'export.xlsx', options: ExportOptions = {}) {
-    const tsv = this.export(activities, options);
-    // Excel can open TSV files
-    const blob = new Blob([tsv], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+    const finalFilename = filename.endsWith('.xlsx') ? filename : `${filename}.xlsx`;
+    const data = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
+    const blob = new Blob([data], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = filename.endsWith('.xlsx') ? filename : `${filename}.xlsx`;
+    link.download = finalFilename;
     link.click();
   }
 }
@@ -184,9 +181,17 @@ class HTMLExporter {
       'listStatus',
       'details',
       'cssOwner',
+      'blBu',
+      'eosOwners',
+      'customerOwners',
       'cssAction',
       'notes',
-      'rating'
+      'customerPriority',
+      'cssPriority',
+      'dueDate',
+      'lastUpdate',
+      'rating',
+      'itemType'
     ];
 
     const columns = includeColumns?.filter((c) => defaultColumns.includes(c)) || defaultColumns;
@@ -272,25 +277,6 @@ class HTMLExporter {
  * Main export service
  */
 export const exportService = {
-  /**
-   * Export to specified format
-   */
-  export(format: ExportFormat, activities: CssActivity[], options: ExportOptions = {}): string {
-    switch (format) {
-      case 'csv':
-        return CSVExporter.export(activities, options);
-      case 'excel':
-        return ExcelExporter.export(activities, options);
-      case 'json':
-        return JSONExporter.export(activities, options);
-      case 'pdf':
-      default:
-        // For PDF, we'd need a library like pdfkit or jspdf
-        // For now, return HTML which can be printed to PDF
-        return HTMLExporter.export(activities, options);
-    }
-  },
-
   /**
    * Download file directly
    */

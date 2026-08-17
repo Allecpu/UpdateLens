@@ -33,19 +33,22 @@ const SECTIONS: ManualSection[] = [
     action: 'Apri Dashboard'
   },
   {
-    id: 'clienti',
-    title: 'Clienti (in CSS)',
+    id: 'css',
+    title: 'CSS - Attivita e clienti',
     purpose:
-      'Definisce il perimetro commerciale usato per associare prodotti, Owner CSS e aggiornamenti ai clienti.',
+      'Traccia le attivita di Customer Success per ogni cliente: stato, owner, priorita, scadenze e note, con import automatico da meeting report.',
     whenToUse:
-      'Aggiorna questa area quando entra un nuovo cliente o cambia il portafoglio prodotti.',
+      'Usala per gestire il ciclo di vita delle attivita CSS, validare le proposte generate dall\'IA a partire dai documenti caricati e mantenere aggiornata l\'anagrafica clienti.',
     steps: [
-      'Crea il cliente e compila nome, Owner CSS e prodotti rilevanti.',
-      'Disattiva un cliente non piu operativo senza perdere la configurazione esistente.',
-      'Usa Import / Export JSON per backup o trasferimenti controllati.'
+      'Crea o modifica un\'attivita dalla griglia, oppure aggiornane un campo rapidamente con un click sulle colonne a scelta.',
+      'Carica un meeting report (DOCX/PDF) e avvia l\'analisi per generare proposte di nuove attivita o aggiornamenti.',
+      'Valida le proposte: risolvi i clienti non riconosciuti, scegli il target per le proposte ambigue, poi applica il batch.',
+      'Usa Viste, filtri avanzati e raggruppamento per isolare il sottoinsieme di attivita da trattare.',
+      'Esporta le attivita filtrate in CSV, Excel, JSON o HTML/PDF per condividerle o archiviarle.',
+      'Gestisci l\'anagrafica clienti: crea, disattiva o unisci clienti duplicati dal pannello dedicato.'
     ],
     note:
-      'Una modifica ai prodotti del cliente cambia i risultati mostrati quando quel cliente viene selezionato.',
+      'L\'Import/Export JSON riguarda le Viste salvate (per backup o condivisione), non l\'anagrafica clienti: quest\'ultima si aggiorna con creazione, merge e migrazione dei clienti legacy.',
     route: '/css',
     action: 'Apri CSS'
   },
@@ -233,7 +236,7 @@ const ManualPage = () => (
           Manuale per UpdateLens {appVersion}
         </span>
         <span className="border border-border bg-muted/40 px-3 py-2">8 aree funzionali</span>
-        <span className="border border-border bg-muted/40 px-3 py-2">3 flussi guidati</span>
+        <span className="border border-border bg-muted/40 px-3 py-2">4 flussi guidati</span>
         <span className="border border-border bg-muted/40 px-3 py-2">Glossario e checklist</span>
       </div>
     </header>
@@ -315,7 +318,10 @@ const ManualPage = () => (
           ['Filtro temporaneo', 'Modifica applicata in Dashboard o dalla chat senza cambiare il preset salvato.'],
           ['Segnalibro', 'Indicatore personale usato per conservare o isolare un aggiornamento.'],
           ['Snapshot', 'Copia dei dati acquisiti da una fonte in una determinata data.'],
-          ['Fonte', 'Sistema di origine: Microsoft Release Plans, EOS, Fabric o M365 Roadmap.']
+          ['Fonte', 'Sistema di origine: Microsoft Release Plans, EOS, Fabric o M365 Roadmap.'],
+          ['Vista (CSS)', 'Configurazione salvata di colonne, filtri e ordinamento nella pagina CSS.'],
+          ['Proposta (CSS)', 'Attivita o aggiornamento suggerito dall\'IA a partire da un documento caricato, in attesa di validazione.'],
+          ['Batch di estrazione', 'Insieme delle proposte generate da un\'unica analisi di un documento CSS.']
         ].map(([term, definition]) => (
           <div key={term} className="border-l-2 border-primary/50 pl-4">
             <dt className="text-sm font-semibold">{term}</dt>
@@ -341,6 +347,10 @@ const ManualPage = () => (
           {
             title: 'Segnalare un problema',
             steps: ['Verifica la Versione', 'Cerca issue simili', 'Descrivi i passaggi', 'Allega uno screenshot']
+          },
+          {
+            title: 'Validare un meeting report in CSS',
+            steps: ['Carica il documento', 'Avvia l\'analisi', 'Risolvi le proposte ambigue', 'Applica il batch']
           }
         ].map((flow) => (
           <div key={flow.title}>
@@ -401,6 +411,13 @@ const ManualPage = () => (
             className="block min-h-11 w-full border-l-2 border-transparent px-4 py-2 text-left text-sm text-muted-foreground transition-colors hover:border-primary hover:text-foreground focus-visible:border-primary focus-visible:outline-none"
           >
             Tipi di preset
+          </button>
+          <button
+            type="button"
+            onClick={() => scrollToSection('css-moduli')}
+            className="block min-h-11 w-full border-l-2 border-transparent px-4 py-2 text-left text-sm text-muted-foreground transition-colors hover:border-primary hover:text-foreground focus-visible:border-primary focus-visible:outline-none"
+          >
+            Moduli CSS
           </button>
           <button
             type="button"
@@ -536,6 +553,58 @@ const ManualPage = () => (
                     E una copia personale indipendente dall'originale.
                   </td>
                 </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="css-moduli" className="scroll-mt-6 py-9">
+          <h2 className="text-2xl font-semibold">Moduli CSS</h2>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
+            La pagina CSS raggruppa piu moduli distinti: griglia attivita, viste e
+            filtri, import documenti, validazione proposte, esportazione e gestione
+            clienti.
+          </p>
+          <div className="mt-5 overflow-x-auto">
+            <table className="w-full min-w-[640px] border-collapse text-left text-sm">
+              <thead>
+                <tr className="border-y border-border">
+                  <th className="px-3 py-3 font-semibold">Modulo</th>
+                  <th className="px-3 py-3 font-semibold">Cosa offre</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {[
+                  [
+                    'Griglia attivita',
+                    'Colonne configurabili, editing inline e rapido, editor colonna con colori personalizzati, ordinamento, raggruppamento, selezione multipla e azioni bulk.'
+                  ],
+                  [
+                    'Viste e filtri',
+                    'Viste di sistema e personali con auto-save, filtri rapidi, filtri avanzati con regole AND/OR, colonne personalizzate per vista.'
+                  ],
+                  [
+                    'Import documenti',
+                    'Caricamento di meeting report (DOCX/PDF), analisi con IA (o motore euristico) per estrarre proposte, storico delle analisi per documento.'
+                  ],
+                  [
+                    'Validazione proposte',
+                    'Revisione delle proposte nuove, di aggiornamento o ambigue, risoluzione dei clienti non riconosciuti (alias o nuovo cliente), applicazione del batch.'
+                  ],
+                  [
+                    'Esportazione',
+                    'Export in CSV, Excel, JSON o HTML/PDF con selezione delle colonne e log di audit.'
+                  ],
+                  [
+                    'Gestione clienti',
+                    'Crea, modifica nome/alias, attiva o disattiva, unisce clienti duplicati e migra i clienti legacy salvati in locale.'
+                  ]
+                ].map(([modulo, testo]) => (
+                  <tr key={modulo}>
+                    <td className="px-3 py-3 font-medium">{modulo}</td>
+                    <td className="px-3 py-3 text-muted-foreground">{testo}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
