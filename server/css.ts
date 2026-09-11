@@ -381,20 +381,31 @@ const normalizeDate = (raw?: string | null): string | null => {
   return parsed.toISOString().slice(0, 10);
 };
 
-const prependDateToDetails = (lastUpdate?: string | null, details?: string | null): string | null => {
+const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const prependDateToDetails = (
+  lastUpdate?: string | null,
+  details?: string | null,
+  sourceFilename?: string | null
+): string | null => {
   const normalizedDetails = (details ?? '').trim();
   if (!normalizedDetails) {
     return null;
   }
   const normalizedDate = normalizeDate(lastUpdate);
-  if (!normalizedDate) {
-    return normalizedDetails;
+  const filename = sourceFilename?.trim() ?? '';
+  let result = normalizedDetails;
+
+  if (normalizedDate && !new RegExp(`^\\[${escapeRegExp(normalizedDate)}\\]`).test(result)) {
+    result = `[${normalizedDate}] ${result}`;
   }
-  const alreadyPrefixed = normalizedDetails.startsWith(`[${normalizedDate}]`);
-  if (alreadyPrefixed) {
-    return normalizedDetails;
+  if (filename && !new RegExp(`^\\[${escapeRegExp(filename)}\\]`).test(result)) {
+    const datePrefix = normalizedDate ? `[${normalizedDate}]` : '';
+    result = datePrefix && result.startsWith(datePrefix)
+      ? result.replace(datePrefix, `${datePrefix} [${filename}]`)
+      : `[${filename}] ${result}`;
   }
-  return `[${normalizedDate}] ${normalizedDetails}`;
+  return result;
 };
 
 const resolveCustomer = (
@@ -2367,7 +2378,11 @@ export const validateCssBatch = (
         ...(decision?.payloadOverride ?? {})
       };
       mergedPayload.lastUpdate = normalizeDate(mergedPayload.lastUpdate) ?? new Date().toISOString().slice(0, 10);
-      mergedPayload.details = prependDateToDetails(mergedPayload.lastUpdate, mergedPayload.details);
+      mergedPayload.details = prependDateToDetails(
+        mergedPayload.lastUpdate,
+        mergedPayload.details,
+        proposal.sourceFilename
+      );
 
       if (finalDecision === 'approved') {
         const decisionOverride = decision?.payloadOverride as Partial<CssProposalPayload> & { targetActivityId?: string } | undefined;
@@ -2451,7 +2466,11 @@ export const applyCssProposal = (
     ...(data.payloadOverride ?? {})
   };
   mergedPayload.lastUpdate = normalizeDate(mergedPayload.lastUpdate) ?? new Date().toISOString().slice(0, 10);
-  mergedPayload.details = prependDateToDetails(mergedPayload.lastUpdate, mergedPayload.details);
+  mergedPayload.details = prependDateToDetails(
+    mergedPayload.lastUpdate,
+    mergedPayload.details,
+    proposal.sourceFilename
+  );
 
   const transaction = db.transaction(() => {
     applyProposalToActivities(db, proposal, mergedPayload, data.payloadOverride?.targetActivityId);

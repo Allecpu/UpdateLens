@@ -93,13 +93,79 @@ const normalizeCustomerRootKey = (value: string): string =>
     .join(' ')
     .trim();
 
-const buildDetailsWithDate = (lastUpdate?: string | null, details?: string | null): string => {
+const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const buildDetailsWithDate = (
+  lastUpdate?: string | null,
+  details?: string | null,
+  sourceFilename?: string | null
+): string => {
   const text = (details ?? '').trim();
   if (!text) return '';
   const date = toDateInputValue(lastUpdate);
-  if (!date) return text;
-  return text.startsWith(`[${date}]`) ? text : `[${date}] ${text}`;
+  const filename = sourceFilename?.trim() ?? '';
+  let normalized = text;
+
+  if (date && !new RegExp(`^\\[${escapeRegExp(date)}\\]`).test(normalized)) {
+    normalized = `[${date}] ${normalized}`;
+  }
+  if (filename && !new RegExp(`^\\[${escapeRegExp(filename)}\\]`).test(normalized)) {
+    const datePrefix = date ? `[${date}]` : '';
+    normalized = datePrefix && normalized.startsWith(datePrefix)
+      ? normalized.replace(datePrefix, `${datePrefix} [${filename}]`)
+      : `[${filename}] ${normalized}`;
+  }
+  return normalized;
 };
+
+const PROPOSAL_FIELD_DESCRIPTIONS: Record<string, string> = {
+  customerName: 'Cliente associato all’attività.',
+  lastUpdate: 'Data dell’aggiornamento o del meeting da cui deriva la proposta.',
+  issue: 'Titolo o descrizione sintetica dell’attività.',
+  issueStatus: 'Stato operativo dell’attività.',
+  cssOwner: 'Referente CSS responsabile, se identificato.',
+  blBu: 'Business Line o Business Unit coinvolta.',
+  details: 'Dettagli estratti dal documento. Il sistema aggiunge data e file sorgente.',
+  listStatus: 'Stato previsto nella lista CSS.',
+  dueDate: 'Data entro cui completare l’attività.',
+  customerPriority: 'Priorità indicata dal cliente.',
+  cssPriority: 'Priorità assegnata dal team CSS.',
+  eosOwners: 'Referenti EOS coinvolti.',
+  customerOwners: 'Referenti del cliente coinvolti.',
+  cssAction: 'Prossima azione da eseguire.',
+  notes: 'Note aggiuntive per la validazione o la gestione successiva.',
+  rating: 'Valutazione dell’attività da 0 a 5.',
+  itemType: 'Tipologia dell’elemento CSS.'
+};
+
+function ProposalField({
+  field,
+  label,
+  className = '',
+  children
+}: {
+  field: string;
+  label: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  const description = PROPOSAL_FIELD_DESCRIPTIONS[field] ?? label;
+  return (
+    <div className={`space-y-1 ${className}`}>
+      <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+        <span>{label}</span>
+        <span
+          className="inline-flex h-4 w-4 cursor-help items-center justify-center rounded-full border border-border text-[10px] font-bold"
+          title={description}
+          aria-label={`${label}: ${description}`}
+        >
+          i
+        </span>
+      </div>
+      {children}
+    </div>
+  );
+}
 
 const ensureFilterArray = (value?: string | string[]): string[] => {
   if (Array.isArray(value)) {
@@ -1447,7 +1513,8 @@ const CssPage = () => {
   // a partire dalla bozza corrente della proposta e dal nome cliente canonico risolto.
   const buildProposalPayloadOverride = (
     draft: CssProposalPayload,
-    canonicalCustomer: string
+    canonicalCustomer: string,
+    sourceFilename?: string | null
   ): Partial<CssProposalPayload> & { targetActivityId?: string } => ({
     customerName: canonicalCustomer,
     issue: draft.issue,
@@ -1456,7 +1523,7 @@ const CssPage = () => {
     cssOwner: draft.cssOwner ?? null,
     blBu: draft.blBu ?? null,
     lastUpdate: toDateInputValue(draft.lastUpdate) || draft.lastUpdate || null,
-    details: buildDetailsWithDate(draft.lastUpdate, draft.details ?? null),
+    details: buildDetailsWithDate(draft.lastUpdate, draft.details ?? null, sourceFilename),
     eosOwners: draft.eosOwners ?? null,
     customerOwners: draft.customerOwners ?? null,
     cssAction: draft.cssAction ?? null,
@@ -1523,7 +1590,7 @@ const CssPage = () => {
         const draft = getProposalDraft(proposal);
         const customerKey = normalizeCustomerKey(draft.customerName);
         const canonicalCustomer = resolvedAliasMap.get(customerKey) ?? resolveCanonicalCustomer(draft.customerName) ?? draft.customerName;
-        const payloadOverride = buildProposalPayloadOverride(draft, canonicalCustomer);
+        const payloadOverride = buildProposalPayloadOverride(draft, canonicalCustomer, proposal.sourceFilename);
         if (proposal.actionType === 'ambiguous') {
           const target = ambiguousTargetByProposal[proposal.proposalId];
           if (target) {
@@ -1595,7 +1662,7 @@ const CssPage = () => {
 
     setApplyingProposalId(proposal.proposalId);
     try {
-      const payloadOverride = buildProposalPayloadOverride(draft, canonicalCustomer);
+      const payloadOverride = buildProposalPayloadOverride(draft, canonicalCustomer, proposal.sourceFilename);
       if (proposal.actionType === 'ambiguous') {
         payloadOverride.targetActivityId = ambiguousTargetByProposal[proposal.proposalId];
       }
@@ -4211,7 +4278,11 @@ const CssPage = () => {
               {proposals.map((proposal) => {
                 const draft = getProposalDraft(proposal);
                 const resolvedCustomer = resolveCanonicalCustomer(draft.customerName);
-                const datePrefixedDetails = buildDetailsWithDate(draft.lastUpdate, draft.details ?? null);
+                const datePrefixedDetails = buildDetailsWithDate(
+                  draft.lastUpdate,
+                  draft.details ?? null,
+                  proposal.sourceFilename
+                );
                 return (
                 <div key={proposal.proposalId} className="rounded-xl border border-border p-3">
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -4310,176 +4381,200 @@ const CssPage = () => {
                         </div>
                       )}
                       <div className="mt-3 grid gap-2 md:grid-cols-2">
-                        {resolvedCustomer &&
-                        normalizeCustomerKey(resolvedCustomer) === normalizeCustomerKey(draft.customerName) &&
-                        !unlockedCustomerFields[proposal.proposalId] ? (
-                          <div className="ul-input flex items-center justify-between gap-2 bg-muted/40">
-                            <span className="flex items-center gap-1.5 truncate">
-                              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-emerald-600">
-                                <path d="M20 6 9 17l-5-5" />
-                              </svg>
-                              {draft.customerName}
-                            </span>
-                            <button
-                              type="button"
-                              className="shrink-0 text-xs text-muted-foreground underline hover:text-foreground"
-                              onClick={() =>
-                                setUnlockedCustomerFields((prev) => ({ ...prev, [proposal.proposalId]: true }))
-                              }
-                            >
-                              Modifica
-                            </button>
-                          </div>
-                        ) : (
+                        <ProposalField field="customerName" label="Cliente">
+                          {resolvedCustomer &&
+                          normalizeCustomerKey(resolvedCustomer) === normalizeCustomerKey(draft.customerName) &&
+                          !unlockedCustomerFields[proposal.proposalId] ? (
+                            <div className="ul-input flex items-center justify-between gap-2 bg-muted/40">
+                              <span className="flex items-center gap-1.5 truncate">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-emerald-600">
+                                  <path d="M20 6 9 17l-5-5" />
+                                </svg>
+                                {draft.customerName}
+                              </span>
+                              <button
+                                type="button"
+                                className="shrink-0 text-xs text-muted-foreground underline hover:text-foreground"
+                                onClick={() =>
+                                  setUnlockedCustomerFields((prev) => ({ ...prev, [proposal.proposalId]: true }))
+                                }
+                              >
+                                Modifica
+                              </button>
+                            </div>
+                          ) : (
+                            <input
+                              className="ul-input"
+                              value={draft.customerName}
+                              onChange={(event) => updateProposalDraft(proposal.proposalId, { customerName: event.target.value })}
+                              list="css-customers-options"
+                            />
+                          )}
+                        </ProposalField>
+                        <ProposalField field="lastUpdate" label="Data aggiornamento">
                           <input
                             className="ul-input"
-                            value={draft.customerName}
-                            onChange={(event) => updateProposalDraft(proposal.proposalId, { customerName: event.target.value })}
-                            placeholder="Cliente"
-                            list="css-customers-options"
+                            value={toDateInputValue(draft.lastUpdate)}
+                            onChange={(event) => updateProposalDraft(proposal.proposalId, { lastUpdate: event.target.value })}
+                            type="date"
                           />
-                        )}
-                        <input
-                          className="ul-input"
-                          value={toDateInputValue(draft.lastUpdate)}
-                          onChange={(event) => updateProposalDraft(proposal.proposalId, { lastUpdate: event.target.value })}
-                          type="date"
-                        />
-                        <input
-                          className="ul-input md:col-span-2"
-                          value={draft.issue}
-                          onChange={(event) => updateProposalDraft(proposal.proposalId, { issue: event.target.value })}
-                          placeholder="Testo attività"
-                        />
-                        <select
-                          className="ul-input"
-                          value={draft.issueStatus}
-                          onChange={(event) => updateProposalDraft(proposal.proposalId, { issueStatus: event.target.value })}
-                        >
-                          {ISSUE_STATUS_BASE_OPTIONS.map((status) => (
-                            <option key={status} value={status}>
-                              {status}
-                            </option>
-                          ))}
-                        </select>
-                        <input
-                          className="ul-input"
-                          list="css-owner-options"
-                          value={draft.cssOwner ?? ''}
-                          onChange={(event) => updateProposalDraft(proposal.proposalId, { cssOwner: event.target.value || null })}
-                          placeholder="CSS Owner (vuoto se non certo)"
-                        />
-                        <select
-                          className="ul-input md:col-span-2"
-                          value={blBuOptions.includes(draft.blBu ?? '') ? (draft.blBu ?? '') : ''}
-                          onChange={(event) => updateProposalDraft(proposal.proposalId, { blBu: event.target.value || null })}
-                        >
-                          <option value="">BLs/BUs (vuoto se non certo)</option>
-                          {blBuOptions.map((option) => (
-                            <option key={option} value={option}>
-                              {option}
-                            </option>
-                          ))}
-                        </select>
-                        <textarea
-                          className="ul-textarea md:col-span-2 min-h-[92px]"
-                          value={datePrefixedDetails}
-                          onChange={(event) => updateProposalDraft(proposal.proposalId, { details: event.target.value })}
-                          placeholder="Dettagli attività"
-                        />
-                        <select
-                          className="ul-input"
-                          value={listStatusOptions.includes(draft.listStatus ?? '') ? (draft.listStatus ?? '') : ''}
-                          onChange={(event) => updateProposalDraft(proposal.proposalId, { listStatus: event.target.value || null })}
-                        >
-                          <option value="">Status (Lista) — vuoto se non certo</option>
-                          {listStatusOptions.map((status) => (
-                            <option key={status} value={status}>
-                              {status}
-                            </option>
-                          ))}
-                        </select>
-                        <input
-                          className="ul-input"
-                          value={toDateInputValue(draft.dueDate)}
-                          onChange={(event) => updateProposalDraft(proposal.proposalId, { dueDate: event.target.value || null })}
-                          type="date"
-                          title="Due Date"
-                        />
-                        <select
-                          className="ul-input"
-                          value={(PRIORITY_BASE_OPTIONS as readonly string[]).includes(draft.customerPriority ?? '') ? (draft.customerPriority ?? '') : ''}
-                          onChange={(event) => updateProposalDraft(proposal.proposalId, { customerPriority: event.target.value || null })}
-                        >
-                          <option value="">Customer Priority — vuoto se non certo</option>
-                          {PRIORITY_BASE_OPTIONS.map((priority) => (
-                            <option key={priority} value={priority}>
-                              {priority}
-                            </option>
-                          ))}
-                        </select>
-                        <select
-                          className="ul-input"
-                          value={(PRIORITY_BASE_OPTIONS as readonly string[]).includes(draft.cssPriority ?? '') ? (draft.cssPriority ?? '') : ''}
-                          onChange={(event) => updateProposalDraft(proposal.proposalId, { cssPriority: event.target.value || null })}
-                        >
-                          <option value="">CSS Priority — vuoto se non certo</option>
-                          {PRIORITY_BASE_OPTIONS.map((priority) => (
-                            <option key={priority} value={priority}>
-                              {priority}
-                            </option>
-                          ))}
-                        </select>
-                        <input
-                          className="ul-input"
-                          list="css-owner-options"
-                          value={draft.eosOwners ?? ''}
-                          onChange={(event) => updateProposalDraft(proposal.proposalId, { eosOwners: event.target.value || null })}
-                          placeholder="EOS Owners (vuoto se non certo)"
-                        />
-                        <input
-                          className="ul-input"
-                          value={draft.customerOwners ?? ''}
-                          onChange={(event) => updateProposalDraft(proposal.proposalId, { customerOwners: event.target.value || null })}
-                          placeholder="Customer Owners"
-                        />
-                        <textarea
-                          className="ul-textarea md:col-span-2 min-h-[70px]"
-                          value={draft.cssAction ?? ''}
-                          onChange={(event) => updateProposalDraft(proposal.proposalId, { cssAction: event.target.value || null })}
-                          placeholder="CSS Action (prossima azione, vuoto se non certo)"
-                        />
-                        <textarea
-                          className="ul-textarea md:col-span-2 min-h-[70px]"
-                          value={draft.notes ?? ''}
-                          onChange={(event) => updateProposalDraft(proposal.proposalId, { notes: event.target.value || null })}
-                          placeholder="Notes"
-                        />
-                        <input
-                          className="ul-input"
-                          value={draft.rating ?? ''}
-                          onChange={(event) => {
-                            const raw = event.target.value;
-                            updateProposalDraft(proposal.proposalId, { rating: raw === '' ? null : Number(raw) });
-                          }}
-                          type="number"
-                          min={0}
-                          max={5}
-                          step={0.5}
-                          placeholder="Rating (0-5)"
-                        />
-                        <select
-                          className="ul-input"
-                          value={itemTypeOptions.includes(draft.itemType ?? '') ? (draft.itemType ?? '') : ''}
-                          onChange={(event) => updateProposalDraft(proposal.proposalId, { itemType: event.target.value || null })}
-                        >
-                          <option value="">Item Type — vuoto se non certo</option>
-                          {itemTypeOptions.map((type) => (
-                            <option key={type} value={type}>
-                              {type}
-                            </option>
-                          ))}
-                        </select>
+                        </ProposalField>
+                        <ProposalField field="issue" label="Attività" className="md:col-span-2">
+                          <input
+                            className="ul-input"
+                            value={draft.issue}
+                            onChange={(event) => updateProposalDraft(proposal.proposalId, { issue: event.target.value })}
+                          />
+                        </ProposalField>
+                        <ProposalField field="issueStatus" label="Issue Status">
+                          <select
+                            className="ul-input"
+                            value={draft.issueStatus}
+                            onChange={(event) => updateProposalDraft(proposal.proposalId, { issueStatus: event.target.value })}
+                          >
+                            {ISSUE_STATUS_BASE_OPTIONS.map((status) => (
+                              <option key={status} value={status}>
+                                {status}
+                              </option>
+                            ))}
+                          </select>
+                        </ProposalField>
+                        <ProposalField field="cssOwner" label="CSS Owner">
+                          <input
+                            className="ul-input"
+                            list="css-owner-options"
+                            value={draft.cssOwner ?? ''}
+                            onChange={(event) => updateProposalDraft(proposal.proposalId, { cssOwner: event.target.value || null })}
+                          />
+                        </ProposalField>
+                        <ProposalField field="blBu" label="BLs/BUs" className="md:col-span-2">
+                          <select
+                            className="ul-input"
+                            value={blBuOptions.includes(draft.blBu ?? '') ? (draft.blBu ?? '') : ''}
+                            onChange={(event) => updateProposalDraft(proposal.proposalId, { blBu: event.target.value || null })}
+                          >
+                            <option value="">Seleziona BL/BU...</option>
+                            {blBuOptions.map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                        </ProposalField>
+                        <ProposalField field="details" label="Details" className="md:col-span-2">
+                          <textarea
+                            className="ul-textarea min-h-[92px]"
+                            value={datePrefixedDetails}
+                            onChange={(event) => updateProposalDraft(proposal.proposalId, { details: event.target.value })}
+                          />
+                        </ProposalField>
+                        <ProposalField field="listStatus" label="Status (Lista)">
+                          <select
+                            className="ul-input"
+                            value={listStatusOptions.includes(draft.listStatus ?? '') ? (draft.listStatus ?? '') : ''}
+                            onChange={(event) => updateProposalDraft(proposal.proposalId, { listStatus: event.target.value || null })}
+                          >
+                            <option value="">Seleziona status lista...</option>
+                            {listStatusOptions.map((status) => (
+                              <option key={status} value={status}>
+                                {status}
+                              </option>
+                            ))}
+                          </select>
+                        </ProposalField>
+                        <ProposalField field="dueDate" label="Due Date">
+                          <input
+                            className="ul-input"
+                            value={toDateInputValue(draft.dueDate)}
+                            onChange={(event) => updateProposalDraft(proposal.proposalId, { dueDate: event.target.value || null })}
+                            type="date"
+                          />
+                        </ProposalField>
+                        <ProposalField field="customerPriority" label="Customer Priority">
+                          <select
+                            className="ul-input"
+                            value={(PRIORITY_BASE_OPTIONS as readonly string[]).includes(draft.customerPriority ?? '') ? (draft.customerPriority ?? '') : ''}
+                            onChange={(event) => updateProposalDraft(proposal.proposalId, { customerPriority: event.target.value || null })}
+                          >
+                            <option value="">Seleziona priorità cliente...</option>
+                            {PRIORITY_BASE_OPTIONS.map((priority) => (
+                              <option key={priority} value={priority}>
+                                {priority}
+                              </option>
+                            ))}
+                          </select>
+                        </ProposalField>
+                        <ProposalField field="cssPriority" label="CSS Priority">
+                          <select
+                            className="ul-input"
+                            value={(PRIORITY_BASE_OPTIONS as readonly string[]).includes(draft.cssPriority ?? '') ? (draft.cssPriority ?? '') : ''}
+                            onChange={(event) => updateProposalDraft(proposal.proposalId, { cssPriority: event.target.value || null })}
+                          >
+                            <option value="">Seleziona priorità CSS...</option>
+                            {PRIORITY_BASE_OPTIONS.map((priority) => (
+                              <option key={priority} value={priority}>
+                                {priority}
+                              </option>
+                            ))}
+                          </select>
+                        </ProposalField>
+                        <ProposalField field="eosOwners" label="EOS Owners">
+                          <input
+                            className="ul-input"
+                            list="css-owner-options"
+                            value={draft.eosOwners ?? ''}
+                            onChange={(event) => updateProposalDraft(proposal.proposalId, { eosOwners: event.target.value || null })}
+                          />
+                        </ProposalField>
+                        <ProposalField field="customerOwners" label="Customer Owners">
+                          <input
+                            className="ul-input"
+                            value={draft.customerOwners ?? ''}
+                            onChange={(event) => updateProposalDraft(proposal.proposalId, { customerOwners: event.target.value || null })}
+                          />
+                        </ProposalField>
+                        <ProposalField field="cssAction" label="CSS Action" className="md:col-span-2">
+                          <textarea
+                            className="ul-textarea min-h-[70px]"
+                            value={draft.cssAction ?? ''}
+                            onChange={(event) => updateProposalDraft(proposal.proposalId, { cssAction: event.target.value || null })}
+                          />
+                        </ProposalField>
+                        <ProposalField field="notes" label="Notes" className="md:col-span-2">
+                          <textarea
+                            className="ul-textarea min-h-[70px]"
+                            value={draft.notes ?? ''}
+                            onChange={(event) => updateProposalDraft(proposal.proposalId, { notes: event.target.value || null })}
+                          />
+                        </ProposalField>
+                        <ProposalField field="rating" label="Rating (0-5)">
+                          <input
+                            className="ul-input"
+                            value={draft.rating ?? ''}
+                            onChange={(event) => {
+                              const raw = event.target.value;
+                              updateProposalDraft(proposal.proposalId, { rating: raw === '' ? null : Number(raw) });
+                            }}
+                            type="number"
+                            min={0}
+                            max={5}
+                            step={0.5}
+                          />
+                        </ProposalField>
+                        <ProposalField field="itemType" label="Item Type">
+                          <select
+                            className="ul-input"
+                            value={itemTypeOptions.includes(draft.itemType ?? '') ? (draft.itemType ?? '') : ''}
+                            onChange={(event) => updateProposalDraft(proposal.proposalId, { itemType: event.target.value || null })}
+                          >
+                            <option value="">Seleziona tipo elemento...</option>
+                            {itemTypeOptions.map((type) => (
+                              <option key={type} value={type}>
+                                {type}
+                              </option>
+                            ))}
+                          </select>
+                        </ProposalField>
                       </div>
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-2">
