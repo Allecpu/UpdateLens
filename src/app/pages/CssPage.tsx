@@ -3942,16 +3942,16 @@ const CssPage = () => {
         </div>
 
         {(documents.length > 0 || documentFiltersActive) && (
-          <div className="mt-4 flex flex-wrap items-center gap-2">
+          <div className="mt-4 grid grid-cols-1 items-center gap-2 md:grid-cols-12">
             <input
               type="text"
-              className="ul-input h-9 w-full max-w-xs text-sm"
+              className="ul-input h-9 w-full text-sm md:col-span-3"
               placeholder="Cerca per nome file..."
               value={documentSearchInput}
               onChange={(event) => setDocumentSearchInput(event.target.value)}
             />
             <select
-              className="ul-input h-9 text-sm"
+              className="ul-input h-9 w-full text-sm md:col-span-2"
               value={documentStatusFilter}
               onChange={(event) => {
                 setDocumentStatusFilter(event.target.value as typeof documentStatusFilter);
@@ -3964,7 +3964,7 @@ const CssPage = () => {
               <option value="failed">Errore</option>
             </select>
             <select
-              className="ul-input h-9 text-sm"
+              className="ul-input h-9 w-full text-sm md:col-span-2"
               value={documentFileTypeFilter}
               onChange={(event) => {
                 setDocumentFileTypeFilter(event.target.value as typeof documentFileTypeFilter);
@@ -3977,7 +3977,7 @@ const CssPage = () => {
               <option value="pdf">PDF</option>
             </select>
             <select
-              className="ul-input h-9 text-sm"
+              className="ul-input h-9 w-full text-sm md:col-span-3"
               value={documentSortBy}
               onChange={(event) => {
                 setDocumentSortBy(event.target.value as CssDocumentSortField);
@@ -3990,7 +3990,7 @@ const CssPage = () => {
             </select>
             <button
               type="button"
-              className="ul-button ul-button-ghost h-9 px-3 text-xs"
+              className="ul-button ul-button-ghost h-9 w-full px-3 text-xs md:col-span-1"
               onClick={() => {
                 setDocumentSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
                 setDocumentPage(1);
@@ -4000,7 +4000,7 @@ const CssPage = () => {
               {documentSortOrder === 'asc' ? 'Crescente ↑' : 'Decrescente ↓'}
             </button>
             <select
-              className="ul-input h-9 text-sm"
+              className="ul-input h-9 w-full text-sm md:col-span-1"
               value={documentPageSize}
               onChange={(event) => {
                 setDocumentPageSize(Number(event.target.value));
