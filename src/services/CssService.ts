@@ -1,4 +1,12 @@
-import type { CssActivity, CssCustomer, CssDocument, CssDocumentBatchSummary, CssMeta, CssProposal } from '../models/Css';
+import type {
+  CssActivity,
+  CssCustomer,
+  CssDocument,
+  CssDocumentBatchSummary,
+  CssMeta,
+  CssProposal,
+  CssProposalPayload
+} from '../models/Css';
 
 type ActivityFilters = {
   customer?: string;
@@ -213,6 +221,22 @@ export const cssService = {
   async validateBatch(batchId: string, payload: ValidateBatchRequest): Promise<{ applied: number; rejected: number; proposals: CssProposal[] }> {
     return request<{ applied: number; rejected: number; proposals: CssProposal[] }>(
       `/api/css/proposals/${encodeURIComponent(batchId)}/validate`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      }
+    );
+  },
+
+  async applyProposal(
+    proposalId: string,
+    payload: {
+      note?: string | null;
+      payloadOverride?: Partial<CssProposalPayload> & { targetActivityId?: string };
+    } = {}
+  ): Promise<{ proposal: CssProposal; batchValidated: boolean }> {
+    return request<{ proposal: CssProposal; batchValidated: boolean }>(
+      `/api/css/proposals/single/${encodeURIComponent(proposalId)}/apply`,
       {
         method: 'POST',
         body: JSON.stringify(payload)

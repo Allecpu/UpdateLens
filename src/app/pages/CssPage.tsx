@@ -3,7 +3,7 @@ import type { CssActivity, CssCustomer, CssDocument, CssDocumentBatchSummary, Cs
 import { cssService } from '../../services/CssService';
 import { loadCustomerIndex } from '../../services/CustomerStorage';
 import { useCssControlsStore } from '../store/cssControlsStore';
-import { useViewsStore } from '../store/viewsStore';
+import { useViewsStore, DEFAULT_COLUMN_ORDER } from '../store/viewsStore';
 import { ModernListsLayout } from '../components/ModernListsLayout';
 import type { GroupByKey } from '../components/GroupingPanel';
 import { useAdvancedFilters } from '../hooks/useAdvancedFilters';
@@ -255,6 +255,19 @@ const DEFAULT_VISIBLE_COLUMNS: Record<ColumnKey, boolean> = {
 
 const GRID_PREFS_STORAGE_KEY = 'css-grid-prefs';
 const GRID_PREFS_VERSION = 2;
+
+// Combina un ordine colonne salvato (es. su una vista) con l'elenco completo delle
+// colonne conosciute: mantiene l'ordine salvato per le chiavi presenti e accoda in
+// fondo, nell'ordine di default, eventuali colonne mancanti (viste create prima
+// dell'introduzione di questo campo, o nuove colonne aggiunte in seguito).
+const mergeColumnOrder = (saved?: ColumnKey[] | null): ColumnKey[] => {
+  const validKeys = new Set(COLUMN_DEFINITIONS.map((column) => column.key));
+  const cleanedSaved = (saved ?? []).filter((key): key is ColumnKey => validKeys.has(key));
+  const seen = new Set(cleanedSaved);
+  const missing = COLUMN_DEFINITIONS.map((column) => column.key).filter((key) => !seen.has(key));
+  return [...cleanedSaved, ...missing];
+};
+
 const CHOICE_PREFS_STORAGE_KEY = 'css-choice-column-prefs';
 const ISSUE_STATUS_BASE_OPTIONS = [
   'Action required',
@@ -597,6 +610,8 @@ const CssPage = () => {
   const [isWideMode, setIsWideMode] = useState(true);
   const [showColumnPanel, setShowColumnPanel] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<Record<ColumnKey, boolean>>(DEFAULT_VISIBLE_COLUMNS);
+  const [columnOrder, setColumnOrder] = useState<ColumnKey[]>(DEFAULT_COLUMN_ORDER);
+  const [draggedColumnKey, setDraggedColumnKey] = useState<ColumnKey | null>(null);
   const [groupBy, setGroupBy] = useState<GroupByKey>(null);
   const [inlineEditId, setInlineEditId] = useState<string | null>(null);
   const [inlineEdit, setInlineEdit] = useState({
@@ -633,6 +648,8 @@ const CssPage = () => {
   const [extractingId, setExtractingId] = useState<string | null>(null);
   const [deletingDocumentId, setDeletingDocumentId] = useState<string | null>(null);
   const [documents, setDocuments] = useState<CssDocument[]>([]);
+  const [documentSearchQuery, setDocumentSearchQuery] = useState('');
+  const [documentStatusFilter, setDocumentStatusFilter] = useState<'all' | CssDocument['extractionStatus']>('all');
   const [expandedDocumentHistory, setExpandedDocumentHistory] = useState<Record<string, boolean>>({});
   const [documentBatchesById, setDocumentBatchesById] = useState<Record<string, CssDocumentBatchSummary[]>>({});
   const [expandedBatchDetails, setExpandedBatchDetails] = useState<Record<string, boolean>>({});
@@ -649,6 +666,7 @@ const CssPage = () => {
   const [creatingProposalCustomerId, setCreatingProposalCustomerId] = useState<string | null>(null);
   const [approved, setApproved] = useState<Record<string, boolean>>({});
   const [validating, setValidating] = useState(false);
+  const [applyingProposalId, setApplyingProposalId] = useState<string | null>(null);
   const [extractionSummary, setExtractionSummary] = useState<string | null>(null);
   const [validationSummary, setValidationSummary] = useState<string | null>(null);
   const [quickUpdatingId, setQuickUpdatingId] = useState<string | null>(null);
@@ -746,6 +764,9 @@ const CssPage = () => {
 
     // Apply visible columns from view
     setVisibleColumns(activeView.visibleColumns);
+    // Colonne mancanti dall'array salvato (es. viste create prima di questo campo,
+    // o nuove colonne introdotte dopo) vengono accodate nell'ordine di default.
+    setColumnOrder(mergeColumnOrder(activeView.columnOrder));
 
     // Apply filters from view
     setCustomerFilter(ensureFilterArray(activeView.filters.customer));
@@ -766,6 +787,7 @@ const CssPage = () => {
     const timer = setTimeout(() => {
       saveActiveView({
         visibleColumns,
+        columnOrder,
         filters: {
           customer: customerFilter.length > 0 ? customerFilter : undefined,
           owner: ownerFilter.length > 0 ? ownerFilter : undefined,
@@ -781,7 +803,7 @@ const CssPage = () => {
     setUnsavedChanges(true);
 
     return () => clearTimeout(timer);
-  }, [visibleColumns, customerFilter, ownerFilter, statusFilter, ratingFilter, query, sortBy, sortDirection, activeView, activeViewId]);
+  }, [visibleColumns, columnOrder, customerFilter, ownerFilter, statusFilter, ratingFilter, query, sortBy, sortDirection, activeView, activeViewId]);
 
   // Nota: visibleColumns NON viene ripristinato da qui. La visibilita' delle
   // colonne e' interamente governata dalla vista attiva (vedi effetto sopra),
@@ -1050,7 +1072,26 @@ const CssPage = () => {
     try {
       const uploaded = await cssService.uploadDocument(file);
       if (uploaded.reusedExisting) {
-        setExtractionSummary(`Documento già presente: aggiornato record esistente (${uploaded.filename}).`);
+        const analysisCount = uploaded.analysisCount ?? 0;
+        const historyNote =
+          analysisCount > 0
+            ? ` Storico esistente: ${analysisCount} analisi precedente${analysisCount === 1 ? '' : 'i'}${
+                uploaded.lastAnalyzedAt ? ` (ultima: ${formatDateTime(uploaded.lastAnalyzedAt)})` : ''
+              }.`
+            : '';
+        setExtractionSummary(
+          `Documento già presente: aggiornato record esistente (${uploaded.filename}).${historyNote} Storico analisi espanso qui sotto: puoi consultarlo o rieseguire l'estrazione.`
+        );
+        await refreshDocuments();
+        setLoadingDocumentHistoryId(uploaded.documentId);
+        try {
+          const historyResult = await cssService.listDocumentBatches(uploaded.documentId);
+          setDocumentBatchesById((prev) => ({ ...prev, [uploaded.documentId]: historyResult.items }));
+        } finally {
+          setLoadingDocumentHistoryId(null);
+        }
+        setExpandedDocumentHistory((prev) => ({ ...prev, [uploaded.documentId]: true }));
+        return;
       }
       await refreshDocuments();
     } catch (err) {
@@ -1074,7 +1115,8 @@ const CssPage = () => {
       setAmbiguousTargetByProposal({});
       const decisions: Record<string, boolean> = {};
       result.proposals.forEach((proposal) => {
-        decisions[proposal.proposalId] = true;
+        // Le nuove proposte partono deselezionate: l'utente deve scegliere esplicitamente cosa applicare.
+        decisions[proposal.proposalId] = false;
       });
       setApproved(decisions);
       const provider = result.aiProvider === 'none' ? 'heuristic' : result.aiProvider;
@@ -1187,7 +1229,9 @@ const CssPage = () => {
       setAmbiguousTargetByProposal({});
       const decisions: Record<string, boolean> = {};
       items.forEach((proposal) => {
-        decisions[proposal.proposalId] = proposal.decisionStatus !== 'rejected';
+        // Riprendendo il batch, restano deselezionate le proposte ancora "pending":
+        // solo quelle già approvate individualmente risultano selezionate.
+        decisions[proposal.proposalId] = proposal.decisionStatus === 'approved';
       });
       setApproved(decisions);
       setExtractionSummary(`Batch ripreso: ${items.length} proposte da completare.`);
@@ -1349,6 +1393,31 @@ const CssPage = () => {
     }
   };
 
+  // Costruisce l'override payload da inviare al backend (validazione batch o applicazione singola)
+  // a partire dalla bozza corrente della proposta e dal nome cliente canonico risolto.
+  const buildProposalPayloadOverride = (
+    draft: CssProposalPayload,
+    canonicalCustomer: string
+  ): Partial<CssProposalPayload> & { targetActivityId?: string } => ({
+    customerName: canonicalCustomer,
+    issue: draft.issue,
+    issueStatus: draft.issueStatus,
+    listStatus: draft.listStatus ?? null,
+    cssOwner: draft.cssOwner ?? null,
+    blBu: draft.blBu ?? null,
+    lastUpdate: toDateInputValue(draft.lastUpdate) || draft.lastUpdate || null,
+    details: buildDetailsWithDate(draft.lastUpdate, draft.details ?? null),
+    eosOwners: draft.eosOwners ?? null,
+    customerOwners: draft.customerOwners ?? null,
+    cssAction: draft.cssAction ?? null,
+    notes: draft.notes ?? null,
+    customerPriority: draft.customerPriority ?? null,
+    cssPriority: draft.cssPriority ?? null,
+    dueDate: draft.dueDate ? toDateInputValue(draft.dueDate) : null,
+    rating: draft.rating ?? null,
+    itemType: draft.itemType ?? null
+  });
+
   const onValidateBatch = async () => {
     if (!activeBatchId) return;
     setError(null);
@@ -1357,7 +1426,7 @@ const CssPage = () => {
     const missingTarget = proposals.find(
       (proposal) =>
         proposal.actionType === 'ambiguous' &&
-        (approved[proposal.proposalId] ?? true) &&
+        (approved[proposal.proposalId] ?? false) &&
         !ambiguousTargetByProposal[proposal.proposalId]
     );
     if (missingTarget) {
@@ -1370,7 +1439,7 @@ const CssPage = () => {
     // Clienti nuovi non ancora risolti (una voce per nome grezzo, tra le proposte da applicare).
     const unresolvedGroups = new Map<string, { candidateAlias: string }>();
     proposals.forEach((proposal) => {
-      if (!(approved[proposal.proposalId] ?? true)) return;
+      if (!(approved[proposal.proposalId] ?? false)) return;
       const draft = getProposalDraft(proposal);
       if (resolveCanonicalCustomer(draft.customerName)) return;
       const key = normalizeCustomerKey(draft.customerName);
@@ -1404,32 +1473,14 @@ const CssPage = () => {
         const draft = getProposalDraft(proposal);
         const customerKey = normalizeCustomerKey(draft.customerName);
         const canonicalCustomer = resolvedAliasMap.get(customerKey) ?? resolveCanonicalCustomer(draft.customerName) ?? draft.customerName;
-        const payloadOverride: Partial<CssProposalPayload> & { targetActivityId?: string } = {
-          customerName: canonicalCustomer,
-          issue: draft.issue,
-          issueStatus: draft.issueStatus,
-          listStatus: draft.listStatus ?? null,
-          cssOwner: draft.cssOwner ?? null,
-          blBu: draft.blBu ?? null,
-          lastUpdate: toDateInputValue(draft.lastUpdate) || draft.lastUpdate || null,
-          details: buildDetailsWithDate(draft.lastUpdate, draft.details ?? null),
-          eosOwners: draft.eosOwners ?? null,
-          customerOwners: draft.customerOwners ?? null,
-          cssAction: draft.cssAction ?? null,
-          notes: draft.notes ?? null,
-          customerPriority: draft.customerPriority ?? null,
-          cssPriority: draft.cssPriority ?? null,
-          dueDate: draft.dueDate ? toDateInputValue(draft.dueDate) : null,
-          rating: draft.rating ?? null,
-          itemType: draft.itemType ?? null
-        };
+        const payloadOverride = buildProposalPayloadOverride(draft, canonicalCustomer);
         if (proposal.actionType === 'ambiguous') {
           const target = ambiguousTargetByProposal[proposal.proposalId];
           if (target) {
             payloadOverride.targetActivityId = target;
           }
         }
-        const isApproved = approved[proposal.proposalId] ?? true;
+        const isApproved = approved[proposal.proposalId] ?? false;
         if (isApproved && canonicalCustomer) {
           appliedCustomerNames.add(canonicalCustomer);
         }
@@ -1453,6 +1504,81 @@ const CssPage = () => {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setValidating(false);
+    }
+  };
+
+  // Seleziona/deseleziona in blocco tutte le proposte del batch corrente (checkbox "Applica").
+  const onSelectAllProposals = (checked: boolean) => {
+    setApproved((prev) => {
+      const next = { ...prev };
+      proposals.forEach((proposal) => {
+        next[proposal.proposalId] = checked;
+      });
+      return next;
+    });
+  };
+
+  // Applica immediatamente una singola proposta, senza attendere la validazione dell'intero batch.
+  const onApplySingleProposal = async (proposal: CssProposal) => {
+    setError(null);
+    const draft = getProposalDraft(proposal);
+
+    if (proposal.actionType === 'ambiguous' && !ambiguousTargetByProposal[proposal.proposalId]) {
+      setError(`Seleziona l'attività target per la proposta ambigua "${draft.customerName} - ${draft.issue}" prima di applicarla.`);
+      return;
+    }
+
+    let canonicalCustomer = resolveCanonicalCustomer(draft.customerName);
+    if (!canonicalCustomer) {
+      const key = normalizeCustomerKey(draft.customerName);
+      if (!aliasTargetByCustomerKey[key]) {
+        setError(`Seleziona un cliente canonico per "${draft.customerName}" prima di applicare (oppure crea un nuovo cliente).`);
+        return;
+      }
+      try {
+        canonicalCustomer = await mergeCustomerAliasForKey(key, draft.customerName);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Errore risoluzione alias cliente');
+        return;
+      }
+    }
+
+    setApplyingProposalId(proposal.proposalId);
+    try {
+      const payloadOverride = buildProposalPayloadOverride(draft, canonicalCustomer);
+      if (proposal.actionType === 'ambiguous') {
+        payloadOverride.targetActivityId = ambiguousTargetByProposal[proposal.proposalId];
+      }
+      const result = await cssService.applyProposal(proposal.proposalId, { payloadOverride });
+
+      setProposals((prev) => prev.filter((p) => p.proposalId !== proposal.proposalId));
+      setProposalOverrides((prev) => {
+        const next = { ...prev };
+        delete next[proposal.proposalId];
+        return next;
+      });
+      setApproved((prev) => {
+        const next = { ...prev };
+        delete next[proposal.proposalId];
+        return next;
+      });
+      setAmbiguousTargetByProposal((prev) => {
+        const next = { ...prev };
+        delete next[proposal.proposalId];
+        return next;
+      });
+      setValidationSummary(
+        `Proposta applicata subito: ${canonicalCustomer} - ${draft.issue}${result.batchValidated ? ' • Batch completato' : ''}`
+      );
+      await Promise.all([refreshActivities(), refreshMeta()]);
+      if (result.batchValidated) {
+        // Il batch è ora completo: invalida la cache dello storico analisi cosi' stato/conteggi si aggiornano.
+        setDocumentBatchesById({});
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Errore durante l'applicazione immediata della proposta");
+    } finally {
+      setApplyingProposalId(null);
     }
   };
 
@@ -1585,6 +1711,19 @@ const CssPage = () => {
       return acc;
     }, new Map<string, number>());
   }, [sortedActivities, groupBy]);
+
+  const filteredDocuments = useMemo(() => {
+    const queryToken = documentSearchQuery.trim().toLowerCase();
+    return documents.filter((document) => {
+      if (documentStatusFilter !== 'all' && document.extractionStatus !== documentStatusFilter) {
+        return false;
+      }
+      if (queryToken && !document.filename.toLowerCase().includes(queryToken)) {
+        return false;
+      }
+      return true;
+    });
+  }, [documents, documentSearchQuery, documentStatusFilter]);
 
   const applyChoicePrefs = (base: string[], prefs: BlBuPrefs): string[] => {
     const hidden = new Set(uniqueCanonical(prefs.hidden).map((item) => normalizeToken(item)));
@@ -1808,6 +1947,245 @@ const CssPage = () => {
       next[key] = visible;
     });
     setVisibleColumns(next);
+  };
+
+  // Colonne (definizioni complete) nell'ordine corrente della vista attiva, usato
+  // per pannello colonne, colgroup, intestazioni e celle: e' l'unica fonte di
+  // verita' sull'ordine, cosi' intestazioni e dati restano sempre allineati.
+  const columnDefinitionByKey = useMemo(
+    () => new Map(COLUMN_DEFINITIONS.map((column) => [column.key, column] as const)),
+    []
+  );
+  const orderedColumnDefinitions = useMemo(
+    () => mergeColumnOrder(columnOrder).map((key) => columnDefinitionByKey.get(key)!).filter(Boolean),
+    [columnOrder, columnDefinitionByKey]
+  );
+  const orderedVisibleColumnDefinitions = useMemo(
+    () => orderedColumnDefinitions.filter((column) => isColumnVisible(column.key)),
+    [orderedColumnDefinitions, visibleColumns]
+  );
+
+  // Sposta una colonna di una posizione avanti/indietro nell'ordine (controlli
+  // accessibili da tastiera, alternativa al drag & drop per il riordino colonne).
+  const moveColumnOrder = (key: ColumnKey, direction: -1 | 1) => {
+    setColumnOrder((prev) => {
+      const current = mergeColumnOrder(prev);
+      const index = current.indexOf(key);
+      const targetIndex = index + direction;
+      if (index === -1 || targetIndex < 0 || targetIndex >= current.length) return current;
+      const next = [...current];
+      [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
+      return next;
+    });
+  };
+
+  // Riordino via drag & drop nel pannello colonne (in aggiunta ai pulsanti ▲▼).
+  const reorderColumnOrder = (draggedKey: ColumnKey, targetKey: ColumnKey) => {
+    if (draggedKey === targetKey) return;
+    setColumnOrder((prev) => {
+      const current = mergeColumnOrder(prev);
+      const fromIndex = current.indexOf(draggedKey);
+      const toIndex = current.indexOf(targetKey);
+      if (fromIndex === -1 || toIndex === -1) return current;
+      const next = [...current];
+      next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, draggedKey);
+      return next;
+    });
+  };
+
+  // Intestazione colonna dati (thead): stessa struttura per ogni chiave, resa in un
+  // unico punto cosi' l'ordine di rendering segue sempre `orderedVisibleColumnDefinitions`.
+  const renderHeaderCell = (key: ColumnKey) => {
+    switch (key) {
+      case 'customer':
+        return (
+          <th key={key} className="bg-slate-50 px-3 py-3 dark:bg-slate-900">
+            <div className="flex items-center gap-1">
+              <button type="button" className="hover:text-foreground" onClick={() => onToggleSort('customerName')}>
+                {renderSortLabel('Customer', 'customerName')}
+              </button>
+              <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => openColumnEditor('customer')} title="Modifica opzioni colonna">
+                ⚙
+              </button>
+            </div>
+          </th>
+        );
+      case 'lastUpdate':
+        return (
+          <th key={key} className="px-3 py-3">
+            <button type="button" className="hover:text-foreground" onClick={() => onToggleSort('lastUpdate')}>
+              {renderSortLabel('Last Update', 'lastUpdate')}
+            </button>
+          </th>
+        );
+      case 'blBu':
+        return (
+          <th key={key} className="px-3 py-3">
+            <div className="flex items-center gap-1">
+              <button type="button" className="hover:text-foreground" onClick={() => onToggleSort('blBu')}>
+                {renderSortLabel('BLs/BUs', 'blBu')}
+              </button>
+              <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => openColumnEditor('blBu')} title="Modifica opzioni colonna">
+                ⚙
+              </button>
+            </div>
+          </th>
+        );
+      case 'issue':
+        return (
+          <th key={key} className="px-3 py-3">
+            <div className="flex items-center gap-1">
+              <button type="button" className="hover:text-foreground" onClick={() => onToggleSort('issue')}>
+                {renderSortLabel('Issue', 'issue')}
+              </button>
+              <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => openColumnEditor('issue')} title="Modifica opzioni colonna">
+                ⚙
+              </button>
+            </div>
+          </th>
+        );
+      case 'issueStatus':
+        return (
+          <th key={key} className="px-3 py-3">
+            <div className="flex items-center gap-1">
+              <button type="button" className="hover:text-foreground" onClick={() => onToggleSort('issueStatus')}>
+                {renderSortLabel('Issue Status', 'issueStatus')}
+              </button>
+              <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => openColumnEditor('issueStatus')} title="Modifica opzioni colonna">
+                ⚙
+              </button>
+            </div>
+          </th>
+        );
+      case 'listStatus':
+        return (
+          <th key={key} className="px-3 py-3">
+            <div className="flex items-center gap-1">
+              <span>Status (Lista)</span>
+              <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => openColumnEditor('listStatus')} title="Modifica opzioni colonna">
+                ⚙
+              </button>
+            </div>
+          </th>
+        );
+      case 'details':
+        return (
+          <th key={key} className="px-3 py-3">
+            <div className="flex items-center gap-1">
+              <span>Details</span>
+              <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => openColumnEditor('details')} title="Modifica opzioni colonna">
+                ⚙
+              </button>
+            </div>
+          </th>
+        );
+      case 'cssOwner':
+        return (
+          <th key={key} className="px-3 py-3">
+            <div className="flex items-center gap-1">
+              <button type="button" className="hover:text-foreground" onClick={() => onToggleSort('cssOwner')}>
+                {renderSortLabel('CSS Owner', 'cssOwner')}
+              </button>
+              <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => openColumnEditor('cssOwner')} title="Modifica opzioni colonna">
+                ⚙
+              </button>
+            </div>
+          </th>
+        );
+      case 'eosOwners':
+        return (
+          <th key={key} className="px-3 py-3">
+            <div className="flex items-center gap-1">
+              <span>EOS Owners</span>
+              <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => openColumnEditor('eosOwners')} title="Modifica opzioni colonna">
+                ⚙
+              </button>
+            </div>
+          </th>
+        );
+      case 'customerOwners':
+        return (
+          <th key={key} className="px-3 py-3">
+            <div className="flex items-center gap-1">
+              <span>Customer Owners</span>
+              <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => openColumnEditor('customerOwners')} title="Modifica opzioni colonna">
+                ⚙
+              </button>
+            </div>
+          </th>
+        );
+      case 'cssAction':
+        return (
+          <th key={key} className="px-3 py-3">
+            <div className="flex items-center gap-1">
+              <span>CSS Action</span>
+              <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => openColumnEditor('cssAction')} title="Modifica opzioni colonna">
+                ⚙
+              </button>
+            </div>
+          </th>
+        );
+      case 'notes':
+        return (
+          <th key={key} className="px-3 py-3">
+            <div className="flex items-center gap-1">
+              <span>Notes</span>
+              <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => openColumnEditor('notes')} title="Modifica opzioni colonna">
+                ⚙
+              </button>
+            </div>
+          </th>
+        );
+      case 'customerPriority':
+        return (
+          <th key={key} className="px-3 py-3">
+            <div className="flex items-center gap-1">
+              <span>Customer Priority</span>
+              <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => openColumnEditor('customerPriority')} title="Modifica opzioni colonna">
+                ⚙
+              </button>
+            </div>
+          </th>
+        );
+      case 'cssPriority':
+        return (
+          <th key={key} className="px-3 py-3">
+            <div className="flex items-center gap-1">
+              <span>CSS Priority</span>
+              <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => openColumnEditor('cssPriority')} title="Modifica opzioni colonna">
+                ⚙
+              </button>
+            </div>
+          </th>
+        );
+      case 'dueDate':
+        return <th key={key} className="px-3 py-3">Due Date</th>;
+      case 'rating':
+        return (
+          <th key={key} className="px-3 py-3">
+            <div className="flex items-center gap-1">
+              <span>Rating (0-5)</span>
+              <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => openColumnEditor('rating')} title="Modifica opzioni colonna">
+                ⚙
+              </button>
+            </div>
+          </th>
+        );
+      case 'itemType':
+        return (
+          <th key={key} className="px-3 py-3">
+            <div className="flex items-center gap-1">
+              <span>Item Type</span>
+              <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => openColumnEditor('itemType')} title="Modifica opzioni colonna">
+                ⚙
+              </button>
+            </div>
+          </th>
+        );
+      default:
+        return null;
+    }
   };
 
   const onToggleSort = (key: SortKey) => {
@@ -2414,24 +2792,65 @@ const CssPage = () => {
 
             {showColumnPanel && (
               <div className="mb-4 rounded-xl border border-border bg-muted/30 p-3">
-                <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
-                  <button type="button" className="ul-button ul-button-ghost h-8 px-3" onClick={() => setAllColumnsVisibility(true)}>
-                    Mostra tutte
-                  </button>
-                  <button type="button" className="ul-button ul-button-ghost h-8 px-3" onClick={() => setAllColumnsVisibility(false)}>
-                    Nascondi tutte
-                  </button>
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button type="button" className="ul-button ul-button-ghost h-8 px-3" onClick={() => setAllColumnsVisibility(true)}>
+                      Mostra tutte
+                    </button>
+                    <button type="button" className="ul-button ul-button-ghost h-8 px-3" onClick={() => setAllColumnsVisibility(false)}>
+                      Nascondi tutte
+                    </button>
+                  </div>
+                  <span className="text-muted-foreground">Trascina le righe o usa ▲▼ per riordinare le colonne della tabella</span>
                 </div>
-                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {COLUMN_DEFINITIONS.map((column) => (
-                    <label key={column.key} className="inline-flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={isColumnVisible(column.key)}
-                        onChange={(event) => setColumnVisibility(column.key, event.target.checked)}
-                      />
-                      {column.label}
-                    </label>
+                <div className="grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
+                  {orderedColumnDefinitions.map((column, index) => (
+                    <div
+                      key={column.key}
+                      draggable
+                      onDragStart={() => setDraggedColumnKey(column.key)}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        if (draggedColumnKey) reorderColumnOrder(draggedColumnKey, column.key);
+                        setDraggedColumnKey(null);
+                      }}
+                      onDragEnd={() => setDraggedColumnKey(null)}
+                      className={`flex items-center gap-1 rounded-md px-1 py-0.5 ${draggedColumnKey === column.key ? 'bg-primary/10' : ''}`}
+                      title="Trascina per riordinare"
+                    >
+                      <span className="cursor-grab select-none text-muted-foreground" aria-hidden="true">⋮⋮</span>
+                      <div className="flex flex-col">
+                        <button
+                          type="button"
+                          className="text-[10px] leading-none text-muted-foreground hover:text-foreground disabled:opacity-30"
+                          onClick={() => moveColumnOrder(column.key, -1)}
+                          disabled={index === 0}
+                          aria-label={`Sposta colonna ${column.label} su`}
+                          title="Sposta su"
+                        >
+                          ▲
+                        </button>
+                        <button
+                          type="button"
+                          className="text-[10px] leading-none text-muted-foreground hover:text-foreground disabled:opacity-30"
+                          onClick={() => moveColumnOrder(column.key, 1)}
+                          disabled={index === orderedColumnDefinitions.length - 1}
+                          aria-label={`Sposta colonna ${column.label} giu`}
+                          title="Sposta giu"
+                        >
+                          ▼
+                        </button>
+                      </div>
+                      <label className="inline-flex flex-1 items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={isColumnVisible(column.key)}
+                          onChange={(event) => setColumnVisibility(column.key, event.target.checked)}
+                        />
+                        {column.label}
+                      </label>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -2448,7 +2867,7 @@ const CssPage = () => {
               >
             <colgroup>
               <col style={{ width: CHECKBOX_COLUMN_WIDTH }} />
-              {COLUMN_DEFINITIONS.filter((column) => isColumnVisible(column.key)).map((column) => (
+              {orderedVisibleColumnDefinitions.map((column) => (
                 <col key={column.key} style={{ width: COLUMN_WIDTHS[column.key] }} />
               ))}
               <col style={{ width: ACTIONS_COLUMN_WIDTH }} />
@@ -2463,174 +2882,7 @@ const CssPage = () => {
                     aria-label="Seleziona tutte le righe"
                   />
                 </th>
-                {isColumnVisible('customer') && (
-                  <th className="bg-slate-50 px-3 py-3 dark:bg-slate-900">
-                    <div className="flex items-center gap-1">
-                      <button type="button" className="hover:text-foreground" onClick={() => onToggleSort('customerName')}>
-                        {renderSortLabel('Customer', 'customerName')}
-                      </button>
-                      <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => openColumnEditor('customer')} title="Modifica opzioni colonna">
-                        ⚙
-                      </button>
-                    </div>
-                  </th>
-                )}
-                {isColumnVisible('lastUpdate') && (
-                  <th className="px-3 py-3">
-                    <button type="button" className="hover:text-foreground" onClick={() => onToggleSort('lastUpdate')}>
-                      {renderSortLabel('Last Update', 'lastUpdate')}
-                    </button>
-                  </th>
-                )}
-                {isColumnVisible('blBu') && (
-                  <th className="px-3 py-3">
-                    <div className="flex items-center gap-1">
-                      <button type="button" className="hover:text-foreground" onClick={() => onToggleSort('blBu')}>
-                        {renderSortLabel('BLs/BUs', 'blBu')}
-                      </button>
-                      <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => openColumnEditor('blBu')} title="Modifica opzioni colonna">
-                        ⚙
-                      </button>
-                    </div>
-                  </th>
-                )}
-                {isColumnVisible('issue') && (
-                  <th className="px-3 py-3">
-                    <div className="flex items-center gap-1">
-                      <button type="button" className="hover:text-foreground" onClick={() => onToggleSort('issue')}>
-                        {renderSortLabel('Issue', 'issue')}
-                      </button>
-                      <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => openColumnEditor('issue')} title="Modifica opzioni colonna">
-                        ⚙
-                      </button>
-                    </div>
-                  </th>
-                )}
-                {isColumnVisible('issueStatus') && (
-                  <th className="px-3 py-3">
-                    <div className="flex items-center gap-1">
-                      <button type="button" className="hover:text-foreground" onClick={() => onToggleSort('issueStatus')}>
-                        {renderSortLabel('Issue Status', 'issueStatus')}
-                      </button>
-                      <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => openColumnEditor('issueStatus')} title="Modifica opzioni colonna">
-                        ⚙
-                      </button>
-                    </div>
-                  </th>
-                )}
-                {isColumnVisible('listStatus') && (
-                  <th className="px-3 py-3">
-                    <div className="flex items-center gap-1">
-                      <span>Status (Lista)</span>
-                      <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => openColumnEditor('listStatus')} title="Modifica opzioni colonna">
-                        ⚙
-                      </button>
-                    </div>
-                  </th>
-                )}
-                {isColumnVisible('details') && (
-                  <th className="px-3 py-3">
-                    <div className="flex items-center gap-1">
-                      <span>Details</span>
-                      <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => openColumnEditor('details')} title="Modifica opzioni colonna">
-                        ⚙
-                      </button>
-                    </div>
-                  </th>
-                )}
-                {isColumnVisible('cssOwner') && (
-                  <th className="px-3 py-3">
-                    <div className="flex items-center gap-1">
-                      <button type="button" className="hover:text-foreground" onClick={() => onToggleSort('cssOwner')}>
-                        {renderSortLabel('CSS Owner', 'cssOwner')}
-                      </button>
-                      <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => openColumnEditor('cssOwner')} title="Modifica opzioni colonna">
-                        ⚙
-                      </button>
-                    </div>
-                  </th>
-                )}
-                {isColumnVisible('eosOwners') && (
-                  <th className="px-3 py-3">
-                    <div className="flex items-center gap-1">
-                      <span>EOS Owners</span>
-                      <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => openColumnEditor('eosOwners')} title="Modifica opzioni colonna">
-                        ⚙
-                      </button>
-                    </div>
-                  </th>
-                )}
-                {isColumnVisible('customerOwners') && (
-                  <th className="px-3 py-3">
-                    <div className="flex items-center gap-1">
-                      <span>Customer Owners</span>
-                      <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => openColumnEditor('customerOwners')} title="Modifica opzioni colonna">
-                        ⚙
-                      </button>
-                    </div>
-                  </th>
-                )}
-                {isColumnVisible('cssAction') && (
-                  <th className="px-3 py-3">
-                    <div className="flex items-center gap-1">
-                      <span>CSS Action</span>
-                      <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => openColumnEditor('cssAction')} title="Modifica opzioni colonna">
-                        ⚙
-                      </button>
-                    </div>
-                  </th>
-                )}
-                {isColumnVisible('notes') && (
-                  <th className="px-3 py-3">
-                    <div className="flex items-center gap-1">
-                      <span>Notes</span>
-                      <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => openColumnEditor('notes')} title="Modifica opzioni colonna">
-                        ⚙
-                      </button>
-                    </div>
-                  </th>
-                )}
-                {isColumnVisible('customerPriority') && (
-                  <th className="px-3 py-3">
-                    <div className="flex items-center gap-1">
-                      <span>Customer Priority</span>
-                      <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => openColumnEditor('customerPriority')} title="Modifica opzioni colonna">
-                        ⚙
-                      </button>
-                    </div>
-                  </th>
-                )}
-                {isColumnVisible('cssPriority') && (
-                  <th className="px-3 py-3">
-                    <div className="flex items-center gap-1">
-                      <span>CSS Priority</span>
-                      <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => openColumnEditor('cssPriority')} title="Modifica opzioni colonna">
-                        ⚙
-                      </button>
-                    </div>
-                  </th>
-                )}
-                {isColumnVisible('dueDate') && <th className="px-3 py-3">Due Date</th>}
-                {isColumnVisible('rating') && (
-                  <th className="px-3 py-3">
-                    <div className="flex items-center gap-1">
-                      <span>Rating (0-5)</span>
-                      <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => openColumnEditor('rating')} title="Modifica opzioni colonna">
-                        ⚙
-                      </button>
-                    </div>
-                  </th>
-                )}
-                {isColumnVisible('itemType') && (
-                  <th className="px-3 py-3">
-                    <div className="flex items-center gap-1">
-                      <span>Item Type</span>
-                      <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => openColumnEditor('itemType')} title="Modifica opzioni colonna">
-                        ⚙
-                      </button>
-                    </div>
-                  </th>
-                )}
+                {orderedVisibleColumnDefinitions.map((column) => renderHeaderCell(column.key))}
                 <th className="px-3 py-3">Azioni</th>
               </tr>
             </thead>
@@ -2691,6 +2943,485 @@ const CssPage = () => {
                 const previousGroupLabel =
                   groupBy && index > 0 ? getGroupLabel(sortedActivities[index - 1], groupBy) : '';
                 const showGroupHeader = Boolean(groupBy) && currentGroupLabel !== previousGroupLabel;
+
+                // Celle in modalita' modifica inline, per singola colonna: definite qui (dentro
+                // il callback di riga) cosi' da chiudere naturalmente su `activity`/`inlineEdit`
+                // senza dover propagare decine di props. L'ordine di rendering e' guidato da
+                // `orderedVisibleColumnDefinitions`, condiviso con l'intestazione.
+                const renderEditCell = (key: ColumnKey): React.ReactNode => {
+                  switch (key) {
+                    case 'customer':
+                      return (
+                        <td key={key} className="bg-background px-3 py-2">
+                          <select className="ul-input h-9 w-full" value={inlineEdit.customerName} onChange={(event) => setInlineEdit((prev) => ({ ...prev, customerName: event.target.value }))}>
+                            <option value="" disabled>Seleziona cliente</option>
+                            {customers.map((customer) => (
+                              <option key={customer} value={customer}>{customer}</option>
+                            ))}
+                            {!customers.includes(inlineEdit.customerName) && inlineEdit.customerName && (
+                              <option value={inlineEdit.customerName}>{inlineEdit.customerName}</option>
+                            )}
+                          </select>
+                        </td>
+                      );
+                    case 'lastUpdate':
+                      return <td key={key} className="px-3 py-2"><input className="ul-input h-9 w-full" type="date" value={inlineEdit.lastUpdate} onChange={(event) => setInlineEdit((prev) => ({ ...prev, lastUpdate: event.target.value }))} /></td>;
+                    case 'blBu':
+                      return (
+                        <td key={key} className="px-3 py-2">
+                          <select className={`ul-input h-9 w-full ${getChoiceSelectClassName('blBu', inlineEdit.blBu, resolveChoiceColor('blBu', inlineEdit.blBu))}`} value={inlineEdit.blBu} onChange={(event) => setInlineEdit((prev) => ({ ...prev, blBu: event.target.value }))}>
+                            <option value="">-</option>
+                            {blBuOptions.map((option) => (
+                              <option key={option} value={option}>{option}</option>
+                            ))}
+                            {!blBuOptions.includes(inlineEdit.blBu) && inlineEdit.blBu && (
+                              <option value={inlineEdit.blBu}>{inlineEdit.blBu}</option>
+                            )}
+                          </select>
+                        </td>
+                      );
+                    case 'issue':
+                      return <td key={key} className="px-3 py-2"><input className="ul-input h-9 w-full" value={inlineEdit.issue} onChange={(event) => setInlineEdit((prev) => ({ ...prev, issue: event.target.value }))} /></td>;
+                    case 'issueStatus':
+                      return (
+                        <td key={key} className="px-3 py-2">
+                          <select className={`ul-input h-9 w-full ${getChoiceSelectClassName('issueStatus', inlineEdit.issueStatus, resolveChoiceColor('issueStatus', inlineEdit.issueStatus))}`} value={inlineEdit.issueStatus} onChange={(event) => setInlineEdit((prev) => ({ ...prev, issueStatus: event.target.value }))}>
+                            {issueStatusOptions.map((status) => (
+                              <option key={status} value={status}>{status}</option>
+                            ))}
+                            {!issueStatusOptions.includes(inlineEdit.issueStatus) && inlineEdit.issueStatus && (
+                              <option value={inlineEdit.issueStatus}>{inlineEdit.issueStatus}</option>
+                            )}
+                          </select>
+                        </td>
+                      );
+                    case 'listStatus':
+                      return (
+                        <td key={key} className="px-3 py-2">
+                          <select className={`ul-input h-9 w-full ${getChoiceSelectClassName('listStatus', inlineEdit.listStatus, resolveChoiceColor('listStatus', inlineEdit.listStatus))}`} value={inlineEdit.listStatus} onChange={(event) => setInlineEdit((prev) => ({ ...prev, listStatus: event.target.value }))}>
+                            <option value="">-</option>
+                            {listStatusOptions.map((status) => (
+                              <option key={status} value={status}>{status}</option>
+                            ))}
+                            {!listStatusOptions.includes(inlineEdit.listStatus) && inlineEdit.listStatus && (
+                              <option value={inlineEdit.listStatus}>{inlineEdit.listStatus}</option>
+                            )}
+                          </select>
+                        </td>
+                      );
+                    case 'details':
+                      return <td key={key} className="px-3 py-2"><textarea className="ul-textarea min-h-24 w-full" value={inlineEdit.details} onChange={(event) => setInlineEdit((prev) => ({ ...prev, details: event.target.value }))} /></td>;
+                    case 'cssOwner':
+                      return (
+                        <td key={key} className="px-3 py-2">
+                          <select className="ul-input h-9 w-full" value={inlineEdit.cssOwner} onChange={(event) => setInlineEdit((prev) => ({ ...prev, cssOwner: event.target.value }))}>
+                            <option value="">Nessuno</option>
+                            {owners.map((owner) => (
+                              <option key={owner} value={owner}>{owner}</option>
+                            ))}
+                            {!owners.includes(inlineEdit.cssOwner) && inlineEdit.cssOwner && (
+                              <option value={inlineEdit.cssOwner}>{inlineEdit.cssOwner}</option>
+                            )}
+                          </select>
+                        </td>
+                      );
+                    case 'eosOwners':
+                      return (
+                        <td key={key} className="px-3 py-2">
+                          <input
+                            className="ul-input h-9 w-full"
+                            list="css-eos-owners-options"
+                            value={inlineEdit.eosOwners}
+                            onChange={(event) => setInlineEdit((prev) => ({ ...prev, eosOwners: event.target.value }))}
+                          />
+                        </td>
+                      );
+                    case 'customerOwners':
+                      return (
+                        <td key={key} className="px-3 py-2">
+                          <input
+                            className="ul-input h-9 w-full"
+                            list="css-customer-owners-options"
+                            value={inlineEdit.customerOwners}
+                            onChange={(event) => setInlineEdit((prev) => ({ ...prev, customerOwners: event.target.value }))}
+                          />
+                        </td>
+                      );
+                    case 'cssAction':
+                      return (
+                        <td key={key} className="px-3 py-2">
+                          <input
+                            className="ul-input h-9 w-full"
+                            list="css-action-options"
+                            value={inlineEdit.cssAction}
+                            onChange={(event) => setInlineEdit((prev) => ({ ...prev, cssAction: event.target.value }))}
+                          />
+                        </td>
+                      );
+                    case 'notes':
+                      return (
+                        <td key={key} className="px-3 py-2">
+                          <button
+                            type="button"
+                            className="block w-full overflow-hidden text-ellipsis whitespace-nowrap rounded-md border border-border bg-muted/20 px-3 py-2 text-left hover:bg-muted/35"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              openNotesEditor({ ...activity, notes: inlineEdit.notes || null });
+                            }}
+                            title={(inlineEdit.notes || '').trim() || 'Modifica notes'}
+                          >
+                            {(inlineEdit.notes || '').trim() ? inlineEdit.notes : 'Modifica notes'}
+                          </button>
+                        </td>
+                      );
+                    case 'customerPriority':
+                      return (
+                        <td key={key} className="px-3 py-2">
+                          <select className={`ul-input h-9 w-full ${getChoiceSelectClassName('customerPriority', inlineEdit.customerPriority, resolveChoiceColor('customerPriority', inlineEdit.customerPriority))}`} value={inlineEdit.customerPriority} onChange={(event) => setInlineEdit((prev) => ({ ...prev, customerPriority: event.target.value }))}>
+                            <option value="">-</option>
+                            {priorityOptions.map((priority) => (
+                              <option key={priority} value={priority}>{priority}</option>
+                            ))}
+                            {!priorityOptions.includes(inlineEdit.customerPriority) && inlineEdit.customerPriority && (
+                              <option value={inlineEdit.customerPriority}>{inlineEdit.customerPriority}</option>
+                            )}
+                          </select>
+                        </td>
+                      );
+                    case 'cssPriority':
+                      return (
+                        <td key={key} className="px-3 py-2">
+                          <select className={`ul-input h-9 w-full ${getChoiceSelectClassName('cssPriority', inlineEdit.cssPriority, resolveChoiceColor('cssPriority', inlineEdit.cssPriority))}`} value={inlineEdit.cssPriority} onChange={(event) => setInlineEdit((prev) => ({ ...prev, cssPriority: event.target.value }))}>
+                            <option value="">-</option>
+                            {priorityOptions.map((priority) => (
+                              <option key={priority} value={priority}>{priority}</option>
+                            ))}
+                            {!priorityOptions.includes(inlineEdit.cssPriority) && inlineEdit.cssPriority && (
+                              <option value={inlineEdit.cssPriority}>{inlineEdit.cssPriority}</option>
+                            )}
+                          </select>
+                        </td>
+                      );
+                    case 'dueDate':
+                      return <td key={key} className="px-3 py-2"><input className="ul-input h-9 w-full" type="date" value={inlineEdit.dueDate} onChange={(event) => setInlineEdit((prev) => ({ ...prev, dueDate: event.target.value }))} /></td>;
+                    case 'rating':
+                      return (
+                        <td key={key} className="px-3 py-2">
+                          <div className="flex items-center gap-0.5">
+                            {[1, 2, 3, 4, 5].map((star) => {
+                              const selected = (parseRatingValue(inlineEdit.rating) ?? 0) >= star;
+                              return (
+                                <button
+                                  key={star}
+                                  type="button"
+                                  className={`text-base leading-none ${selected ? 'text-amber-500' : 'text-muted-foreground/40'}`}
+                                  onClick={() => setInlineEdit((prev) => ({ ...prev, rating: String(star) }))}
+                                  aria-label={`${star} stelle`}
+                                  title={`${star} stelle`}
+                                >
+                                  ★
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <button
+                            type="button"
+                            className="text-xs text-muted-foreground underline"
+                            onClick={() => setInlineEdit((prev) => ({ ...prev, rating: '' }))}
+                          >
+                            Nessuno
+                          </button>
+                        </td>
+                      );
+                    case 'itemType':
+                      return (
+                        <td key={key} className="px-3 py-2">
+                          <select className="ul-input h-9 w-full" value={inlineEdit.itemType} onChange={(event) => setInlineEdit((prev) => ({ ...prev, itemType: event.target.value }))}>
+                            <option value="">Nessuno</option>
+                            {itemTypeOptions.map((itemType) => (
+                              <option key={itemType} value={itemType}>{itemType}</option>
+                            ))}
+                            {!itemTypeOptions.includes(inlineEdit.itemType) && inlineEdit.itemType && (
+                              <option value={inlineEdit.itemType}>{inlineEdit.itemType}</option>
+                            )}
+                          </select>
+                        </td>
+                      );
+                    default:
+                      return null;
+                  }
+                };
+
+                // Celle in modalita' lettura, per singola colonna: stessa logica di sopra,
+                // ma per la riga "visualizzata" (non in editing).
+                const renderViewCell = (key: ColumnKey): React.ReactNode => {
+                  switch (key) {
+                    case 'customer':
+                      return (
+                        <td key={key} className="bg-background px-3 py-2 font-medium">
+                          <span className="block overflow-hidden text-ellipsis whitespace-nowrap" title={activity.customerName}>
+                            {activity.customerName}
+                          </span>
+                        </td>
+                      );
+                    case 'lastUpdate':
+                      return <td key={key} className="px-3 py-2">{formatDate(activity.lastUpdate)}</td>;
+                    case 'blBu':
+                      return (
+                        <td key={key} className="px-3 py-2">
+                          {isEditingChoice('blBu') ? (
+                            <select
+                              className="ul-input h-9 w-full"
+                              value={normalizedBlBu}
+                              disabled={quickUpdatingId === activity.activityId}
+                              onBlur={() => setChoiceEditor(null)}
+                              autoFocus
+                              onChange={(event) => void onQuickUpdateField(activity, 'blBu', event.target.value)}
+                            >
+                              <option value="">-</option>
+                              {blBuOptions.map((option) => (
+                                <option key={option} value={option}>{option}</option>
+                              ))}
+                              {normalizedBlBu && !blBuOptions.includes(normalizedBlBu) && (
+                                <option value={normalizedBlBu}>{normalizedBlBu}</option>
+                              )}
+                            </select>
+                          ) : (
+                            <button
+                              type="button"
+                              className={`rounded-full px-3 py-1 text-sm font-semibold ${getChoiceChipClassName('blBu', normalizedBlBu, resolveChoiceColor('blBu', normalizedBlBu))}`}
+                              onClick={() => setChoiceEditor({ activityId: activity.activityId, field: 'blBu' })}
+                              title="Clicca per cambiare BL/BU"
+                            >
+                              {normalizedBlBu || '-'}
+                            </button>
+                          )}
+                        </td>
+                      );
+                    case 'issue':
+                      return (
+                        <td key={key} className="px-3 py-2">
+                          <span className="block overflow-hidden text-ellipsis whitespace-nowrap" title={activity.issue}>
+                            {activity.issue}
+                          </span>
+                        </td>
+                      );
+                    case 'issueStatus':
+                      return (
+                        <td key={key} className="px-3 py-2">
+                          {isEditingChoice('issueStatus') ? (
+                            <select
+                              className="ul-input h-9 w-full"
+                              value={normalizedIssueStatus}
+                              disabled={quickUpdatingId === activity.activityId}
+                              onBlur={() => setChoiceEditor(null)}
+                              autoFocus
+                              onChange={(event) => void onQuickUpdateField(activity, 'issueStatus', event.target.value)}
+                            >
+                              {issueStatusOptions.map((status) => (
+                                <option key={status} value={status}>{status}</option>
+                              ))}
+                              {normalizedIssueStatus && !issueStatusOptions.includes(normalizedIssueStatus) && (
+                                <option value={normalizedIssueStatus}>{normalizedIssueStatus}</option>
+                              )}
+                            </select>
+                          ) : (
+                            <button
+                              type="button"
+                              className={`rounded-full px-3 py-1 text-sm font-semibold ${getChoiceChipClassName('issueStatus', normalizedIssueStatus, resolveChoiceColor('issueStatus', normalizedIssueStatus))}`}
+                              onClick={() => setChoiceEditor({ activityId: activity.activityId, field: 'issueStatus' })}
+                              title="Clicca per cambiare Issue Status"
+                            >
+                              {normalizedIssueStatus || '-'}
+                            </button>
+                          )}
+                        </td>
+                      );
+                    case 'listStatus':
+                      return (
+                        <td key={key} className="px-3 py-2">
+                          {isEditingChoice('listStatus') ? (
+                            <select
+                              className="ul-input h-9 w-full"
+                              value={normalizedListStatus}
+                              disabled={quickUpdatingId === activity.activityId}
+                              onBlur={() => setChoiceEditor(null)}
+                              autoFocus
+                              onChange={(event) => void onQuickUpdateField(activity, 'listStatus', event.target.value)}
+                            >
+                              <option value="">-</option>
+                              {listStatusOptions.map((status) => (
+                                <option key={status} value={status}>{status}</option>
+                              ))}
+                              {normalizedListStatus && !listStatusOptions.includes(normalizedListStatus) && (
+                                <option value={normalizedListStatus}>{normalizedListStatus}</option>
+                              )}
+                            </select>
+                          ) : (
+                            <button
+                              type="button"
+                              className={`rounded-full px-3 py-1 text-sm font-semibold ${getChoiceChipClassName('listStatus', normalizedListStatus, resolveChoiceColor('listStatus', normalizedListStatus))}`}
+                              onClick={() => setChoiceEditor({ activityId: activity.activityId, field: 'listStatus' })}
+                              title="Clicca per cambiare Status lista"
+                            >
+                              {normalizedListStatus || '-'}
+                            </button>
+                          )}
+                        </td>
+                      );
+                    case 'details':
+                      return (
+                        <td key={key} className="px-3 py-2">
+                          <span className="block overflow-hidden text-ellipsis whitespace-nowrap" title={activity.details ?? '-'}>
+                            {activity.details ?? '-'}
+                          </span>
+                        </td>
+                      );
+                    case 'cssOwner':
+                      return (
+                        <td key={key} className="px-3 py-2">
+                          {isEditingChoice('cssOwner') ? (
+                            <select
+                              className="ul-input h-9 w-full"
+                              value={activity.cssOwner ?? ''}
+                              disabled={quickUpdatingId === activity.activityId}
+                              onBlur={() => setChoiceEditor(null)}
+                              autoFocus
+                              onChange={(event) => void onQuickUpdateField(activity, 'cssOwner', event.target.value)}
+                            >
+                              <option value="">Nessuno</option>
+                              {owners.map((owner) => (
+                                <option key={owner} value={owner}>{owner}</option>
+                              ))}
+                              {activity.cssOwner && !owners.includes(activity.cssOwner) && (
+                                <option value={activity.cssOwner}>{activity.cssOwner}</option>
+                              )}
+                            </select>
+                          ) : (
+                            <button
+                              type="button"
+                              className="block w-full overflow-hidden text-ellipsis whitespace-nowrap rounded-full bg-slate-100 px-3 py-1 text-left text-sm font-semibold text-slate-700"
+                              onClick={() => setChoiceEditor({ activityId: activity.activityId, field: 'cssOwner' })}
+                              title={activity.cssOwner ?? 'Clicca per cambiare CSS Owner'}
+                            >
+                              {activity.cssOwner ?? '-'}
+                            </button>
+                          )}
+                        </td>
+                      );
+                    case 'eosOwners':
+                      return (
+                        <td key={key} className="px-3 py-2">
+                          <span className="block overflow-hidden text-ellipsis whitespace-nowrap" title={activity.eosOwners ?? '-'}>
+                            {activity.eosOwners ?? '-'}
+                          </span>
+                        </td>
+                      );
+                    case 'customerOwners':
+                      return (
+                        <td key={key} className="px-3 py-2">
+                          <span className="block overflow-hidden text-ellipsis whitespace-nowrap" title={activity.customerOwners ?? '-'}>
+                            {activity.customerOwners ?? '-'}
+                          </span>
+                        </td>
+                      );
+                    case 'cssAction':
+                      return (
+                        <td key={key} className="px-3 py-2">
+                          <span className="block overflow-hidden text-ellipsis whitespace-nowrap" title={activity.cssAction ?? '-'}>
+                            {activity.cssAction ?? '-'}
+                          </span>
+                        </td>
+                      );
+                    case 'notes':
+                      return (
+                        <td key={key} className="px-3 py-2">
+                          <button
+                            type="button"
+                            className="block w-full overflow-hidden text-ellipsis whitespace-nowrap text-left hover:underline"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              openNotesEditor(activity);
+                            }}
+                            title={activity.notes ?? 'Modifica notes'}
+                          >
+                            {activity.notes ?? '-'}
+                          </button>
+                        </td>
+                      );
+                    case 'customerPriority':
+                      return (
+                        <td key={key} className="px-3 py-2">
+                          {isEditingChoice('customerPriority') ? (
+                            <select
+                              className="ul-input h-9 w-full"
+                              value={normalizedCustomerPriority}
+                              disabled={quickUpdatingId === activity.activityId}
+                              onBlur={() => setChoiceEditor(null)}
+                              autoFocus
+                              onChange={(event) => void onQuickUpdateField(activity, 'customerPriority', event.target.value)}
+                            >
+                              <option value="">-</option>
+                              {priorityOptions.map((priority) => (
+                                <option key={priority} value={priority}>{priority}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <button
+                              type="button"
+                              className={`rounded-full px-3 py-1 text-sm font-semibold ${getChoiceChipClassName('customerPriority', normalizedCustomerPriority, resolveChoiceColor('customerPriority', normalizedCustomerPriority))}`}
+                              onClick={() => setChoiceEditor({ activityId: activity.activityId, field: 'customerPriority' })}
+                              title="Clicca per cambiare Customer Priority"
+                            >
+                              {normalizedCustomerPriority || '-'}
+                            </button>
+                          )}
+                        </td>
+                      );
+                    case 'cssPriority':
+                      return (
+                        <td key={key} className="px-3 py-2">
+                          {isEditingChoice('cssPriority') ? (
+                            <select
+                              className="ul-input h-9 w-full"
+                              value={normalizedCssPriority}
+                              disabled={quickUpdatingId === activity.activityId}
+                              onBlur={() => setChoiceEditor(null)}
+                              autoFocus
+                              onChange={(event) => void onQuickUpdateField(activity, 'cssPriority', event.target.value)}
+                            >
+                              <option value="">-</option>
+                              {priorityOptions.map((priority) => (
+                                <option key={priority} value={priority}>{priority}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <button
+                              type="button"
+                              className={`rounded-full px-3 py-1 text-sm font-semibold ${getChoiceChipClassName('cssPriority', normalizedCssPriority, resolveChoiceColor('cssPriority', normalizedCssPriority))}`}
+                              onClick={() => setChoiceEditor({ activityId: activity.activityId, field: 'cssPriority' })}
+                              title="Clicca per cambiare CSS Priority"
+                            >
+                              {normalizedCssPriority || '-'}
+                            </button>
+                          )}
+                        </td>
+                      );
+                    case 'dueDate':
+                      return <td key={key} className="px-3 py-2">{formatDate(activity.dueDate)}</td>;
+                    case 'rating':
+                      return (
+                        <td key={key} className="px-3 py-2">
+                          {activity.rating == null ? '-' : `${renderRatingStars(activity.rating)} (${activity.rating})`}
+                        </td>
+                      );
+                    case 'itemType':
+                      return <td key={key} className="px-3 py-2">{activity.itemType ?? '-'}</td>;
+                    default:
+                      return null;
+                  }
+                };
+
                 return ([
                 showGroupHeader ? (
                   <tr key={`${activity.activityId}-group`} className="border-t border-border bg-muted/30">
@@ -2723,186 +3454,7 @@ const CssPage = () => {
                   </td>
                   {inlineEditId === activity.activityId ? (
                     <>
-                      {isColumnVisible('customer') && (
-                        <td className="bg-background px-3 py-2">
-                          <select className="ul-input h-9 w-full" value={inlineEdit.customerName} onChange={(event) => setInlineEdit((prev) => ({ ...prev, customerName: event.target.value }))}>
-                            <option value="" disabled>Seleziona cliente</option>
-                            {customers.map((customer) => (
-                              <option key={customer} value={customer}>{customer}</option>
-                            ))}
-                            {!customers.includes(inlineEdit.customerName) && inlineEdit.customerName && (
-                              <option value={inlineEdit.customerName}>{inlineEdit.customerName}</option>
-                            )}
-                          </select>
-                        </td>
-                      )}
-                      {isColumnVisible('lastUpdate') && <td className="px-3 py-2"><input className="ul-input h-9 w-full" type="date" value={inlineEdit.lastUpdate} onChange={(event) => setInlineEdit((prev) => ({ ...prev, lastUpdate: event.target.value }))} /></td>}
-                      {isColumnVisible('blBu') && (
-                        <td className="px-3 py-2">
-                          <select className={`ul-input h-9 w-full ${getChoiceSelectClassName('blBu', inlineEdit.blBu, resolveChoiceColor('blBu', inlineEdit.blBu))}`} value={inlineEdit.blBu} onChange={(event) => setInlineEdit((prev) => ({ ...prev, blBu: event.target.value }))}>
-                            <option value="">-</option>
-                            {blBuOptions.map((option) => (
-                              <option key={option} value={option}>{option}</option>
-                            ))}
-                            {!blBuOptions.includes(inlineEdit.blBu) && inlineEdit.blBu && (
-                              <option value={inlineEdit.blBu}>{inlineEdit.blBu}</option>
-                            )}
-                          </select>
-                        </td>
-                      )}
-                      {isColumnVisible('issue') && <td className="px-3 py-2"><input className="ul-input h-9 w-full" value={inlineEdit.issue} onChange={(event) => setInlineEdit((prev) => ({ ...prev, issue: event.target.value }))} /></td>}
-                      {isColumnVisible('issueStatus') && (
-                        <td className="px-3 py-2">
-                          <select className={`ul-input h-9 w-full ${getChoiceSelectClassName('issueStatus', inlineEdit.issueStatus, resolveChoiceColor('issueStatus', inlineEdit.issueStatus))}`} value={inlineEdit.issueStatus} onChange={(event) => setInlineEdit((prev) => ({ ...prev, issueStatus: event.target.value }))}>
-                            {issueStatusOptions.map((status) => (
-                              <option key={status} value={status}>{status}</option>
-                            ))}
-                            {!issueStatusOptions.includes(inlineEdit.issueStatus) && inlineEdit.issueStatus && (
-                              <option value={inlineEdit.issueStatus}>{inlineEdit.issueStatus}</option>
-                            )}
-                          </select>
-                        </td>
-                      )}
-                      {isColumnVisible('listStatus') && (
-                        <td className="px-3 py-2">
-                          <select className={`ul-input h-9 w-full ${getChoiceSelectClassName('listStatus', inlineEdit.listStatus, resolveChoiceColor('listStatus', inlineEdit.listStatus))}`} value={inlineEdit.listStatus} onChange={(event) => setInlineEdit((prev) => ({ ...prev, listStatus: event.target.value }))}>
-                            <option value="">-</option>
-                            {listStatusOptions.map((status) => (
-                              <option key={status} value={status}>{status}</option>
-                            ))}
-                            {!listStatusOptions.includes(inlineEdit.listStatus) && inlineEdit.listStatus && (
-                              <option value={inlineEdit.listStatus}>{inlineEdit.listStatus}</option>
-                            )}
-                          </select>
-                        </td>
-                      )}
-                      {isColumnVisible('details') && <td className="px-3 py-2"><textarea className="ul-textarea min-h-24 w-full" value={inlineEdit.details} onChange={(event) => setInlineEdit((prev) => ({ ...prev, details: event.target.value }))} /></td>}
-                      {isColumnVisible('cssOwner') && (
-                        <td className="px-3 py-2">
-                          <select className="ul-input h-9 w-full" value={inlineEdit.cssOwner} onChange={(event) => setInlineEdit((prev) => ({ ...prev, cssOwner: event.target.value }))}>
-                            <option value="">Nessuno</option>
-                            {owners.map((owner) => (
-                              <option key={owner} value={owner}>{owner}</option>
-                            ))}
-                            {!owners.includes(inlineEdit.cssOwner) && inlineEdit.cssOwner && (
-                              <option value={inlineEdit.cssOwner}>{inlineEdit.cssOwner}</option>
-                            )}
-                          </select>
-                        </td>
-                      )}
-                      {isColumnVisible('eosOwners') && (
-                        <td className="px-3 py-2">
-                          <input
-                            className="ul-input h-9 w-full"
-                            list="css-eos-owners-options"
-                            value={inlineEdit.eosOwners}
-                            onChange={(event) => setInlineEdit((prev) => ({ ...prev, eosOwners: event.target.value }))}
-                          />
-                        </td>
-                      )}
-                      {isColumnVisible('customerOwners') && (
-                        <td className="px-3 py-2">
-                          <input
-                            className="ul-input h-9 w-full"
-                            list="css-customer-owners-options"
-                            value={inlineEdit.customerOwners}
-                            onChange={(event) => setInlineEdit((prev) => ({ ...prev, customerOwners: event.target.value }))}
-                          />
-                        </td>
-                      )}
-                      {isColumnVisible('cssAction') && (
-                        <td className="px-3 py-2">
-                          <input
-                            className="ul-input h-9 w-full"
-                            list="css-action-options"
-                            value={inlineEdit.cssAction}
-                            onChange={(event) => setInlineEdit((prev) => ({ ...prev, cssAction: event.target.value }))}
-                          />
-                        </td>
-                      )}
-                      {isColumnVisible('notes') && (
-                        <td className="px-3 py-2">
-                          <button
-                            type="button"
-                            className="block w-full overflow-hidden text-ellipsis whitespace-nowrap rounded-md border border-border bg-muted/20 px-3 py-2 text-left hover:bg-muted/35"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              openNotesEditor({ ...activity, notes: inlineEdit.notes || null });
-                            }}
-                            title={(inlineEdit.notes || '').trim() || 'Modifica notes'}
-                          >
-                            {(inlineEdit.notes || '').trim() ? inlineEdit.notes : 'Modifica notes'}
-                          </button>
-                        </td>
-                      )}
-                      {isColumnVisible('customerPriority') && (
-                        <td className="px-3 py-2">
-                          <select className={`ul-input h-9 w-full ${getChoiceSelectClassName('customerPriority', inlineEdit.customerPriority, resolveChoiceColor('customerPriority', inlineEdit.customerPriority))}`} value={inlineEdit.customerPriority} onChange={(event) => setInlineEdit((prev) => ({ ...prev, customerPriority: event.target.value }))}>
-                            <option value="">-</option>
-                            {priorityOptions.map((priority) => (
-                              <option key={priority} value={priority}>{priority}</option>
-                            ))}
-                            {!priorityOptions.includes(inlineEdit.customerPriority) && inlineEdit.customerPriority && (
-                              <option value={inlineEdit.customerPriority}>{inlineEdit.customerPriority}</option>
-                            )}
-                          </select>
-                        </td>
-                      )}
-                      {isColumnVisible('cssPriority') && (
-                        <td className="px-3 py-2">
-                          <select className={`ul-input h-9 w-full ${getChoiceSelectClassName('cssPriority', inlineEdit.cssPriority, resolveChoiceColor('cssPriority', inlineEdit.cssPriority))}`} value={inlineEdit.cssPriority} onChange={(event) => setInlineEdit((prev) => ({ ...prev, cssPriority: event.target.value }))}>
-                            <option value="">-</option>
-                            {priorityOptions.map((priority) => (
-                              <option key={priority} value={priority}>{priority}</option>
-                            ))}
-                            {!priorityOptions.includes(inlineEdit.cssPriority) && inlineEdit.cssPriority && (
-                              <option value={inlineEdit.cssPriority}>{inlineEdit.cssPriority}</option>
-                            )}
-                          </select>
-                        </td>
-                      )}
-                      {isColumnVisible('dueDate') && <td className="px-3 py-2"><input className="ul-input h-9 w-full" type="date" value={inlineEdit.dueDate} onChange={(event) => setInlineEdit((prev) => ({ ...prev, dueDate: event.target.value }))} /></td>}
-                      {isColumnVisible('rating') && (
-                        <td className="px-3 py-2">
-                          <div className="flex items-center gap-0.5">
-                            {[1, 2, 3, 4, 5].map((star) => {
-                              const selected = (parseRatingValue(inlineEdit.rating) ?? 0) >= star;
-                              return (
-                                <button
-                                  key={star}
-                                  type="button"
-                                  className={`text-base leading-none ${selected ? 'text-amber-500' : 'text-muted-foreground/40'}`}
-                                  onClick={() => setInlineEdit((prev) => ({ ...prev, rating: String(star) }))}
-                                  aria-label={`${star} stelle`}
-                                  title={`${star} stelle`}
-                                >
-                                  ★
-                                </button>
-                              );
-                            })}
-                          </div>
-                          <button
-                            type="button"
-                            className="text-xs text-muted-foreground underline"
-                            onClick={() => setInlineEdit((prev) => ({ ...prev, rating: '' }))}
-                          >
-                            Nessuno
-                          </button>
-                        </td>
-                      )}
-                      {isColumnVisible('itemType') && (
-                        <td className="px-3 py-2">
-                          <select className="ul-input h-9 w-full" value={inlineEdit.itemType} onChange={(event) => setInlineEdit((prev) => ({ ...prev, itemType: event.target.value }))}>
-                            <option value="">Nessuno</option>
-                            {itemTypeOptions.map((itemType) => (
-                              <option key={itemType} value={itemType}>{itemType}</option>
-                            ))}
-                            {!itemTypeOptions.includes(inlineEdit.itemType) && inlineEdit.itemType && (
-                              <option value={inlineEdit.itemType}>{inlineEdit.itemType}</option>
-                            )}
-                          </select>
-                        </td>
-                      )}
+                      {orderedVisibleColumnDefinitions.map((column) => renderEditCell(column.key))}
                       <td className="px-3 py-2">
                         <div className="flex gap-2">
                           <button type="button" className="text-primary hover:underline" onClick={() => void saveInlineEdit()}>Salva</button>
@@ -2912,250 +3464,7 @@ const CssPage = () => {
                     </>
                   ) : (
                     <>
-                      {isColumnVisible('customer') && (
-                        <td className="bg-background px-3 py-2 font-medium">
-                          <span className="block overflow-hidden text-ellipsis whitespace-nowrap" title={activity.customerName}>
-                            {activity.customerName}
-                          </span>
-                        </td>
-                      )}
-                      {isColumnVisible('lastUpdate') && <td className="px-3 py-2">{formatDate(activity.lastUpdate)}</td>}
-                      {isColumnVisible('blBu') && (
-                        <td className="px-3 py-2">
-                          {isEditingChoice('blBu') ? (
-                            <select
-                              className="ul-input h-9 w-full"
-                              value={normalizedBlBu}
-                              disabled={quickUpdatingId === activity.activityId}
-                              onBlur={() => setChoiceEditor(null)}
-                              autoFocus
-                              onChange={(event) => void onQuickUpdateField(activity, 'blBu', event.target.value)}
-                            >
-                              <option value="">-</option>
-                              {blBuOptions.map((option) => (
-                                <option key={option} value={option}>{option}</option>
-                              ))}
-                              {normalizedBlBu && !blBuOptions.includes(normalizedBlBu) && (
-                                <option value={normalizedBlBu}>{normalizedBlBu}</option>
-                              )}
-                            </select>
-                          ) : (
-                            <button
-                              type="button"
-                              className={`rounded-full px-3 py-1 text-sm font-semibold ${getChoiceChipClassName('blBu', normalizedBlBu, resolveChoiceColor('blBu', normalizedBlBu))}`}
-                              onClick={() => setChoiceEditor({ activityId: activity.activityId, field: 'blBu' })}
-                              title="Clicca per cambiare BL/BU"
-                            >
-                              {normalizedBlBu || '-'}
-                            </button>
-                          )}
-                        </td>
-                      )}
-                      {isColumnVisible('issue') && (
-                        <td className="px-3 py-2">
-                          <span className="block overflow-hidden text-ellipsis whitespace-nowrap" title={activity.issue}>
-                            {activity.issue}
-                          </span>
-                        </td>
-                      )}
-                      {isColumnVisible('issueStatus') && (
-                        <td className="px-3 py-2">
-                          {isEditingChoice('issueStatus') ? (
-                            <select
-                              className="ul-input h-9 w-full"
-                              value={normalizedIssueStatus}
-                              disabled={quickUpdatingId === activity.activityId}
-                              onBlur={() => setChoiceEditor(null)}
-                              autoFocus
-                              onChange={(event) => void onQuickUpdateField(activity, 'issueStatus', event.target.value)}
-                            >
-                              {issueStatusOptions.map((status) => (
-                                <option key={status} value={status}>{status}</option>
-                              ))}
-                              {normalizedIssueStatus && !issueStatusOptions.includes(normalizedIssueStatus) && (
-                                <option value={normalizedIssueStatus}>{normalizedIssueStatus}</option>
-                              )}
-                            </select>
-                          ) : (
-                            <button
-                              type="button"
-                              className={`rounded-full px-3 py-1 text-sm font-semibold ${getChoiceChipClassName('issueStatus', normalizedIssueStatus, resolveChoiceColor('issueStatus', normalizedIssueStatus))}`}
-                              onClick={() => setChoiceEditor({ activityId: activity.activityId, field: 'issueStatus' })}
-                              title="Clicca per cambiare Issue Status"
-                            >
-                              {normalizedIssueStatus || '-'}
-                            </button>
-                          )}
-                        </td>
-                      )}
-                      {isColumnVisible('listStatus') && (
-                        <td className="px-3 py-2">
-                          {isEditingChoice('listStatus') ? (
-                            <select
-                              className="ul-input h-9 w-full"
-                              value={normalizedListStatus}
-                              disabled={quickUpdatingId === activity.activityId}
-                              onBlur={() => setChoiceEditor(null)}
-                              autoFocus
-                              onChange={(event) => void onQuickUpdateField(activity, 'listStatus', event.target.value)}
-                            >
-                              <option value="">-</option>
-                              {listStatusOptions.map((status) => (
-                                <option key={status} value={status}>{status}</option>
-                              ))}
-                              {normalizedListStatus && !listStatusOptions.includes(normalizedListStatus) && (
-                                <option value={normalizedListStatus}>{normalizedListStatus}</option>
-                              )}
-                            </select>
-                          ) : (
-                            <button
-                              type="button"
-                              className={`rounded-full px-3 py-1 text-sm font-semibold ${getChoiceChipClassName('listStatus', normalizedListStatus, resolveChoiceColor('listStatus', normalizedListStatus))}`}
-                              onClick={() => setChoiceEditor({ activityId: activity.activityId, field: 'listStatus' })}
-                              title="Clicca per cambiare Status lista"
-                            >
-                              {normalizedListStatus || '-'}
-                            </button>
-                          )}
-                        </td>
-                      )}
-                      {isColumnVisible('details') && (
-                        <td className="px-3 py-2">
-                          <span className="block overflow-hidden text-ellipsis whitespace-nowrap" title={activity.details ?? '-'}>
-                            {activity.details ?? '-'}
-                          </span>
-                        </td>
-                      )}
-                      {isColumnVisible('cssOwner') && (
-                        <td className="px-3 py-2">
-                          {isEditingChoice('cssOwner') ? (
-                            <select
-                              className="ul-input h-9 w-full"
-                              value={activity.cssOwner ?? ''}
-                              disabled={quickUpdatingId === activity.activityId}
-                              onBlur={() => setChoiceEditor(null)}
-                              autoFocus
-                              onChange={(event) => void onQuickUpdateField(activity, 'cssOwner', event.target.value)}
-                            >
-                              <option value="">Nessuno</option>
-                              {owners.map((owner) => (
-                                <option key={owner} value={owner}>{owner}</option>
-                              ))}
-                              {activity.cssOwner && !owners.includes(activity.cssOwner) && (
-                                <option value={activity.cssOwner}>{activity.cssOwner}</option>
-                              )}
-                            </select>
-                          ) : (
-                            <button
-                              type="button"
-                              className="block w-full overflow-hidden text-ellipsis whitespace-nowrap rounded-full bg-slate-100 px-3 py-1 text-left text-sm font-semibold text-slate-700"
-                              onClick={() => setChoiceEditor({ activityId: activity.activityId, field: 'cssOwner' })}
-                              title={activity.cssOwner ?? 'Clicca per cambiare CSS Owner'}
-                            >
-                              {activity.cssOwner ?? '-'}
-                            </button>
-                          )}
-                        </td>
-                      )}
-                      {isColumnVisible('eosOwners') && (
-                        <td className="px-3 py-2">
-                          <span className="block overflow-hidden text-ellipsis whitespace-nowrap" title={activity.eosOwners ?? '-'}>
-                            {activity.eosOwners ?? '-'}
-                          </span>
-                        </td>
-                      )}
-                      {isColumnVisible('customerOwners') && (
-                        <td className="px-3 py-2">
-                          <span className="block overflow-hidden text-ellipsis whitespace-nowrap" title={activity.customerOwners ?? '-'}>
-                            {activity.customerOwners ?? '-'}
-                          </span>
-                        </td>
-                      )}
-                      {isColumnVisible('cssAction') && (
-                        <td className="px-3 py-2">
-                          <span className="block overflow-hidden text-ellipsis whitespace-nowrap" title={activity.cssAction ?? '-'}>
-                            {activity.cssAction ?? '-'}
-                          </span>
-                        </td>
-                      )}
-                      {isColumnVisible('notes') && (
-                        <td className="px-3 py-2">
-                          <button
-                            type="button"
-                            className="block w-full overflow-hidden text-ellipsis whitespace-nowrap text-left hover:underline"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              openNotesEditor(activity);
-                            }}
-                            title={activity.notes ?? 'Modifica notes'}
-                          >
-                            {activity.notes ?? '-'}
-                          </button>
-                        </td>
-                      )}
-                      {isColumnVisible('customerPriority') && (
-                        <td className="px-3 py-2">
-                          {isEditingChoice('customerPriority') ? (
-                            <select
-                              className="ul-input h-9 w-full"
-                              value={normalizedCustomerPriority}
-                              disabled={quickUpdatingId === activity.activityId}
-                              onBlur={() => setChoiceEditor(null)}
-                              autoFocus
-                              onChange={(event) => void onQuickUpdateField(activity, 'customerPriority', event.target.value)}
-                            >
-                              <option value="">-</option>
-                              {priorityOptions.map((priority) => (
-                                <option key={priority} value={priority}>{priority}</option>
-                              ))}
-                            </select>
-                          ) : (
-                            <button
-                              type="button"
-                              className={`rounded-full px-3 py-1 text-sm font-semibold ${getChoiceChipClassName('customerPriority', normalizedCustomerPriority, resolveChoiceColor('customerPriority', normalizedCustomerPriority))}`}
-                              onClick={() => setChoiceEditor({ activityId: activity.activityId, field: 'customerPriority' })}
-                              title="Clicca per cambiare Customer Priority"
-                            >
-                              {normalizedCustomerPriority || '-'}
-                            </button>
-                          )}
-                        </td>
-                      )}
-                      {isColumnVisible('cssPriority') && (
-                        <td className="px-3 py-2">
-                          {isEditingChoice('cssPriority') ? (
-                            <select
-                              className="ul-input h-9 w-full"
-                              value={normalizedCssPriority}
-                              disabled={quickUpdatingId === activity.activityId}
-                              onBlur={() => setChoiceEditor(null)}
-                              autoFocus
-                              onChange={(event) => void onQuickUpdateField(activity, 'cssPriority', event.target.value)}
-                            >
-                              <option value="">-</option>
-                              {priorityOptions.map((priority) => (
-                                <option key={priority} value={priority}>{priority}</option>
-                              ))}
-                            </select>
-                          ) : (
-                            <button
-                              type="button"
-                              className={`rounded-full px-3 py-1 text-sm font-semibold ${getChoiceChipClassName('cssPriority', normalizedCssPriority, resolveChoiceColor('cssPriority', normalizedCssPriority))}`}
-                              onClick={() => setChoiceEditor({ activityId: activity.activityId, field: 'cssPriority' })}
-                              title="Clicca per cambiare CSS Priority"
-                            >
-                              {normalizedCssPriority || '-'}
-                            </button>
-                          )}
-                        </td>
-                      )}
-                      {isColumnVisible('dueDate') && <td className="px-3 py-2">{formatDate(activity.dueDate)}</td>}
-                      {isColumnVisible('rating') && (
-                        <td className="px-3 py-2">
-                          {activity.rating == null ? '-' : `${renderRatingStars(activity.rating)} (${activity.rating})`}
-                        </td>
-                      )}
-                      {isColumnVisible('itemType') && <td className="px-3 py-2">{activity.itemType ?? '-'}</td>}
+                      {orderedVisibleColumnDefinitions.map((column) => renderViewCell(column.key))}
                       <td className="px-3 py-2">
                         <div className="flex gap-2">
                           <button
@@ -3525,9 +3834,49 @@ const CssPage = () => {
           </label>
         </div>
 
+        {documents.length > 0 && (
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <input
+              type="text"
+              className="ul-input h-9 w-full max-w-xs text-sm"
+              placeholder="Cerca per nome file..."
+              value={documentSearchQuery}
+              onChange={(event) => setDocumentSearchQuery(event.target.value)}
+            />
+            <select
+              className="ul-input h-9 text-sm"
+              value={documentStatusFilter}
+              onChange={(event) => setDocumentStatusFilter(event.target.value as typeof documentStatusFilter)}
+            >
+              <option value="all">Tutti gli stati</option>
+              <option value="pending">In attesa</option>
+              <option value="processed">Elaborato</option>
+              <option value="failed">Errore</option>
+            </select>
+            {(documentSearchQuery || documentStatusFilter !== 'all') && (
+              <button
+                type="button"
+                className="ul-button ul-button-ghost h-9 px-3 text-xs"
+                onClick={() => {
+                  setDocumentSearchQuery('');
+                  setDocumentStatusFilter('all');
+                }}
+              >
+                Azzera filtri
+              </button>
+            )}
+            <span className="text-xs text-muted-foreground">
+              {filteredDocuments.length} di {documents.length} documenti
+            </span>
+          </div>
+        )}
+
         <div className="mt-4 space-y-2">
           {documents.length === 0 && <p className="text-sm text-muted-foreground">Nessun documento caricato.</p>}
-          {documents.map((document) => (
+          {documents.length > 0 && filteredDocuments.length === 0 && (
+            <p className="text-sm text-muted-foreground">Nessun documento corrisponde ai filtri applicati.</p>
+          )}
+          {filteredDocuments.map((document) => (
             <div key={document.documentId} className="rounded-xl border border-border p-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
@@ -3587,6 +3936,7 @@ const CssPage = () => {
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <div>
                               Batch: {batch.batchId} • Stato: {batch.status} • Proposte: {batch.proposalCount} • Data: {formatDateTime(batch.createdAt)}
+                              {batch.filename && ` • File: ${batch.filename}`}
                               {batch.validatedAt && ` • Validato: ${formatDateTime(batch.validatedAt)}`}
                               {batch.validatedBy && ` (${batch.validatedBy})`}
                             </div>
@@ -3704,12 +4054,34 @@ const CssPage = () => {
           <h2 className="text-lg font-semibold">Proposte da validare</h2>
           <div className="text-sm text-muted-foreground">
             Batch: {activeBatchId ?? '-'} • Proposte: {extractedCount}
+            {proposals[0]?.sourceFilename && ` • File: ${proposals[0].sourceFilename}`}
           </div>
         </div>
         {proposals.length === 0 ? (
           <p className="mt-3 text-sm text-muted-foreground">Nessuna proposta disponibile.</p>
         ) : (
           <>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+              <div className="text-xs text-muted-foreground">
+                {proposals.filter((proposal) => approved[proposal.proposalId] ?? false).length} di {proposals.length} selezionate
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="ul-button ul-button-ghost h-8 px-3 text-xs"
+                  onClick={() => onSelectAllProposals(true)}
+                >
+                  Seleziona tutte
+                </button>
+                <button
+                  type="button"
+                  className="ul-button ul-button-ghost h-8 px-3 text-xs"
+                  onClick={() => onSelectAllProposals(false)}
+                >
+                  Deseleziona tutte
+                </button>
+              </div>
+            </div>
             <div className="mt-3 space-y-2">
               {proposals.map((proposal) => {
                 const draft = getProposalDraft(proposal);
@@ -3726,6 +4098,7 @@ const CssPage = () => {
                       <div className="text-xs text-muted-foreground">
                         Status proposto: {draft.issueStatus} • Confidence: {(proposal.confidence * 100).toFixed(0)}%
                         {proposal.matchScore !== null && ` • Match: ${(proposal.matchScore * 100).toFixed(0)}%`}
+                        {proposal.sourceFilename && ` • File: ${proposal.sourceFilename}`}
                       </div>
                       {proposal.matchReason && (
                         <div className="mt-1 text-xs text-slate-600 dark:text-slate-400">
@@ -3984,16 +4357,27 @@ const CssPage = () => {
                         </select>
                       </div>
                     </div>
-                    <label className="inline-flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={approved[proposal.proposalId] ?? true}
-                        onChange={(event) =>
-                          setApproved((prev) => ({ ...prev, [proposal.proposalId]: event.target.checked }))
-                        }
-                      />
-                      Applica
-                    </label>
+                    <div className="flex shrink-0 flex-col items-end gap-2">
+                      <label className="inline-flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={approved[proposal.proposalId] ?? false}
+                          onChange={(event) =>
+                            setApproved((prev) => ({ ...prev, [proposal.proposalId]: event.target.checked }))
+                          }
+                        />
+                        Applica
+                      </label>
+                      <button
+                        type="button"
+                        className="ul-button ul-button-primary h-8 px-3 text-xs whitespace-nowrap"
+                        onClick={() => void onApplySingleProposal(proposal)}
+                        disabled={applyingProposalId === proposal.proposalId || validating}
+                        title="Applica subito questa singola proposta, senza attendere la validazione dell'intero batch"
+                      >
+                        {applyingProposalId === proposal.proposalId ? 'Applicazione...' : 'Applica subito'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               )})}

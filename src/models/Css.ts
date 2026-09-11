@@ -60,6 +60,7 @@ export type CssDocument = {
 export type CssDocumentBatchSummary = {
   batchId: string;
   documentId: string;
+  filename: string | null;
   status: string;
   aiProvider: string;
   aiModel: string | null;
@@ -102,6 +103,7 @@ export type CssProposal = {
   matchCandidates: Array<{ activityId: string; issue: string; score: number }> | null;
   decisionStatus: 'pending' | 'approved' | 'rejected';
   decisionNote: string | null;
+  sourceFilename: string | null;
   createdAt: string;
   updatedAt: string;
 };

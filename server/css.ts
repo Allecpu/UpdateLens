@@ -58,6 +58,7 @@ export type CssDocument = {
 export type CssDocumentBatchSummary = {
   batchId: string;
   documentId: string;
+  filename: string | null;
   status: string;
   aiProvider: string;
   aiModel: string | null;
@@ -100,9 +101,17 @@ export type CssProposal = {
   matchCandidates: Array<{ activityId: string; issue: string; score: number }> | null;
   decisionStatus: 'pending' | 'approved' | 'rejected';
   decisionNote: string | null;
+  sourceFilename: string | null;
   createdAt: string;
   updatedAt: string;
 };
+
+// Forma "bozza" di una proposta prima dell'inserimento in DB: non ha ancora un id, un batch
+// né i metadati di decisione/join (es. sourceFilename, derivato solo in lettura dal batch).
+type DraftCssProposal = Omit<
+  CssProposal,
+  'proposalId' | 'batchId' | 'decisionStatus' | 'decisionNote' | 'createdAt' | 'updatedAt' | 'sourceFilename'
+>;
 
 type ActivityRow = {
   activity_id: string;
@@ -141,6 +150,7 @@ type ProposalRow = {
   match_candidates: string | null;
   decision_status: 'pending' | 'approved' | 'rejected';
   decision_note: string | null;
+  source_filename?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -300,6 +310,7 @@ const toProposal = (row: ProposalRow): CssProposal => ({
   matchCandidates: row.match_candidates ? (JSON.parse(row.match_candidates) as Array<{ activityId: string; issue: string; score: number }>) : null,
   decisionStatus: row.decision_status,
   decisionNote: row.decision_note,
+  sourceFilename: row.source_filename ?? null,
   createdAt: row.created_at,
   updatedAt: row.updated_at
 });
@@ -948,8 +959,8 @@ const normalizeProposalPayload = (
 };
 
 const normalizeDraftProposal = (
-  proposal: Omit<CssProposal, 'proposalId' | 'batchId' | 'decisionStatus' | 'decisionNote' | 'createdAt' | 'updatedAt'>
-): Omit<CssProposal, 'proposalId' | 'batchId' | 'decisionStatus' | 'decisionNote' | 'createdAt' | 'updatedAt'> | null => {
+  proposal: DraftCssProposal
+): DraftCssProposal | null => {
   const payload = normalizeProposalPayload(proposal.payload, new Set(), new Set());
   if (!payload) {
     return null;
@@ -961,8 +972,8 @@ const normalizeDraftProposal = (
 };
 
 const dedupeProposals = (
-  proposals: Array<Omit<CssProposal, 'proposalId' | 'batchId' | 'decisionStatus' | 'decisionNote' | 'createdAt' | 'updatedAt'>>
-): Array<Omit<CssProposal, 'proposalId' | 'batchId' | 'decisionStatus' | 'decisionNote' | 'createdAt' | 'updatedAt'>> => {
+  proposals: Array<DraftCssProposal>
+): Array<DraftCssProposal> => {
   const seen = new Set<string>();
   return proposals.filter((proposal) => {
     const key = `${proposal.payload.customerName.toLowerCase()}::${proposal.payload.issue.toLowerCase()}`;
@@ -1030,9 +1041,9 @@ const extractTextFromPdf = (buffer: Buffer): string => {
   return text.replace(/\s+/g, ' ').trim();
 };
 
-const extractWithHeuristics = (text: string): Array<Omit<CssProposal, 'proposalId' | 'batchId' | 'decisionStatus' | 'decisionNote' | 'createdAt' | 'updatedAt'>> => {
+const extractWithHeuristics = (text: string): Array<DraftCssProposal> => {
   const inferredCustomer = inferPrimaryCustomerName(text);
-  const proposals: Array<Omit<CssProposal, 'proposalId' | 'batchId' | 'decisionStatus' | 'decisionNote' | 'createdAt' | 'updatedAt'>> = [];
+  const proposals: Array<DraftCssProposal> = [];
 
   // Parse tabelle markdown: | Task | Aggiornamento | Stato | Owner |
   const tableRowPattern = /\|\s*\*?\*?([^|*]+?)\*?\*?\s*\|\s*([^|]+?)\s*\|\s*\*?\*?([^|*]+?)\*?\*?\s*\|\s*([^|]*?)\s*\|/;
@@ -1902,6 +1913,7 @@ export const listCssDocumentBatches = (db: Database.Database, documentId: string
     SELECT
       vb.batch_id,
       vb.document_id,
+      d.filename,
       vb.status,
       vb.ai_provider,
       vb.ai_model,
@@ -1922,6 +1934,7 @@ export const listCssDocumentBatches = (db: Database.Database, documentId: string
   `).all(document.file_hash) as Array<{
     batch_id: string;
     document_id: string;
+    filename: string | null;
     status: string;
     ai_provider: string;
     ai_model: string | null;
@@ -1935,6 +1948,7 @@ export const listCssDocumentBatches = (db: Database.Database, documentId: string
   return rows.map((row) => ({
     batchId: row.batch_id,
     documentId: row.document_id,
+    filename: row.filename ?? null,
     status: row.status,
     aiProvider: row.ai_provider,
     aiModel: row.ai_model,
@@ -2148,14 +2162,60 @@ export const processCssDocument = async (
 
 export const getCssProposalsByBatch = (db: Database.Database, batchId: string): CssProposal[] => {
   const rows = db.prepare(`
-    SELECT proposal_id, batch_id, action_type, target_activity_id, payload_json, confidence,
-           decision_status, decision_note, created_at, updated_at
-    FROM css_activity_proposals
-    WHERE batch_id = ?
-    ORDER BY created_at ASC
+    SELECT p.proposal_id, p.batch_id, p.action_type, p.target_activity_id, p.payload_json, p.confidence,
+           p.match_reason, p.match_score, p.match_candidates, p.decision_status, p.decision_note,
+           d.filename AS source_filename, p.created_at, p.updated_at
+    FROM css_activity_proposals p
+    LEFT JOIN css_validation_batches vb ON vb.batch_id = p.batch_id
+    LEFT JOIN css_meeting_documents d ON d.document_id = vb.document_id
+    WHERE p.batch_id = ?
+    ORDER BY p.created_at ASC
   `).all(batchId) as ProposalRow[];
 
   return rows.map(toProposal);
+};
+
+// Costruisce i campi attività condivisi tra creazione e aggiornamento a partire dal payload
+// (eventualmente arricchito con override) di una proposta.
+const buildActivityFieldsFromPayload = (payload: CssProposalPayload) => ({
+  customerName: payload.customerName,
+  cssOwner: payload.cssOwner ?? null,
+  lastUpdate: payload.lastUpdate ?? null,
+  blBu: payload.blBu ?? null,
+  issue: payload.issue,
+  listStatus: payload.listStatus ?? null,
+  issueStatus: payload.issueStatus,
+  details: payload.details ?? null,
+  eosOwners: payload.eosOwners ?? null,
+  customerOwners: payload.customerOwners ?? null,
+  cssAction: payload.cssAction ?? null,
+  notes: payload.notes ?? null,
+  customerPriority: payload.customerPriority ?? null,
+  cssPriority: payload.cssPriority ?? null,
+  dueDate: payload.dueDate ?? null,
+  rating: payload.rating ?? null,
+  itemType: payload.itemType ?? null
+});
+
+// Applica una proposta approvata (create/update/ambiguous) alle attività CSS.
+// Condivisa tra la validazione dell'intero batch e l'applicazione immediata di una singola proposta.
+const applyProposalToActivities = (
+  db: Database.Database,
+  proposal: CssProposal,
+  mergedPayload: CssProposalPayload,
+  ambiguousTargetActivityId: string | undefined
+): void => {
+  const fields = buildActivityFieldsFromPayload(mergedPayload);
+  if (proposal.actionType === 'ambiguous') {
+    if (!ambiguousTargetActivityId) {
+      throw new Error(`Proposta ambigua ${proposal.proposalId} richiede targetActivityId esplicito`);
+    }
+    updateCssActivity(db, ambiguousTargetActivityId, fields);
+  } else if (proposal.actionType === 'update' && proposal.targetActivityId) {
+    updateCssActivity(db, proposal.targetActivityId, fields);
+  } else {
+    createCssActivity(db, { ...fields, sourceRef: `batch:${proposal.batchId}` });
+  }
 };
 
 export const validateCssBatch = (
@@ -2200,6 +2260,12 @@ export const validateCssBatch = (
     let applied = 0;
     let rejected = 0;
     for (const proposal of existing) {
+      // Le proposte già decise individualmente (applicazione immediata) non vengono
+      // rielaborate qui per evitare di creare/aggiornare due volte la stessa attività.
+      if (proposal.decisionStatus !== 'pending') {
+        continue;
+      }
+
       const decision = decisionsMap.get(proposal.proposalId);
       const finalDecision: 'approved' | 'rejected' =
         decision?.decision ?? (data.approveAll ? 'approved' : 'rejected');
@@ -2211,73 +2277,8 @@ export const validateCssBatch = (
       mergedPayload.details = prependDateToDetails(mergedPayload.lastUpdate, mergedPayload.details);
 
       if (finalDecision === 'approved') {
-        if (proposal.actionType === 'ambiguous') {
-          const decisionOverride = decision?.payloadOverride as Partial<CssProposalPayload> & { targetActivityId?: string } | undefined;
-          const targetId = decisionOverride?.targetActivityId;
-          if (!targetId) {
-            throw new Error(`Proposta ambigua ${proposal.proposalId} richiede targetActivityId esplicito`);
-          }
-          updateCssActivity(db, targetId, {
-            customerName: mergedPayload.customerName,
-            cssOwner: mergedPayload.cssOwner ?? null,
-            lastUpdate: mergedPayload.lastUpdate ?? null,
-            blBu: mergedPayload.blBu ?? null,
-            issue: mergedPayload.issue,
-            listStatus: mergedPayload.listStatus ?? null,
-            issueStatus: mergedPayload.issueStatus,
-            details: mergedPayload.details ?? null,
-            eosOwners: mergedPayload.eosOwners ?? null,
-            customerOwners: mergedPayload.customerOwners ?? null,
-            cssAction: mergedPayload.cssAction ?? null,
-            notes: mergedPayload.notes ?? null,
-            customerPriority: mergedPayload.customerPriority ?? null,
-            cssPriority: mergedPayload.cssPriority ?? null,
-            dueDate: mergedPayload.dueDate ?? null,
-            rating: mergedPayload.rating ?? null,
-            itemType: mergedPayload.itemType ?? null
-          });
-        } else if (proposal.actionType === 'update' && proposal.targetActivityId) {
-          updateCssActivity(db, proposal.targetActivityId, {
-            customerName: mergedPayload.customerName,
-            cssOwner: mergedPayload.cssOwner ?? null,
-            lastUpdate: mergedPayload.lastUpdate ?? null,
-            blBu: mergedPayload.blBu ?? null,
-            issue: mergedPayload.issue,
-            listStatus: mergedPayload.listStatus ?? null,
-            issueStatus: mergedPayload.issueStatus,
-            details: mergedPayload.details ?? null,
-            eosOwners: mergedPayload.eosOwners ?? null,
-            customerOwners: mergedPayload.customerOwners ?? null,
-            cssAction: mergedPayload.cssAction ?? null,
-            notes: mergedPayload.notes ?? null,
-            customerPriority: mergedPayload.customerPriority ?? null,
-            cssPriority: mergedPayload.cssPriority ?? null,
-            dueDate: mergedPayload.dueDate ?? null,
-            rating: mergedPayload.rating ?? null,
-            itemType: mergedPayload.itemType ?? null
-          });
-        } else {
-          createCssActivity(db, {
-            customerName: mergedPayload.customerName,
-            cssOwner: mergedPayload.cssOwner ?? null,
-            lastUpdate: mergedPayload.lastUpdate ?? null,
-            blBu: mergedPayload.blBu ?? null,
-            issue: mergedPayload.issue,
-            listStatus: mergedPayload.listStatus ?? null,
-            issueStatus: mergedPayload.issueStatus,
-            details: mergedPayload.details ?? null,
-            eosOwners: mergedPayload.eosOwners ?? null,
-            customerOwners: mergedPayload.customerOwners ?? null,
-            cssAction: mergedPayload.cssAction ?? null,
-            notes: mergedPayload.notes ?? null,
-            customerPriority: mergedPayload.customerPriority ?? null,
-            cssPriority: mergedPayload.cssPriority ?? null,
-            dueDate: mergedPayload.dueDate ?? null,
-            rating: mergedPayload.rating ?? null,
-            itemType: mergedPayload.itemType ?? null,
-            sourceRef: `batch:${batchId}`
-          });
-        }
+        const decisionOverride = decision?.payloadOverride as Partial<CssProposalPayload> & { targetActivityId?: string } | undefined;
+        applyProposalToActivities(db, proposal, mergedPayload, decisionOverride?.targetActivityId);
         applied += 1;
       } else {
         rejected += 1;
@@ -2311,4 +2312,90 @@ export const validateCssBatch = (
     rejected: result.rejected,
     proposals: getCssProposalsByBatch(db, batchId)
   };
+};
+
+// Applica immediatamente una singola proposta (senza attendere la validazione dell'intero batch).
+// Se, dopo l'applicazione, non restano più proposte "pending" nel batch, quest'ultimo viene
+// automaticamente marcato come validato.
+export const applyCssProposal = (
+  db: Database.Database,
+  proposalId: string,
+  data: {
+    reviewer?: string | null;
+    note?: string | null;
+    payloadOverride?: Partial<CssProposalPayload> & { targetActivityId?: string };
+  }
+): { proposal: CssProposal; batchValidated: boolean } => {
+  const row = db.prepare(`
+    SELECT p.proposal_id, p.batch_id, p.action_type, p.target_activity_id, p.payload_json, p.confidence,
+           p.match_reason, p.match_score, p.match_candidates, p.decision_status, p.decision_note,
+           d.filename AS source_filename, p.created_at, p.updated_at
+    FROM css_activity_proposals p
+    LEFT JOIN css_validation_batches vb ON vb.batch_id = p.batch_id
+    LEFT JOIN css_meeting_documents d ON d.document_id = vb.document_id
+    WHERE p.proposal_id = ?
+  `).get(proposalId) as ProposalRow | undefined;
+  if (!row) {
+    throw new Error('Proposta non trovata');
+  }
+  const proposal = toProposal(row);
+  if (proposal.decisionStatus !== 'pending') {
+    throw new Error('Proposta già decisa in precedenza');
+  }
+
+  const batch = db
+    .prepare(`SELECT batch_id, status FROM css_validation_batches WHERE batch_id = ?`)
+    .get(proposal.batchId) as { batch_id: string; status: string } | undefined;
+  if (!batch) {
+    throw new Error('Batch non trovato');
+  }
+  if (batch.status === 'validated') {
+    throw new Error('Batch già validato');
+  }
+
+  const mergedPayload: CssProposalPayload = {
+    ...proposal.payload,
+    ...(data.payloadOverride ?? {})
+  };
+  mergedPayload.lastUpdate = normalizeDate(mergedPayload.lastUpdate) ?? new Date().toISOString().slice(0, 10);
+  mergedPayload.details = prependDateToDetails(mergedPayload.lastUpdate, mergedPayload.details);
+
+  const transaction = db.transaction(() => {
+    applyProposalToActivities(db, proposal, mergedPayload, data.payloadOverride?.targetActivityId);
+
+    db.prepare(`
+      UPDATE css_activity_proposals
+      SET decision_status = 'approved', decision_note = ?, payload_json = ?, updated_at = ?
+      WHERE proposal_id = ?
+    `).run(data.note?.trim() || null, JSON.stringify(mergedPayload), new Date().toISOString(), proposalId);
+
+    const remainingPending = db.prepare(`
+      SELECT COUNT(*) AS count FROM css_activity_proposals WHERE batch_id = ? AND decision_status = 'pending'
+    `).get(proposal.batchId) as { count: number };
+
+    let batchValidated = false;
+    if (remainingPending.count === 0) {
+      db.prepare(`
+        UPDATE css_validation_batches
+        SET status = 'validated', validated_at = ?, validated_by = ?
+        WHERE batch_id = ?
+      `).run(new Date().toISOString(), data.reviewer?.trim() || null, proposal.batchId);
+      batchValidated = true;
+    }
+
+    return batchValidated;
+  });
+
+  const batchValidated = transaction();
+  const updatedRow = db.prepare(`
+    SELECT p.proposal_id, p.batch_id, p.action_type, p.target_activity_id, p.payload_json, p.confidence,
+           p.match_reason, p.match_score, p.match_candidates, p.decision_status, p.decision_note,
+           d.filename AS source_filename, p.created_at, p.updated_at
+    FROM css_activity_proposals p
+    LEFT JOIN css_validation_batches vb ON vb.batch_id = p.batch_id
+    LEFT JOIN css_meeting_documents d ON d.document_id = vb.document_id
+    WHERE p.proposal_id = ?
+  `).get(proposalId) as ProposalRow;
+
+  return { proposal: toProposal(updatedRow), batchValidated };
 };

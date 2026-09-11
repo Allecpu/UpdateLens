@@ -20,12 +20,36 @@ export type ColumnKey =
   | 'rating'
   | 'itemType';
 
+export const DEFAULT_COLUMN_ORDER: ColumnKey[] = [
+  'customer',
+  'lastUpdate',
+  'blBu',
+  'issue',
+  'issueStatus',
+  'listStatus',
+  'details',
+  'cssOwner',
+  'eosOwners',
+  'customerOwners',
+  'cssAction',
+  'notes',
+  'customerPriority',
+  'cssPriority',
+  'dueDate',
+  'rating',
+  'itemType',
+];
+
 export interface CssView {
   id: string;
   name: string;
   description?: string;
   isDefault?: boolean;
   visibleColumns: Record<ColumnKey, boolean>;
+  /** Ordine di visualizzazione delle colonne per questa vista. Le colonne mancanti
+   *  dall'elenco vengono aggiunte in coda nell'ordine di default (compatibilita'
+   *  con viste salvate prima dell'introduzione di questo campo). */
+  columnOrder?: ColumnKey[];
   filters: {
     customer?: string | string[];
     owner?: string | string[];
@@ -84,6 +108,7 @@ const DEFAULT_VIEWS: CssView[] = [
       rating: true,
       itemType: false,
     },
+    columnOrder: DEFAULT_COLUMN_ORDER,
     filters: {
       status: 'Action required',
     },
@@ -115,6 +140,7 @@ const DEFAULT_VIEWS: CssView[] = [
       rating: true,
       itemType: false,
     },
+    columnOrder: DEFAULT_COLUMN_ORDER,
     filters: {
       status: 'In progress',
     },
@@ -146,6 +172,7 @@ const DEFAULT_VIEWS: CssView[] = [
       rating: true,
       itemType: true,
     },
+    columnOrder: DEFAULT_COLUMN_ORDER,
     filters: {},
     sortBy: 'lastUpdate',
     sortDirection: 'desc',

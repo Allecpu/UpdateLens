@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { useViewsStore, type ColumnKey } from '../store/viewsStore';
+import { DEFAULT_COLUMN_ORDER, useViewsStore, type ColumnKey } from '../store/viewsStore';
 
 interface ViewsPanelProps {
   compact?: boolean;
@@ -39,6 +39,7 @@ export function ViewsPanel({ compact = false }: ViewsPanelProps) {
     createView({
       name: nextName,
       visibleColumns: (activeView?.visibleColumns || {}) as Record<ColumnKey, boolean>,
+      columnOrder: activeView?.columnOrder || DEFAULT_COLUMN_ORDER,
       filters: activeView?.filters || {},
       sortBy: activeView?.sortBy,
       sortDirection: activeView?.sortDirection,
@@ -232,8 +233,8 @@ export function ViewsPanel({ compact = false }: ViewsPanelProps) {
             </button>
           ))}
 
-          {/* Custom Views */}
-          {(showAll || customViews.length <= 3) && customViews.map((view) => (
+          {/* Custom Views: le prime 3 sono sempre visibili, le restanti sono dietro il toggle */}
+          {(showAll ? customViews : customViews.slice(0, 3)).map((view) => (
             <div key={view.id} className="inline-flex items-center gap-1 rounded-full bg-purple-100 pr-1">
               <button
                 onClick={() => switchView(view.id)}
@@ -262,13 +263,13 @@ export function ViewsPanel({ compact = false }: ViewsPanelProps) {
             </div>
           ))}
 
-          {customViews.length > 3 && !showAll && (
+          {customViews.length > 3 && (
             <button
-              onClick={() => setShowAll(true)}
+              onClick={() => setShowAll((prev) => !prev)}
               className="rounded-full bg-gray-100 px-2 py-1 text-sm font-medium text-gray-600 hover:bg-gray-200"
-              title={`${customViews.length - 3} viste nascoste`}
+              title={showAll ? 'Nascondi le viste aggiuntive' : `${customViews.length - 3} viste nascoste`}
             >
-              +{customViews.length - 3}
+              {showAll ? 'Mostra meno' : `+${customViews.length - 3}`}
             </button>
           )}
 
@@ -322,17 +323,18 @@ export function ViewsPanel({ compact = false }: ViewsPanelProps) {
           {/* Divider */}
           {customViews.length > 0 && <div className="h-6 w-px bg-gray-300" />}
 
-          {/* Custom Views */}
-          {(showAll || customViews.length <= 3) && customViews.map((view) => (
+          {/* Custom Views: le prime 3 sono sempre visibili, le restanti sono dietro il toggle */}
+          {(showAll ? customViews : customViews.slice(0, 3)).map((view) => (
             <ViewButton key={view.id} view={view} />
           ))}
 
-          {customViews.length > 3 && !showAll && (
+          {customViews.length > 3 && (
             <button
-              onClick={() => setShowAll(true)}
+              onClick={() => setShowAll((prev) => !prev)}
               className="rounded-full px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900"
+              title={showAll ? 'Nascondi le viste aggiuntive' : `${customViews.length - 3} viste nascoste`}
             >
-              +{customViews.length - 3}
+              {showAll ? 'Mostra meno' : `+${customViews.length - 3}`}
             </button>
           )}
 

@@ -191,6 +191,28 @@ export function ModernListsLayout({
             >
               Nuova attivita
             </button>
+            {customerFilter.length > 0 && (
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-100 px-3 py-1 text-sm font-medium text-sky-800"
+                onClick={() => onCustomerFilterChange([])}
+                title="Rimuovi filtro cliente"
+              >
+                Clienti: {customerFilter.length}
+                <span aria-hidden="true" className="text-sky-700">x</span>
+              </button>
+            )}
+            {ownerFilter.length > 0 && (
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-100 px-3 py-1 text-sm font-medium text-violet-800"
+                onClick={() => onOwnerFilterChange([])}
+                title="Rimuovi filtro owner"
+              >
+                Owner: {ownerFilter.length}
+                <span aria-hidden="true" className="text-violet-700">x</span>
+              </button>
+            )}
             {statusFilter.length > 0 && (
               <button
                 type="button"
@@ -200,6 +222,39 @@ export function ModernListsLayout({
               >
                 Status: {statusFilter.length}
                 <span aria-hidden="true" className="text-amber-700">x</span>
+              </button>
+            )}
+            {ratingFilter && (
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-100 px-3 py-1 text-sm font-medium text-orange-800"
+                onClick={() => onRatingFilterChange('')}
+                title="Rimuovi filtro rating"
+              >
+                Rating: {ratingFilter}
+                <span aria-hidden="true" className="text-orange-700">x</span>
+              </button>
+            )}
+            {query && (
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-100 px-3 py-1 text-sm font-medium text-emerald-800"
+                onClick={() => onQueryChange('')}
+                title="Rimuovi ricerca testuale"
+              >
+                Ricerca: "{query.length > 18 ? `${query.slice(0, 18)}…` : query}"
+                <span aria-hidden="true" className="text-emerald-700">x</span>
+              </button>
+            )}
+            {advancedFilters.rules && advancedFilters.rules.length > 0 && (
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-rose-100 px-3 py-1 text-sm font-medium text-rose-800"
+                onClick={() => onAdvancedFiltersChange({ logic: advancedFilters.logic, rules: [] })}
+                title="Rimuovi filtri avanzati"
+              >
+                Filtri avanzati: {advancedFilters.rules.length}
+                <span aria-hidden="true" className="text-rose-700">x</span>
               </button>
             )}
           </div>

@@ -981,6 +981,24 @@ export const createApi = () => {
     }
   });
 
+  app.post('/api/css/proposals/single/:proposalId/apply', (req, res) => {
+    try {
+      const result = css.applyCssProposal(db, req.params.proposalId, {
+        reviewer: req.user?.email ?? null,
+        note: typeof req.body?.note === 'string' ? req.body.note : null,
+        payloadOverride:
+          req.body?.payloadOverride && typeof req.body.payloadOverride === 'object'
+            ? req.body.payloadOverride
+            : undefined
+      });
+      res.json(result);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Errore durante l\'applicazione immediata della proposta';
+      const status = message.includes('non trovat') ? 404 : 400;
+      res.status(status).json({ error: message });
+    }
+  });
+
   // ============================================
   // Auth & Preset API Endpoints
   // ============================================
