@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { CssActivity, CssCustomer, CssDocument, CssDocumentBatchSummary, CssProposal, CssProposalPayload } from '../../models/Css';
+import type {
+  CssActivity,
+  CssCustomer,
+  CssDocument,
+  CssDocumentBatchSummary,
+  CssDocumentSortField,
+  CssProposal,
+  CssProposalPayload,
+  CssSortOrder
+} from '../../models/Css';
 import { cssService } from '../../services/CssService';
 import { loadCustomerIndex } from '../../services/CustomerStorage';
 import { useCssControlsStore } from '../store/cssControlsStore';
@@ -648,8 +657,17 @@ const CssPage = () => {
   const [extractingId, setExtractingId] = useState<string | null>(null);
   const [deletingDocumentId, setDeletingDocumentId] = useState<string | null>(null);
   const [documents, setDocuments] = useState<CssDocument[]>([]);
+  const [documentTotal, setDocumentTotal] = useState(0);
+  const [documentPage, setDocumentPage] = useState(1);
+  const [documentPageSize, setDocumentPageSize] = useState(25);
+  const [documentSearchInput, setDocumentSearchInput] = useState('');
   const [documentSearchQuery, setDocumentSearchQuery] = useState('');
   const [documentStatusFilter, setDocumentStatusFilter] = useState<'all' | CssDocument['extractionStatus']>('all');
+  const [documentFileTypeFilter, setDocumentFileTypeFilter] = useState<'all' | CssDocument['fileType']>('all');
+  const [documentSortBy, setDocumentSortBy] = useState<CssDocumentSortField>('uploadedAt');
+  const [documentSortOrder, setDocumentSortOrder] = useState<CssSortOrder>('desc');
+  const [loadingDocuments, setLoadingDocuments] = useState(false);
+  const [documentsError, setDocumentsError] = useState<string | null>(null);
   const [expandedDocumentHistory, setExpandedDocumentHistory] = useState<Record<string, boolean>>({});
   const [documentBatchesById, setDocumentBatchesById] = useState<Record<string, CssDocumentBatchSummary[]>>({});
   const [expandedBatchDetails, setExpandedBatchDetails] = useState<Record<string, boolean>>({});
@@ -705,8 +723,25 @@ const CssPage = () => {
   };
 
   const refreshDocuments = async () => {
-    const result = await cssService.listDocuments();
-    setDocuments(result.items);
+    setLoadingDocuments(true);
+    setDocumentsError(null);
+    try {
+      const result = await cssService.listDocuments({
+        search: documentSearchQuery || undefined,
+        status: documentStatusFilter !== 'all' ? documentStatusFilter : undefined,
+        fileType: documentFileTypeFilter !== 'all' ? documentFileTypeFilter : undefined,
+        sortBy: documentSortBy,
+        sortOrder: documentSortOrder,
+        page: documentPage,
+        pageSize: documentPageSize
+      });
+      setDocuments(result.items);
+      setDocumentTotal(result.total);
+    } catch (err) {
+      setDocumentsError(err instanceof Error ? err.message : 'Errore caricamento documenti');
+    } finally {
+      setLoadingDocuments(false);
+    }
   };
 
   const refreshCssCustomers = async () => {
@@ -725,7 +760,7 @@ const CssPage = () => {
       setIsLoading(true);
       setError(null);
       try {
-        await Promise.all([refreshMeta(), refreshActivities(), refreshDocuments(), refreshCssCustomers()]);
+        await Promise.all([refreshMeta(), refreshActivities(), refreshCssCustomers()]);
       } catch (err) {
         if (!active) return;
         setError(err instanceof Error ? err.message : 'Errore caricamento sezione CSS');
@@ -740,6 +775,21 @@ const CssPage = () => {
       active = false;
     };
   }, []);
+
+  // Debounce del testo di ricerca documenti prima di interrogare il server;
+  // il reset di pagina e' incluso nello stesso batch per evitare un doppio fetch.
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      setDocumentSearchQuery(documentSearchInput.trim());
+      setDocumentPage(1);
+    }, 350);
+    return () => window.clearTimeout(handle);
+  }, [documentSearchInput]);
+
+  useEffect(() => {
+    void refreshDocuments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [documentSearchQuery, documentStatusFilter, documentFileTypeFilter, documentSortBy, documentSortOrder, documentPage, documentPageSize]);
 
   // Apply Microsoft Lists Controls (hidden columns & auto-filters).
   // Le viste (vedi effetto sotto) definiscono esplicitamente la visibilita' di
@@ -1712,18 +1762,8 @@ const CssPage = () => {
     }, new Map<string, number>());
   }, [sortedActivities, groupBy]);
 
-  const filteredDocuments = useMemo(() => {
-    const queryToken = documentSearchQuery.trim().toLowerCase();
-    return documents.filter((document) => {
-      if (documentStatusFilter !== 'all' && document.extractionStatus !== documentStatusFilter) {
-        return false;
-      }
-      if (queryToken && !document.filename.toLowerCase().includes(queryToken)) {
-        return false;
-      }
-      return true;
-    });
-  }, [documents, documentSearchQuery, documentStatusFilter]);
+  const documentTotalPages = Math.max(1, Math.ceil(documentTotal / documentPageSize));
+  const documentFiltersActive = documentSearchInput.trim().length > 0 || documentStatusFilter !== 'all' || documentFileTypeFilter !== 'all';
 
   const applyChoicePrefs = (base: string[], prefs: BlBuPrefs): string[] => {
     const hidden = new Set(uniqueCanonical(prefs.hidden).map((item) => normalizeToken(item)));
@@ -3834,49 +3874,108 @@ const CssPage = () => {
           </label>
         </div>
 
-        {documents.length > 0 && (
+        {(documents.length > 0 || documentFiltersActive) && (
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <input
               type="text"
               className="ul-input h-9 w-full max-w-xs text-sm"
               placeholder="Cerca per nome file..."
-              value={documentSearchQuery}
-              onChange={(event) => setDocumentSearchQuery(event.target.value)}
+              value={documentSearchInput}
+              onChange={(event) => setDocumentSearchInput(event.target.value)}
             />
             <select
               className="ul-input h-9 text-sm"
               value={documentStatusFilter}
-              onChange={(event) => setDocumentStatusFilter(event.target.value as typeof documentStatusFilter)}
+              onChange={(event) => {
+                setDocumentStatusFilter(event.target.value as typeof documentStatusFilter);
+                setDocumentPage(1);
+              }}
             >
               <option value="all">Tutti gli stati</option>
               <option value="pending">In attesa</option>
               <option value="processed">Elaborato</option>
               <option value="failed">Errore</option>
             </select>
-            {(documentSearchQuery || documentStatusFilter !== 'all') && (
+            <select
+              className="ul-input h-9 text-sm"
+              value={documentFileTypeFilter}
+              onChange={(event) => {
+                setDocumentFileTypeFilter(event.target.value as typeof documentFileTypeFilter);
+                setDocumentPage(1);
+              }}
+            >
+              <option value="all">Tutti i formati</option>
+              <option value="docx">DOCX</option>
+              <option value="doc">DOC</option>
+              <option value="pdf">PDF</option>
+            </select>
+            <select
+              className="ul-input h-9 text-sm"
+              value={documentSortBy}
+              onChange={(event) => {
+                setDocumentSortBy(event.target.value as CssDocumentSortField);
+                setDocumentPage(1);
+              }}
+            >
+              <option value="uploadedAt">Ordina per data caricamento</option>
+              <option value="lastAnalyzedAt">Ordina per ultima analisi</option>
+              <option value="filename">Ordina per nome file</option>
+            </select>
+            <button
+              type="button"
+              className="ul-button ul-button-ghost h-9 px-3 text-xs"
+              onClick={() => {
+                setDocumentSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+                setDocumentPage(1);
+              }}
+              title="Inverti ordine"
+            >
+              {documentSortOrder === 'asc' ? 'Crescente ↑' : 'Decrescente ↓'}
+            </button>
+            <select
+              className="ul-input h-9 text-sm"
+              value={documentPageSize}
+              onChange={(event) => {
+                setDocumentPageSize(Number(event.target.value));
+                setDocumentPage(1);
+              }}
+              title="Documenti per pagina"
+            >
+              <option value={25}>25 per pagina</option>
+              <option value={50}>50 per pagina</option>
+              <option value={100}>100 per pagina</option>
+            </select>
+            {documentFiltersActive && (
               <button
                 type="button"
                 className="ul-button ul-button-ghost h-9 px-3 text-xs"
                 onClick={() => {
+                  setDocumentSearchInput('');
                   setDocumentSearchQuery('');
                   setDocumentStatusFilter('all');
+                  setDocumentFileTypeFilter('all');
+                  setDocumentPage(1);
                 }}
               >
                 Azzera filtri
               </button>
             )}
             <span className="text-xs text-muted-foreground">
-              {filteredDocuments.length} di {documents.length} documenti
+              {loadingDocuments ? 'Caricamento...' : `${documentTotal} documento${documentTotal === 1 ? '' : 'i'} totali`}
             </span>
           </div>
         )}
 
+        {documentsError && <p className="mt-2 text-sm text-destructive">{documentsError}</p>}
+
         <div className="mt-4 space-y-2">
-          {documents.length === 0 && <p className="text-sm text-muted-foreground">Nessun documento caricato.</p>}
-          {documents.length > 0 && filteredDocuments.length === 0 && (
+          {!loadingDocuments && documents.length === 0 && documentTotal === 0 && !documentFiltersActive && (
+            <p className="text-sm text-muted-foreground">Nessun documento caricato.</p>
+          )}
+          {!loadingDocuments && documents.length === 0 && (documentTotal === 0) && documentFiltersActive && (
             <p className="text-sm text-muted-foreground">Nessun documento corrisponde ai filtri applicati.</p>
           )}
-          {filteredDocuments.map((document) => (
+          {documents.map((document) => (
             <div key={document.documentId} className="rounded-xl border border-border p-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
@@ -4016,6 +4115,32 @@ const CssPage = () => {
             </div>
           ))}
         </div>
+
+        {documentTotal > 0 && (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+            <span>
+              Pagina {documentPage} di {documentTotalPages}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="ul-button ul-button-ghost h-8 px-3 text-xs"
+                onClick={() => setDocumentPage((prev) => Math.max(1, prev - 1))}
+                disabled={documentPage <= 1 || loadingDocuments}
+              >
+                Precedente
+              </button>
+              <button
+                type="button"
+                className="ul-button ul-button-ghost h-8 px-3 text-xs"
+                onClick={() => setDocumentPage((prev) => Math.min(documentTotalPages, prev + 1))}
+                disabled={documentPage >= documentTotalPages || loadingDocuments}
+              >
+                Successiva
+              </button>
+            </div>
+          </div>
+        )}
       </section>
 
       {notesEditor && (
@@ -4358,8 +4483,9 @@ const CssPage = () => {
                       </div>
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-2">
-                      <label className="inline-flex items-center gap-2 text-sm">
+                      <label className="ul-apply-toggle">
                         <input
+                          className="ul-checkbox"
                           type="checkbox"
                           checked={approved[proposal.proposalId] ?? false}
                           onChange={(event) =>
@@ -4370,7 +4496,7 @@ const CssPage = () => {
                       </label>
                       <button
                         type="button"
-                        className="ul-button ul-button-primary h-8 px-3 text-xs whitespace-nowrap"
+                        className="ul-button ul-button-primary ul-button-apply-now h-8 px-3 text-xs whitespace-nowrap"
                         onClick={() => void onApplySingleProposal(proposal)}
                         disabled={applyingProposalId === proposal.proposalId || validating}
                         title="Applica subito questa singola proposta, senza attendere la validazione dell'intero batch"

@@ -892,12 +892,45 @@ export const createApi = () => {
     }
   });
 
-  app.get('/api/css/documents', (_req, res) => {
+  app.get('/api/css/documents', (req, res) => {
     try {
-      res.json({ items: css.listCssDocuments(db) });
+      const { search, status, fileType, sortBy, sortOrder, page, pageSize } = req.query;
+
+      if (status !== undefined && !css.CSS_DOCUMENT_STATUSES.includes(status as (typeof css.CSS_DOCUMENT_STATUSES)[number])) {
+        return res.status(400).json({ error: 'Parametro status non valido' });
+      }
+      if (fileType !== undefined && !css.CSS_DOCUMENT_FILE_TYPES.includes(fileType as (typeof css.CSS_DOCUMENT_FILE_TYPES)[number])) {
+        return res.status(400).json({ error: 'Parametro fileType non valido' });
+      }
+      if (sortBy !== undefined && !css.CSS_DOCUMENT_SORT_FIELDS.includes(sortBy as css.CssDocumentSortField)) {
+        return res.status(400).json({ error: 'Parametro sortBy non valido' });
+      }
+      if (sortOrder !== undefined && !css.CSS_DOCUMENT_SORT_ORDERS.includes(sortOrder as css.CssDocumentSortOrder)) {
+        return res.status(400).json({ error: 'Parametro sortOrder non valido' });
+      }
+
+      const parsedPage = page !== undefined ? Number(page) : undefined;
+      if (parsedPage !== undefined && (!Number.isFinite(parsedPage) || parsedPage < 1)) {
+        return res.status(400).json({ error: 'Parametro page non valido' });
+      }
+      const parsedPageSize = pageSize !== undefined ? Number(pageSize) : undefined;
+      if (parsedPageSize !== undefined && (!Number.isFinite(parsedPageSize) || parsedPageSize < 1)) {
+        return res.status(400).json({ error: 'Parametro pageSize non valido' });
+      }
+
+      const result = css.listCssDocuments(db, {
+        search: typeof search === 'string' ? search : undefined,
+        status: status as css.CssDocument['extractionStatus'] | undefined,
+        fileType: fileType as css.CssDocument['fileType'] | undefined,
+        sortBy: sortBy as css.CssDocumentSortField | undefined,
+        sortOrder: sortOrder as css.CssDocumentSortOrder | undefined,
+        page: parsedPage,
+        pageSize: parsedPageSize
+      });
+      res.json(result);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Errore durante il recupero documenti CSS';
-      res.status(500).json({ error: message });
+      res.status(400).json({ error: message });
     }
   });
 

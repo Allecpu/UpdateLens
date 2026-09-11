@@ -69,6 +69,34 @@ export type CssDocumentBatchSummary = {
   validatedBy: string | null;
 };
 
+export type CssDocumentSortField = 'uploadedAt' | 'filename' | 'lastAnalyzedAt';
+export type CssDocumentSortOrder = 'asc' | 'desc';
+
+export const CSS_DOCUMENT_STATUSES = ['pending', 'processed', 'failed'] as const;
+export const CSS_DOCUMENT_FILE_TYPES = ['docx', 'doc', 'pdf'] as const;
+export const CSS_DOCUMENT_SORT_FIELDS: CssDocumentSortField[] = ['uploadedAt', 'filename', 'lastAnalyzedAt'];
+export const CSS_DOCUMENT_SORT_ORDERS: CssDocumentSortOrder[] = ['asc', 'desc'];
+
+export type ListCssDocumentsOptions = {
+  search?: string;
+  status?: CssDocument['extractionStatus'];
+  fileType?: CssDocument['fileType'];
+  sortBy?: CssDocumentSortField;
+  sortOrder?: CssDocumentSortOrder;
+  page?: number;
+  pageSize?: number;
+};
+
+export type ListCssDocumentsResult = {
+  items: CssDocument[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
+const DOCUMENT_PAGE_SIZE_DEFAULT = 20;
+const DOCUMENT_PAGE_SIZE_MAX = 100;
+
 type CssProposalPayload = {
   customerName: string;
   cssOwner?: string | null;
@@ -1834,7 +1862,65 @@ const getCssDocumentSummaryById = (db: Database.Database, documentId: string): C
   return row ? mapDocumentSummary(row) : null;
 };
 
-export const listCssDocuments = (db: Database.Database): CssDocument[] => {
+const DOCUMENT_SORT_COLUMNS: Record<CssDocumentSortField, string> = {
+  uploadedAt: 'ld.uploaded_at',
+  filename: 'ld.filename COLLATE NOCASE',
+  lastAnalyzedAt: 'last_analyzed_at'
+};
+
+const escapeLikeValue = (value: string): string => value.replace(/[\\%_]/g, (match) => `\\${match}`);
+
+export const listCssDocuments = (
+  db: Database.Database,
+  options: ListCssDocumentsOptions = {}
+): ListCssDocumentsResult => {
+  const conditions: string[] = [];
+  const params: Array<string> = [];
+
+  const search = options.search?.trim();
+  if (search) {
+    conditions.push('ld.filename LIKE ? ESCAPE \'\\\' COLLATE NOCASE');
+    params.push(`%${escapeLikeValue(search)}%`);
+  }
+
+  if (options.status) {
+    if (!CSS_DOCUMENT_STATUSES.includes(options.status)) {
+      throw new Error('Filtro stato non valido');
+    }
+    conditions.push('ld.extraction_status = ?');
+    params.push(options.status);
+  }
+
+  if (options.fileType) {
+    if (!CSS_DOCUMENT_FILE_TYPES.includes(options.fileType)) {
+      throw new Error('Filtro tipo file non valido');
+    }
+    conditions.push('ld.file_type = ?');
+    params.push(options.fileType);
+  }
+
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  const sortBy = options.sortBy && CSS_DOCUMENT_SORT_FIELDS.includes(options.sortBy) ? options.sortBy : 'uploadedAt';
+  const sortOrder = options.sortOrder && CSS_DOCUMENT_SORT_ORDERS.includes(options.sortOrder) ? options.sortOrder : 'desc';
+  const orderColumn = DOCUMENT_SORT_COLUMNS[sortBy];
+  const orderDirection = sortOrder === 'asc' ? 'ASC' : 'DESC';
+
+  const pageSize = Math.min(
+    DOCUMENT_PAGE_SIZE_MAX,
+    Math.max(1, Math.trunc(options.pageSize ?? DOCUMENT_PAGE_SIZE_DEFAULT) || DOCUMENT_PAGE_SIZE_DEFAULT)
+  );
+  const page = Math.max(1, Math.trunc(options.page ?? 1) || 1);
+  const offset = (page - 1) * pageSize;
+
+  const totalRow = db.prepare(`
+    ${DOCS_SUMMARY_CTE}
+    SELECT COUNT(*) AS count
+    FROM latest_docs ld
+    ${whereClause}
+  `).get(...params) as { count: number };
+  const total = Number(totalRow?.count) || 0;
+
   const rows = db.prepare(`
     ${DOCS_SUMMARY_CTE}
     SELECT
@@ -1893,10 +1979,17 @@ export const listCssDocuments = (db: Database.Database): CssDocument[] => {
         LIMIT 1
       ) AS last_extraction_notes
     FROM latest_docs ld
-    ORDER BY ld.uploaded_at DESC
-    LIMIT 50
-  `).all() as DocumentSummaryRow[];
-  return rows.map(mapDocumentSummary);
+    ${whereClause}
+    ORDER BY ${orderColumn} ${orderDirection}, ld.document_id ${orderDirection}
+    LIMIT ? OFFSET ?
+  `).all(...params, pageSize, offset) as DocumentSummaryRow[];
+
+  return {
+    items: rows.map(mapDocumentSummary),
+    total,
+    page,
+    pageSize
+  };
 };
 
 export const listCssDocumentBatches = (db: Database.Database, documentId: string): CssDocumentBatchSummary[] => {

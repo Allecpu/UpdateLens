@@ -3,6 +3,8 @@ import type {
   CssCustomer,
   CssDocument,
   CssDocumentBatchSummary,
+  CssDocumentListParams,
+  CssDocumentListResponse,
   CssMeta,
   CssProposal,
   CssProposalPayload
@@ -160,8 +162,17 @@ export const cssService = {
     });
   },
 
-  async listDocuments(): Promise<{ items: CssDocument[] }> {
-    return request<{ items: CssDocument[] }>('/api/css/documents');
+  async listDocuments(params: CssDocumentListParams = {}): Promise<CssDocumentListResponse> {
+    const search = new URLSearchParams();
+    if (params.search) search.set('search', params.search);
+    if (params.status) search.set('status', params.status);
+    if (params.fileType) search.set('fileType', params.fileType);
+    if (params.sortBy) search.set('sortBy', params.sortBy);
+    if (params.sortOrder) search.set('sortOrder', params.sortOrder);
+    if (params.page) search.set('page', String(params.page));
+    if (params.pageSize) search.set('pageSize', String(params.pageSize));
+    const qs = search.toString();
+    return request<CssDocumentListResponse>(`/api/css/documents${qs ? `?${qs}` : ''}`);
   },
 
   async uploadDocument(file: File): Promise<CssDocument> {

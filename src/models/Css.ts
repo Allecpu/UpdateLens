@@ -57,6 +57,26 @@ export type CssDocument = {
   reusedExisting?: boolean;
 };
 
+export type CssDocumentSortField = 'uploadedAt' | 'filename' | 'lastAnalyzedAt';
+export type CssSortOrder = 'asc' | 'desc';
+
+export type CssDocumentListParams = {
+  search?: string;
+  status?: CssDocument['extractionStatus'];
+  fileType?: CssDocument['fileType'];
+  sortBy?: CssDocumentSortField;
+  sortOrder?: CssSortOrder;
+  page?: number;
+  pageSize?: number;
+};
+
+export type CssDocumentListResponse = {
+  items: CssDocument[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
 export type CssDocumentBatchSummary = {
   batchId: string;
   documentId: string;
